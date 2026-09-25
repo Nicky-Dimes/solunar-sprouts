@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Solunar Sprouts</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Pixelify+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="app.css">
+<meta name="theme-color" content="#fff8e6">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Solunar">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>#hud{padding-top:calc(8px + env(safe-area-inset-top, 0px))}</style>
+</head>
+<body>
+<div id="app">
+  <header id="hud">
+    <button class="player-chip" id="playerChip" aria-label="Main menu: switch player"><canvas class="px" id="playerAvatar" width="32" height="32"></canvas><span id="playerName" class="px-title">Player</span></button>
+    <div class="hud-pills">
+      <div class="pill-stat" id="clockPill" title="Day and night switch every 15 minutes">
+        <canvas class="px" id="clockIcon" width="9" height="9"></canvas><span id="clockText" class="num">Day</span>
+      </div>
+      <div class="pill-stat" id="coinPill"><canvas class="px" id="coinIcon" width="9" height="9"></canvas><span id="coinText" class="num">0</span></div>
+    </div>
+  </header>
+
+  <main id="stage">
+    <section class="screen" id="scr-garden" data-screen="garden"></section>
+    <section class="screen" id="scr-race" data-screen="race" hidden></section>
+    <section class="screen" id="scr-battle" data-screen="battle" hidden></section>
+    <section class="screen" id="scr-shop" data-screen="shop" hidden></section>
+    <section class="screen" id="scr-sprouts" data-screen="sprouts" hidden></section>
+  </main>
+
+  <nav id="nav" aria-label="Main">
+    <button data-go="garden" aria-current="page"><canvas class="px" width="16" height="16"></canvas><span>Garden</span><i class="badge" hidden></i></button>
+    <button data-go="race"><canvas class="px" width="16" height="16"></canvas><span>Race</span><i class="badge" hidden></i></button>
+    <button data-go="battle"><canvas class="px" width="16" height="16"></canvas><span>Battle</span><i class="badge" hidden></i></button>
+    <button data-go="shop"><canvas class="px" width="16" height="16"></canvas><span>Shop</span><i class="badge" hidden></i></button>
+    <button data-go="sprouts"><canvas class="px" width="16" height="16"></canvas><span>Sprouts</span><i class="badge" hidden></i></button>
+  </nav>
+
+  <div id="modalRoot"></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="version.js"></script>
+<script src="pixel.js"></script>
+<script src="data.js"></script>
+<script src="state.js"></script>
+<script src="app.js"></script>
+<script src="menu.js"></script>
+<script src="garden.js"></script>
+<script src="race.js"></script>
+<script src="battle.js"></script>
+<script src="shop.js"></script>
+<script src="sprouts.js"></script>
+<script>PS.ui.boot();</script>
+</body>
+</html>
