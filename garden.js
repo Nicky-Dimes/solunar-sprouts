@@ -31,7 +31,7 @@
     unihorn: 'a unicorn horn', multitail: 'extra tails', flamewings: 'flame wings', dragonwings: 'dragon wings',
     petals: 'a petal collar', mushcap: 'a mushroom cap', leafears: 'leaf ears', vines: 'vines', thorns: 'thorns' };
   // living plants: rooted ones sway in place and now and then pop up and move; the others waddle about in little scoots
-  const ROOTED = { sunbuddy: 1, cloverkin: 1, snapvine: 1, lollibloom: 1, cactling: 1 };
+  const ROOTED = { sunbuddy: 1, cloverkin: 1, snapvine: 1, lollibloom: 1, cactling: 1, peapod: 1 };
   const PLANT_GLOW = { glowcap: '160,250,255', moonlotus: '230,205,255' };
   const PLANT_COL = { sunbuddy: '#fbd84a', shroomy: '#e8404a', puffball: '#ffffff', cloverkin: '#99e550', cactling: '#f07aa0', kelpie: '#9cd06a', coconut: '#c48a5c',
     glowcap: '#9ff8f0', snapvine: '#e8506a', moonlotus: '#e4c8f8', lollibloom: '#f07aa0', marshroom: '#ffe6f0', licovine: '#e0303e', sugarlily: '#ffd8ec' };
@@ -1256,6 +1256,8 @@
         shadow(c.x, c.y, Math.max(7, s.width - 8));
         if (c.rooted && !hopY) { bx.fillStyle = '#8f6a4a'; bx.fillRect(Math.round(c.x) - 4, Math.round(c.y) - 1, 9, 1); bx.fillStyle = '#b8946a'; bx.fillRect(Math.round(c.x) - 3, Math.round(c.y) - 2, 7, 1); }
         PX.blit(bx, s, c.x + (wob ? c.facing : 0), c.y - hopY, flip, Math.floor(s.width / 2), s.height - 1);
+        // the Pea Popper puffs its cheeks and pops a pea now and then
+        if (c.id === 'peapod' && !hopY && plantFrame(c) === 1 && t > (c.peaT || 0)) { c.peaT = t + 0.9; parts.push({ x: c.x + c.facing * 8, y: c.y - 10, vx: c.facing * 46, vy: -3, life: 0.7, type: 'spark', color: '#8ee04a' }); }
       } else if (c.where === 'air') { const fl = Math.floor(t * 8 + c.ph) % 2; shadow(c.x, Math.min(Lw.maxY, c.y + 22), 5); PX.blit(bx, s, c.x, c.y - fl, flip, Math.floor(s.width / 2), s.height - 1); }
       else { const hopY = c.hopT < 1 ? Math.round(Math.sin(c.hopT * Math.PI) * (c.where === 'coast' ? 2 : 4)) : 0; shadow(c.x, c.y, Math.max(7, s.width - 8)); PX.blit(bx, s, c.x, c.y - hopY, flip, Math.floor(s.width / 2), s.height - 1); }
     }

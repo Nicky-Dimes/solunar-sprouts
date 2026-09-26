@@ -206,6 +206,9 @@
     luckyleaf: M('Lucky Leaf', 'leaf', 40, 1, { crit: 0.3 }, 'Often lands a lucky hit.'),
     clovercharm: M('Clover Charm', 'leaf', 0, 1, { heal: 0.25, cleanse: true }, 'Heals and clears status.'),
     fourleaf: M('Four Leaf', 'leaf', 20, 0.95, { hits: 4 }, 'Four leafy hits.'),
+    peashot: M('Pea Shot', 'leaf', 40, 1, { first: true }, 'Pop! A speedy pea. Goes first.'),
+    rapidpeas: M('Rapid Peas', 'leaf', 16, 0.95, { hits: 4 }, 'Pop-pop-pop-pop! Four peas.'),
+    podguard: M('Pod Guard', 'leaf', 0, 1, { buff: { stat: 'def', n: 1 }, heal: 0.2 }, 'Tucks into its pod. Heals and raises Defense.'),
     // living plants (beach)
     needlejab: M('Needle Jab', 'stone', 40, 1, { first: true }, 'A quick poke. Goes first.'),
     cactusguard: M('Cactus Guard', 'stone', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Prickles up. Sharply raises Defense.'),
@@ -321,6 +324,7 @@
     shroomy: P('Shroomy', 'meadow', 'land', 'night', { stamina: 10, power: 5 }, 'mushcap', 'stone', ['sporepuff', 'capbonk', 'shroomshield'], -2, 'A little walking mushroom.'),
     puffball: P('Dandelion Puff', 'meadow', 'air', 'day', { fly: 12, run: 4 }, 'fluff', 'sky', ['puffdrift', 'seedstorm', 'windride'], 1, 'Drifts wherever the wind goes.'),
     cloverkin: P('Lucky Clover', 'meadow', 'land', 'any', { run: 8, stamina: 6 }, 'leafears', 'leaf', ['luckyleaf', 'clovercharm', 'fourleaf'], 2, 'Four leaves, lots of luck.'),
+    peapod: P('Pea Popper', 'meadow', 'land', 'day', { power: 9, run: 6 }, 'leafears', 'leaf', ['peashot', 'rapidpeas', 'podguard'], 1, 'Puffs its cheeks and pops peas. Pop! Pop!'),
     cactling: P('Cactling', 'beach', 'coast', 'day', { power: 10, stamina: 6, swim: -3 }, 'spikes', 'stone', ['needlejab', 'cactusguard', 'prickleburst'], 0, 'Prickly outside, soft inside.'),
     kelpie: P('Kelpie', 'beach', 'water', 'any', { swim: 11, stamina: 6 }, 'vines', 'water', ['kelpwrap', 'tidetangle', 'seasway'], 1, 'A wiggly bunch of kelp.'),
     coconut: P('Coco Sprout', 'beach', 'land', 'day', { power: 9, stamina: 7 }, 'leafears', 'stone', ['coconutbonk', 'palmfan', 'hardshell'], 1, 'A coconut with a palm-leaf hairdo.'),

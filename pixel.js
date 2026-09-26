@@ -1571,6 +1571,23 @@
       pEyes(g, 10, 13, 4, f === 2); pSmile(g, 10, 7, 4); pCheeks(g, 9, 14, 7, '#ffb0c8');
     },
     sugarlily(g, f) { lily(g, f, ['#ffffff', '#ffd8ec', '#f07aa8'], ['#c8fff0', '#7ee4c4', '#3fa890'], '#5fcde4'); g.px([[3, 11], [15, 11]].filter(([x, y]) => g.filled(x, y)), '#fff27a'); },
+    // Pea Popper: a round pod head with a tube snout that puffs peas (frame 1 = cheeks puffed, pea in the snout)
+    peapod(g, f) {
+      const PG = ['#c6f48a', '#6cc84a', '#3a8a3e'], puff = f === 1, lean = puff ? -0.5 : 0;
+      stroke(g, [[8, 17], [8.4, 14], [7.8, 11.4]], 0.9, 0.8, '#4f9a3e');
+      g.ell(5, 15.6, 2.7, 1.1, LEAFG, 0.4); g.ell(11.2, 15.8, 2.7, 1.1, LEAFG, -0.4);
+      piece(g, t => t.ell(3.6 + lean, 3.4, 2.2, 1.1, LEAFG, -0.8));
+      g.ell(7.8 + lean, 7.4, 4.8, 4.5, PG);
+      g.ell(12.6 + lean, 7.4, 3, puff ? 2.3 : 1.9, PG);
+      piece(g, t => t.ell(15.4 + lean, 7.4, 1.4, puff ? 2.6 : 2.3, PG));
+      g.outline();
+      const hx = Math.round(15.4 + lean);
+      for (let y = 6; y <= 8; y++) if (g.filled(hx, y)) g.set(hx, y, '#1f4a2a');
+      if (puff && g.filled(hx, 7)) g.set(hx, 7, '#b8f07a');
+      g.px([[5, 4], [6, 4]].filter(([x, y]) => g.filled(x, y)), '#e8ffc8');
+      const ex = Math.round(7 + lean); pEyes(g, ex, ex + 3, 6, f === 2); pCheeks(g, ex - 1, ex + 3, 9, puff ? '#f07a84' : '#f4a3b8');
+      g.px([[3, 15], [12, 16]].filter(([x, y]) => g.filled(x, y)), '#d4f8a8');
+    },
   };
   const PLANT_FRAMES = 3;
   // number of animation frames a critter has (living plants have 3; animals 1)
