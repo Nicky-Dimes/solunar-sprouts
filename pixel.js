@@ -488,11 +488,29 @@
       const k = sz(pt.fluff);
       for (const deg of [-170, -138, -106, -74, -42, -10, 20, 160]) { const a = deg * Math.PI / 180; B.ell(16 + (8.4 + 1.2 * k) * Math.cos(a), 22 + (7.8 + 1.2 * k) * Math.sin(a), 2.7 * k, 2.5 * k, RAMPS.cloud); }
     }
+    // plant parts behind: a petal collar round the head, little thorns along the body edge
+    if (pt.petals > 0) {
+      const k = sz(pt.petals), PT = L.leaf === 'sun' ? ['#fff8b0', '#fbd84a', '#d0a02a'] : L.leaf === 'plum' ? ['#f4e8ff', '#c8aaf0', '#8c6cc4'] : ['#ffe4f0', '#f7a6c8', '#d0609a'];
+      for (const deg of [-168, -140, -112, -90, -68, -40, -12, 14, 166]) {
+        const a = deg * Math.PI / 180, r = 8.6 + 1.3 * k;
+        piece(B, t => t.ell(16 + Math.cos(a) * r, 21.4 + Math.sin(a) * r * 0.9, 2.5 * k, 1.8 * k, PT, a));
+      }
+    }
+    if (pt.thorns > 0) {
+      const k = sz(pt.thorns);
+      for (const deg of [-156, -126, -54, -24, 8, 172]) {
+        const a = deg * Math.PI / 180, rim = t => [16 + 8.2 * Math.cos(t), 22 + 7.6 * Math.sin(t)], tip = 9 + 3.2 * k;
+        B.poly([rim(a - 0.17), rim(a + 0.17), [16 + tip * Math.cos(a), 22 + tip * 0.93 * Math.sin(a)]], '#b8804a');
+      }
+    }
     // --- behind (main layer) ---
     if (pt.wings > 0) { const k = sz(pt.wings); const fl = P.flap ? (P.frame ? 0.35 : -0.25) : 0; g.ell(6.2, 19, 2.7 * k, 4.9 * k, RAMPS.cloud, -0.6 - fl); g.ell(25.8, 19, 2.7 * k, 4.9 * k, RAMPS.cloud, 0.6 + fl); }
     if (pt.shell > 0) { const k = pt.shell >= 0.9 ? 1.08 : pt.shell >= 0.5 ? 1 : 0.94; g.ell(16, 22.6, 10.2 * k, 8.4 * k, RAMPS.moss); }
     if (pt.tail > 0) { const k = sz(pt.tail); g.ell(24.6 + k, 26.4 - k, 3.6 * k, 2.1 * k, R, -0.7); g.ell(26.8 + 1.8 * k, 24.4 - 1.4 * k, 1.5 * k, 1.5 * k, LR[1]); }
     if (pt.ears > 0) { const k = sz(pt.ears); g.ell(10.4 - k, 13.6 - 1.2 * k, 1.9, 4.6 * k, R, -0.42); g.ell(21.6 + k, 13.6 - 1.2 * k, 1.9, 4.6 * k, R, 0.42); }
+    if (pt.vines > 0) { const k = sz(pt.vines); for (const s2 of [-1, 1]) piece(g, t => stroke(t, [[16 + s2 * 7.6, 17.6], [16 + s2 * (9 + k), 16.4], [16 + s2 * (9.4 + k), 14.4], [16 + s2 * (8.2 + k), 13.6]], 0.6, 0.5, '#3f8a3a')); }
+    const LEAFE = pt.leafears > 0 ? [9.4 - sz(pt.leafears) * 1.2, 14 - 1.6 * sz(pt.leafears), 4.4 * sz(pt.leafears)] : null;
+    if (LEAFE) { const [ex2, ey2, el] = LEAFE; g.ell(ex2, ey2, 2.3, el, LR, -0.78); g.ell(32 - ex2, ey2, 2.3, el, LR, 0.78); }
     if (pt.fins > 0) { const k = sz(pt.fins); g.ell(7 - k * 0.6, 19, 2 * k, 3.4 * k, RAMPS.sky, -0.55); g.ell(25 + k * 0.6, 19, 2 * k, 3.4 * k, RAMPS.sky, 0.55); }
     if (pt.horns > 0) { const k = sz(pt.horns); const hc = '#eec39a'; g.poly([[10.5, 16.5], [13.8, 15.2], [10 - k, 10.5 - 2 * k]], hc); g.poly([[21.5, 16.5], [18.2, 15.2], [22 + k, 10.5 - 2 * k]], hc); }
     if (pt.antennae > 0) { const k = sz(pt.antennae); g.ell(11 - 3.2 * k, 15 - 6 * k, 1.3, 1.3, RAMPS.sun); g.ell(21 + 3.2 * k, 15 - 6 * k, 1.3, 1.3, RAMPS.sun); }
@@ -555,6 +573,9 @@
       }
       g.merge(C);
     }
+    // mushroom cap on the head (hats cover it; leaves, buds and blooms poke up through it)
+    const capOn = pt.mushcap > 0 && (!L.hat || L.hat === 'none');
+    if (capOn) { const k = sz(pt.mushcap); piece(g, t => t.ell(16, 15.6, 5.6 * k + 0.8, 4.6 * k, ['#ff9aa0', '#e8404a', '#a02c3a'], 0, (x, y) => y <= 15)); }
     // sprout / bud / bloom
     if (!hatHidesLeaves && L.bloom) {
       g.rect(15, 11, 2, 4, '#37946e');
@@ -588,6 +609,17 @@
     if (pt.spikes > 0) for (const i of behind) { const x = i % 32, y = (i / 32) | 0; const c = g.get(x, y); if (c === R[2] && Math.hypot(x + 0.5 - 16, (y + 0.5 - 22) * 1.08) > 10.4 && (x + y) % 2) g.set(x, y, R[1]); }
     if (pt.ears > 0) { const k = sz(pt.ears); g.ell(10.4 - k, 13.6 - 1.2 * k, 0.7, 3.2 * k, L.cheek, -0.42, (x, y) => g.filled(x, y)); g.ell(21.6 + k, 13.6 - 1.2 * k, 0.7, 3.2 * k, L.cheek, 0.42, (x, y) => g.filled(x, y)); }
     if (pt.shell > 0) g.px([[7, 20], [7, 21], [24, 20], [24, 21], [8, 27], [23, 27]].filter(([x, y]) => g.filled(x, y) && !onBody(x, y)), '#4b692f');
+    if (LEAFE) { const [ex2, ey2, el] = LEAFE; const m = (x, y) => LR.includes(g.get(x, y)); g.ell(ex2, ey2, 0.5, el - 1, LR[2], -0.78, m); g.ell(32 - ex2, ey2, 0.5, el - 1, LR[2], 0.78, m); }
+    if (capOn) { const CAPC = ['#ff9aa0', '#e8404a', '#a02c3a']; g.px([[12, 13], [13, 13], [16, 11], [17, 11], [16, 12], [20, 13], [19, 14], [11, 14]].filter(([x, y]) => CAPC.includes(g.get(x, y))), '#ffffff'); }
+    if (pt.thorns > 0) for (const i of behind) { const x = i % 32, y = (i / 32) | 0; if (g.get(x, y) === '#b8804a' && Math.hypot(x + 0.5 - 16, (y + 0.5 - 22) * 1.07) > 9.3) g.set(x, y, '#f0d8a8'); }
+    if (pt.vines > 0) { // curly vines winding down both sides
+      const k = sz(pt.vines), VN = '#3f8a3a', VL = '#8ee06a';
+      for (const s2 of [-1, 1]) for (let i = 0; i <= 26; i++) {
+        const u = i / 26, y = Math.round(15.5 + u * 12 * Math.min(1, k + 0.1)), x = Math.round(16 + s2 * (7.6 + Math.sin(u * 8 + (s2 > 0 ? 1.5 : 0)) * 1.2));
+        if (g.filled(x, y) && g.get(x, y) !== L.cheek) g.set(x, y, VN);
+        if (i % 7 === 3) { const lx = x + s2, ly = y - 1; if (g.filled(lx, ly)) g.set(lx, ly, VL); }
+      }
+    }
     if (pt.antennae > 0) { const k = sz(pt.antennae); const tx = Math.round(11 - 3.2 * k), ty = Math.round(15 - 6 * k) + 1; line(g, 11, 15, tx + 1, ty, INK); line(g, 20, 15, 32 - tx - 2, ty, INK); g.set(Math.floor(11 - 3.2 * k - 0.6), Math.floor(15 - 6 * k - 0.6), '#ffffff'); g.set(Math.floor(21 + 3.2 * k - 0.6), Math.floor(15 - 6 * k - 0.6), '#ffffff'); }
     if (tent) { const k = sz(pt.tentacles); for (const s of [-1, 1]) for (const [x, y] of [[16 + s * (5.5 + 3.4 * k), 29], [16 + s * (5.5 + 5.6 * k), 28], [16 + s * (2.2 + 1.6 * k), 30]]) { const X = Math.floor(x), Y = Math.floor(y); if (g.filled(X, Y) && !onBody(X, Y)) g.set(X, Y, L.belly || BELLY); } }
     if (pt.claws > 0) { const s0 = hands; const cx = Math.floor(s0[0] - 1), cy = Math.floor(s0[1] - 1); if (g.filled(cx, cy)) g.set(cx, cy, '#ffc8b0'); if (g.filled(31 - cx, cy)) g.set(31 - cx, cy, '#ffc8b0'); }
@@ -1375,12 +1407,183 @@
       for (const [x, y] of [[3, 3], [24, 11], [2, 21], [23, 20], [5, 23]]) if (!g.get(x, y)) g.set(x, y, '#fff27a');
     },
   };
-  function critter(kind) {
-    if (critterCache[kind]) return critterCache[kind];
+  // ---------------- Living plants (18x18, facing right, 3 frames: 0 rest, 1 sway/wave/open, 2 blink or squish) ----------------
+  const pEyes = (g, x1, x2, y, blink) => { for (const x of [x1, x2]) { if (blink) g.set(x, y + 1, INK); else { g.set(x, y, INK); g.set(x, y + 1, INK); } } };
+  const pSmile = (g, x, y, w) => { g.set(x, y, INK); for (let i = 1; i < w - 1; i++) g.set(x + i, y + 1, INK); g.set(x + w - 1, y, INK); };
+  const pCheeks = (g, x1, x2, y, c) => g.px([[x1, y], [x2, y]].filter(([x, y2]) => g.filled(x, y2)), c || '#f4a3b8');
+  const LEAFG = ['#a6ec70', '#5cb43a', '#2f7a4a'];
+  // a water flower: pointed petals opening round a smiling bud, on a floating pad (face kept high so the swim cut shows it)
+  function lily(g, f, P, PAD, dot) {
+    const o = f === 1 ? 1 : 0;
+    g.ell(9, 15.4, 8, 1.8, PAD);
+    piece(g, t => { t.poly([[4.6, 13], [1.4 - o, 6 + o], [7.4, 9.6]], P[1]); t.poly([[13.4, 13], [16.6 + o, 6 + o], [10.6, 9.6]], P[1]); });
+    piece(g, t => t.ell(9, 12.2, 6, 2.8, P, 0, (x, y) => y >= 10));
+    piece(g, t => t.ell(9, 6.6, 4, 4.2 - o * 0.3, P));
+    g.outline();
+    g.px([[3, 8], [15, 8], [2, 7]].filter(([x, y]) => g.filled(x, y)), P[0]);
+    pEyes(g, 7, 10, 5 + o, f === 2); pSmile(g, 7, 8 + o, 4); pCheeks(g, 6, 11, 8 + o, '#f7b6c8');
+    g.px([[8, 3], [9, 3]].filter(([x, y]) => g.filled(x, y)), '#ffffff');
+    g.px([[7, 11], [9, 11], [11, 11]].filter(([x, y]) => g.filled(x, y)), dot);
+  }
+  const PLANTS = {
+    // ----- meadow -----
+    sunbuddy(g, f) {
+      const hx = 9.6 + (f === 1 ? 0.7 : 0), hy = 6.6, pr = f === 1 ? 4.5 : 4.1, up = f === 1;
+      g.rect(9, 10, 2, 6, '#4f9a3e');
+      g.ell(5.8, up ? 10.2 : 12.4, 2.5, 1.2, LEAFG, up ? -0.7 : 0.4); g.ell(13.6, up ? 11 : 12.6, 2.5, 1.2, LEAFG, up ? 0.7 : -0.4);
+      g.ell(8, 16.2, 1.7, 0.9, '#8f563b'); g.ell(11.8, 16.2, 1.7, 0.9, '#8f563b');
+      for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5 + (up ? 0.2 : 0); g.ell(hx + Math.cos(a) * (pr + 0.3), hy + Math.sin(a) * (pr + 0.3), 1.8, 1.1, RAMPS.sun, a); }
+      piece(g, t => t.ell(hx, hy, 3.5, 3.3, ['#fbe0b0', '#f0c080', '#c88a50']));
+      g.outline();
+      const ex = Math.round(hx) - 2; pEyes(g, ex, ex + 3, 4, f === 2);
+      pSmile(g, ex, 7, 4); pCheeks(g, ex - 1, ex + 4, 7);
+      g.px([[5, 10], [13, 11]].filter(([x, y]) => g.filled(x, y)), '#d4f8a8');
+    },
+    shroomy(g, f) {
+      const sq = f === 2 ? 1 : 0, CAP = ['#ff9aa0', '#e8404a', '#a02c3a'];
+      g.ell(6.6 + (f === 1 ? -0.6 : 0), 15.8, 1.8, 1.1, '#e8d8c0'); g.ell(11.6 + (f === 1 ? 0.6 : 0), 15.8, 1.8, 1.1, '#e8d8c0');
+      g.ell(9.4, 11.8 + sq * 0.4, 4.9 + sq * 0.4, 3.6 - sq * 0.4, ['#fffaf0', '#f4e6d0', '#c8b498']);
+      g.ell(9, 7.6 + sq, 7.4 + sq * 0.4, 5.2 - sq * 0.5, CAP, 0, (x, y) => y <= 8 + sq);
+      g.outline();
+      for (const [x, y] of [[5, 5], [9, 3], [12, 6], [7, 7], [14, 8]]) if (CAP.includes(g.get(x, y + sq))) { g.set(x, y + sq, '#ffffff'); if (CAP.includes(g.get(x + 1, y + sq))) g.set(x + 1, y + sq, '#fbe8e8'); }
+      g.px([[3, 8 + sq], [4, 8 + sq], [15, 8 + sq]].filter(([x, y]) => g.filled(x, y)), '#c86a5a');
+      pEyes(g, 8, 11, 10, f === 2); pSmile(g, 8, 13, 4); pCheeks(g, 7, 12, 13);
+    },
+    puffball(g, f) {
+      stroke(g, [[9, 17], [9.4, 13.4], [9, 11]], 0.55, 0.5, '#4f9a3e');
+      g.ell(6.6, 15.6, 2, 0.9, LEAFG, 0.5);
+      const r = f === 1 ? 5.6 : 5.9;
+      g.ell(9, 6.8, r, r, RAMPS.cloud);
+      g.outline('#9aa4c0');
+      for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6 + (f === 1 ? 0.26 : 0), x = Math.round(9 + Math.cos(a) * (r - 0.6)), y = Math.round(6.8 + Math.sin(a) * (r - 0.6)); if (g.filled(x, y)) g.set(x, y, '#dfe4f4'); }
+      for (const [x, y] of f === 1 ? [[16, 2], [1, 5], [15, 11]] : [[17, 4], [2, 1]]) if (!g.get(x, y)) { g.set(x, y, '#ffffff'); if (!g.get(x - 1, y + 1)) g.set(x - 1, y + 1, '#c8d0e0'); }
+      pEyes(g, 8, 11, 6, f === 2); pSmile(g, 8, 9, 4); pCheeks(g, 7, 12, 9, '#f7b6c8');
+    },
+    cloverkin(g, f) {
+      const s = f === 1 ? 0.35 : 0;
+      g.ell(6.8, 15.8, 1.6, 0.9, '#37946e'); g.ell(11.4, 15.8, 1.6, 0.9, '#37946e');
+      g.ell(9.4, 11.8, 4.9, 3.8, LEAFG);
+      g.rect(9, 5, 1, 3, '#37946e');
+      for (let k = 0; k < 4; k++) { const a = -Math.PI / 4 + k * Math.PI / 2 + s; piece(g, t => t.ell(9.5 + Math.cos(a) * 2.2, 4.6 + Math.sin(a) * 2, 2.1, 1.8, ['#c8f4a0', '#6abe30', '#37946e'], a)); }
+      g.outline();
+      g.px([[9, 4], [10, 5]].filter(([x, y]) => g.filled(x, y)), '#37946e'); g.set(8, 3, '#ffffff');
+      pEyes(g, 8, 11, 10, f === 2); pSmile(g, 8, 13, 4); pCheeks(g, 7, 12, 13);
+      g.px([[6, 10], [6, 11]].filter(([x, y]) => g.filled(x, y)), '#c8f4a0');
+    },
+    // ----- beach -----
+    cactling(g, f) {
+      const CG = ['#9ce07a', '#4fae5a', '#2f7a4a'], up = f === 1;
+      g.poly([[4.4, 12.6], [13.6, 12.6], [12.6, 16.6], [5.4, 16.6]], '#d8764a');
+      g.rect(4, 12, 10, 1, '#e8905a');
+      piece(g, t => { stroke(t, [[4.6, 10.4], [2.6, 9.8], [2.2, 7.4]], 1, 0.9, CG[1]); stroke(t, [[13.6, 9.8], [15.4, up ? 8 : 9.6], [15.6, up ? 5 : 7.2]], 1, 0.9, CG[1]); });
+      g.ell(9.2, 7.8, 5, 5.6, CG, 0, (x, y) => y <= 12);
+      g.outline();
+      for (let y = 12; y < 17; y++) for (let x = 3; x < 15; x++) { const c = g.get(x, y); if (c === '#d8764a' && g.get(x + 1, y) === INK) g.set(x, y, '#a8502e'); }
+      g.px([[6, 4], [5, 9], [12, 4], [12, 10], [6, 11], [2, 8], [15, up ? 6 : 8]].filter(([x, y]) => g.filled(x, y)), '#ffffff');
+      g.ell(9, 1.8, 1.8, 1.2, '#f07aa0'); g.set(9, 1, '#ffd0e0'); g.px([[8, 2], [10, 2]], '#e04a80'); g.set(9, 3, '#fbf236');
+      pEyes(g, 8, 11, 6, f === 2); pSmile(g, 8, 9, 4); pCheeks(g, 7, 12, 9);
+    },
+    kelpie(g, f) {
+      const K = ['#9cd06a', '#4f9a3e', '#2f6a3a'], w = f === 1 ? 1 : -1;
+      piece(g, t => { stroke(t, [[3.4, 17], [2.4 - w * 0.5, 12.4], [3.2 + w * 0.6, 8], [2 - w * 0.4, 4.4]], 1.1, 0.7, '#6a9a3a'); stroke(t, [[15, 17], [15.8 + w * 0.5, 12.6], [15 - w * 0.6, 8.4], [16 + w * 0.4, 5]], 1.1, 0.7, '#6a9a3a'); });
+      g.ell(9.4, 10.6, 5, 6.2, K);
+      stroke(g, [[9, 4.6], [9.6 + w * 0.8, 2.2], [11 + w * 0.4, 0.8]], 0.9, 0.6, K[1]);
+      g.outline();
+      g.px([[7, 14], [8, 12], [11, 15], [10, 13]].filter(([x, y]) => g.filled(x, y)), K[2]); g.px([[3, 10], [15, 11]].filter(([x, y]) => g.filled(x, y)), '#b8e08a');
+      pEyes(g, 8, 11, 6, f === 2); pSmile(g, 8, 9, 4); pCheeks(g, 7, 12, 9);
+      for (const [x, y] of f === 1 ? [[16, 1], [1, 3]] : [[17, 3], [0, 6]]) if (!g.get(x, y)) g.set(x, y, '#dff6ff');
+    },
+    coconut(g, f) {
+      const CO = ['#c48a5c', '#8f563b', '#5a3322'], sw = f === 1 ? 0.35 : 0;
+      g.ell(6.6, 16, 1.7, 0.9, CO[2]); g.ell(11.6, 16, 1.7, 0.9, CO[2]);
+      for (const [a, l] of [[-2.5, 5.2], [-1.9, 5.6], [-1.2, 5.2], [-0.6, 4.4]]) { const b = a + sw; piece(g, t => stroke(t, [[9, 6], [9 + Math.cos(b) * l * 0.55, 6 + Math.sin(b) * l * 0.55 - 0.8], [9 + Math.cos(b) * l, 6 + Math.sin(b) * l + 1.2]], 1.2, 0.5, LEAFG[1])); }
+      g.ell(9, 11, 5.2, 4.8, CO);
+      g.outline();
+      g.ell(10.4, 10.6, 3.2, 2.4, '#f0dcc0', 0, (x, y) => CO.includes(g.get(x, y)));
+      g.px([[5, 8], [6, 7], [4, 11], [6, 13], [13, 14]].filter(([x, y]) => CO.includes(g.get(x, y))), '#6a3e26');
+      pEyes(g, 9, 12, 9, f === 2); pSmile(g, 9, 12, 4); pCheeks(g, 8, 13, 12);
+    },
+    // ----- moonlit -----
+    glowcap(g, f) {
+      const CAP = f === 1 ? ['#f0ffff', '#9ff8f0', '#4fb8b8'] : ['#c8fff8', '#5fe8e0', '#2f8f98'];
+      g.ell(6.8, 15.8, 1.7, 1, '#d8e0f0'); g.ell(11.4, 15.8, 1.7, 1, '#d8e0f0');
+      g.ell(9.4, 12, 4.4, 3.6, ['#ffffff', '#e8eef8', '#b8c0d8']);
+      g.ell(9, 7.8, 7, 5.4, CAP, 0, (x, y) => y <= 8.5);
+      g.outline();
+      for (const [x, y] of [[5, 5], [9, 3], [12, 5], [14, 7], [6, 7]]) if (CAP.includes(g.get(x, y))) g.set(x, y, '#ffffff');
+      if (f === 1) for (const [x, y] of [[1, 5], [17, 6], [3, 1], [15, 1]]) if (!g.get(x, y)) g.set(x, y, '#c8fff8');
+      pEyes(g, 8, 11, 10, f === 2); pSmile(g, 8, 13, 4); pCheeks(g, 7, 12, 13, '#a6e8ff');
+    },
+    snapvine(g, f) {
+      const open = f === 1, JW = ['#b4ec6c', '#5cb43a', '#2f7a4a'];
+      g.ell(6.4, 16, 2.2, 1, LEAFG, 0.3); g.ell(11.8, 16, 2.2, 1, LEAFG, -0.3);
+      g.rect(8, 11, 2, 5, '#4f9a3e');
+      piece(g, t => t.ell(9.4, 5.4 - (open ? 0.6 : 0), 6.4, 3.6, JW, 0, (x, y) => y <= 6 - (open ? 0.6 : 0)));
+      piece(g, t => t.ell(9.4, 7.6 + (open ? 0.8 : 0), 6.4, 3.4, JW, 0, (x, y) => y >= 7 + (open ? 0.8 : 0)));
+      g.outline();
+      const y1 = open ? 6 : 6, y2 = open ? 8 : 7;
+      for (let x = 4; x <= 15; x++) { if (g.get(x, y1) && g.get(x, y1) !== INK) g.set(x, y1, '#e8506a'); if (open && g.filled(x, 6) && g.filled(x, 8)) g.set(x, 7, '#a02c46'); }
+      for (const x of [4, 7, 12, 15]) for (let y = 0; y < 9; y++) if (g.get(x, y) === INK) { if (!g.get(x, y - 1)) g.set(x, y - 1, '#7ed04a'); break; }
+      for (const x of [5, 8, 11, 14]) { if (g.filled(x, y1)) g.set(x, y1, '#ffffff'); if (open && g.filled(x + 1, y2)) g.set(x + 1, y2, '#ffffff'); }
+      // eyes on top of the head
+      piece(g, t => { t.ell(8, 1.6, 1.5, 1.5, '#ffffff'); t.ell(11.6, 1.6, 1.5, 1.5, '#ffffff'); });
+      if (f === 2) { g.px([[7, 2], [8, 2], [11, 2], [12, 2]], INK); } else { g.px([[8, 1], [8, 2], [12, 1], [12, 2]], INK); }
+      g.px([[4, 5], [14, 4]].filter(([x, y]) => g.filled(x, y)), '#f4a3b8');
+    },
+    moonlotus(g, f) { lily(g, f, ['#fff4ff', '#e4c8f8', '#a88ad8'], ['#6ad0a8', '#2f8f78', '#1f5a50'], '#fff27a'); },
+    // ----- candy -----
+    lollibloom(g, f) {
+      g.rect(9, 11, 1, 5, '#fff4f8'); g.px([[9, 12], [9, 14]], '#f07aa0');
+      g.ell(5.8, 13, 2.2, 1.1, ['#c8fff0', '#7ee4c4', '#3fa890'], f === 1 ? -0.8 : 0.4); g.ell(12.8, 13.4, 2.2, 1.1, ['#c8fff0', '#7ee4c4', '#3fa890'], f === 1 ? 0.8 : -0.4);
+      g.ell(7.4, 16.2, 1.5, 0.8, '#f07aa0'); g.ell(11.2, 16.2, 1.5, 0.8, '#f07aa0');
+      g.ell(9.4, 6, 5.6, 5.6, '#fff');
+      g.outline();
+      const ph = f === 1 ? 0.6 : 0;
+      for (let y = 0; y < 13; y++) for (let x = 2; x < 17; x++) if (g.get(x, y) === '#fff') { const dx = x + 0.5 - 9.4, dy = y + 0.5 - 6, a = Math.atan2(dy, dx), r = Math.hypot(dx, dy); const b = Math.floor(((a / (2 * Math.PI)) * 2 + r * 0.55 + ph) % 2 + 2) % 2; g.set(x, y, b ? '#ffffff' : (dx + dy > 3 ? '#d04a7a' : '#f07aa0')); }
+      g.ell(10, 6.6, 2.6, 2, '#fff4f8', 0, (x, y) => g.filled(x, y));
+      pEyes(g, 8, 11, 4, f === 2); pSmile(g, 8, 7, 4); pCheeks(g, 7, 12, 7);
+    },
+    marshroom(g, f) {
+      const sq = f === 1 ? 1 : 0, M = ['#ffffff', '#ffe6f0', '#e4a8c4'];
+      g.ell(6.8, 15.9, 1.7, 1, '#f7b6c8'); g.ell(11.4, 15.9, 1.7, 1, '#f7b6c8');
+      g.ell(9, 12.2, 4.6, 3.4, ['#ffe0ec', '#f7b6c8', '#d07aa0']);
+      for (const [x, r] of [[4.4, 3], [9, 3.8], [13.6, 3]]) g.ell(x, 7 + sq + (x === 9 ? -1 : 0), r + sq * 0.3, r - sq * 0.4, M);
+      g.outline();
+      g.px([[5, 6 + sq], [10, 4 + sq], [13, 7 + sq], [8, 8 + sq]].filter(([x, y]) => g.filled(x, y)), '#e0b080'); g.px([[6, 6 + sq], [11, 4 + sq]].filter(([x, y]) => g.filled(x, y)), '#c8905a');
+      g.set(7, 4 + sq, '#ffffff');
+      pEyes(g, 7, 10, 11, f === 2); g.px([[8, 14], [9, 14]], INK); pCheeks(g, 6, 11, 13);
+    },
+    licovine(g, f) {
+      const w = f === 1 ? 1 : 0;
+      stroke(g, [[5, 16.4], [7, 13.6], [5.4 + w, 11], [8, 9]], 1.4, 1.2, '#fff');
+      stroke(g, [[12, 16.4], [11, 14], [13 - w, 12.4], [14.6, 13.4], [15.4 - w, 11.6]], 1, 0.8, '#fff');
+      g.ell(10.6, 6.4, 4.4, 4.2, '#d24552');
+      stroke(g, [[13.4, 3.6], [15.2, 1.8 + w], [16.6, 2.4], [16, 3.8]], 0.6, 0.5, '#fff');
+      g.outline();
+      const Rd = ['#ff8a90', '#e0303e', '#901c30'], Bk = ['#6a5a70', '#3a2e44', '#2a2034'];
+      for (let y = 0; y < 18; y++) for (let x = 0; x < 18; x++) {
+        const c = g.get(x, y); if (!c || c === INK) continue;
+        const R2 = c === '#fff' ? (Math.floor((x - y * 0.7 + 20) / 1.5) % 2 ? Bk : Rd) : ['#ff9aa0', '#e0303e', '#a01c34'];
+        const top = g.get(x, y - 1) === INK, bot = g.get(x, y + 1) === INK;
+        g.set(x, y, top && !bot ? R2[0] : bot && !top ? R2[2] : R2[1]);
+      }
+      g.set(8, 4, '#ffffff'); g.set(9, 3, '#ffb0b8');
+      pEyes(g, 10, 13, 4, f === 2); pSmile(g, 10, 7, 4); pCheeks(g, 9, 14, 7, '#ffb0c8');
+    },
+    sugarlily(g, f) { lily(g, f, ['#ffffff', '#ffd8ec', '#f07aa8'], ['#c8fff0', '#7ee4c4', '#3fa890'], '#5fcde4'); g.px([[3, 11], [15, 11]].filter(([x, y]) => g.filled(x, y)), '#fff27a'); },
+  };
+  const PLANT_FRAMES = 3;
+  // number of animation frames a critter has (living plants have 3; animals 1)
+  const critterFrames = kind => (PLANTS[kind] ? PLANT_FRAMES : 1);
+  // PX.critter(id) is frame 0; PX.critter(id, f) gives another animation frame (unknown frames fall back to 0)
+  function critter(kind, frame) {
+    const f = PLANTS[kind] && frame > 0 && frame < PLANT_FRAMES ? frame | 0 : 0, key = f ? kind + ':' + f : kind;
+    if (critterCache[key]) return critterCache[key];
     const D = window.PSDATA || {}, rare = !!(D.RARES && D.RARES[kind]) || ['dragon', 'unicorn', 'kitsune', 'yeti', 'griffin', 'dinosaur', 'kraken', 'phoenix', 'fairy'].includes(kind);
     let c;
-    if (CR[kind]) { const g = new Grid(rare ? 26 : 18, rare ? 26 : 18); g.spec = true; try { CR[kind](g); c = g.canvas(); } catch (e) { console.error('PX.critter', kind, e); } }
-    return (critterCache[kind] = c || genericCritter(kind));
+    const fn = PLANTS[kind] || CR[kind];
+    if (fn) { const g = new Grid(rare ? 26 : 18, rare ? 26 : 18); g.spec = true; try { fn(g, f); c = g.canvas(); } catch (e) { console.error('PX.critter', kind, e); } }
+    return (critterCache[key] = c || (f ? critter(kind) : genericCritter(kind)));
   }
   // Fallback critter for unknown ids: shaped by where it lives, tinted by its element.
   const EL_RAMP = { leaf: 'leaf', water: 'sky', fire: 'clay', stone: 'slate', sky: 'cloud', shadow: 'night', light: 'sun', sweet: 'rose', normal: 'peach' };
@@ -1404,9 +1607,10 @@
   }
   // Swimming version: top ~60% of the critter with a ripple line. Anchor bottom-centre = water surface.
   const swimCache = {};
-  function critterSwim(kind) {
-    if (swimCache[kind]) return swimCache[kind];
-    const c = critter(kind), w = c.width, h = c.height, d = c.getContext('2d').getImageData(0, 0, w, h).data;
+  function critterSwim(kind, frame) {
+    const f = PLANTS[kind] && frame > 0 && frame < PLANT_FRAMES ? frame | 0 : 0, key = f ? kind + ':' + f : kind;
+    if (swimCache[key]) return swimCache[key];
+    const c = critter(kind, f), w = c.width, h = c.height, d = c.getContext('2d').getImageData(0, 0, w, h).data;
     let top = h, bot = 0;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3]) { top = Math.min(top, y); bot = Math.max(bot, y); }
     const cut = Math.max(top + 3, Math.round(top + (bot - top) * 0.62));
@@ -1417,7 +1621,7 @@
     x.fillStyle = '#ffffff'; for (let i = Math.max(0, x0 - 2); i <= Math.min(w - 1, x1 + 2); i++) if ((i - x0) % 4 !== 3) x.fillRect(i, cut, 1, 1);
     x.fillStyle = '#9fd8ff'; for (let i = Math.max(0, x0); i <= Math.min(w - 1, x1); i++) if ((i - x0) % 4 < 2) x.fillRect(i, cut + 1, 1, 1);
     x.fillStyle = '#cbe8ff'; x.fillRect(Math.max(0, x0 - 1), cut - 1, 1, 1); x.fillRect(Math.min(w - 1, x1 + 1), cut - 1, 1, 1);
-    return (swimCache[kind] = o);
+    return (swimCache[key] = o);
   }
 
   // ---------------- Items (fruit 13x13, egg 20x24, coin 9x9, bigcoin 11x11, xp 9x9, element 7x7, flower 12x12) ----------------
@@ -2303,7 +2507,7 @@
   })();
   function buzz(ms) { try { navigator.vibrate && navigator.vibrate(ms || 10); } catch (e) {} }
 
-  window.PX = { PAL, RAMPS, INK, BELLY, Grid, fromStrings, inEll, shadeOf, sprig, buildSprig, SPRIG_AX, SPRIG_AY, emote, critter, critterSwim, item, fruit, fx, prop, blit, SPRIG_W, SPRIG_H, FLOWER_IDS: Object.keys(FLO).filter(k => !k.endsWith('D')), stroke, line, starPts, DEFAULT_LOOK, cloneLook, clamp, lerp, Sound, buzz,
+  window.PX = { PAL, RAMPS, INK, BELLY, Grid, fromStrings, inEll, shadeOf, sprig, buildSprig, SPRIG_AX, SPRIG_AY, emote, critter, critterSwim, critterFrames, PLANT_IDS: Object.keys(PLANTS), item, fruit, fx, prop, blit, SPRIG_W, SPRIG_H, FLOWER_IDS: Object.keys(FLO).filter(k => !k.endsWith('D')), stroke, line, starPts, DEFAULT_LOOK, cloneLook, clamp, lerp, Sound, buzz,
     gumballMachine, gumballColors: GUM.map(r => r[1]),
     // pet houses: door (bottom centre) and window centres, relative to the bottom-centre anchor
     HOMES: { shroomhouse: { door: [0, 0], win: [[8, -12]], w: 36, h: 40 }, beachhut: { door: [0, 0], win: [[-10, -13], [9, -13]], w: 30, h: 38 },

@@ -303,14 +303,14 @@
     };
   }
   // Race rating per segment type (roughly 1.5 fresh → 6 mid-game → 12+ late). Body parts add a little.
-  const PART_RACE = { run: ['ears'], swim: ['fins', 'tentacles'], climb: ['horns', 'claws', 'spikes'], fly: ['wings', 'batwings', 'fairywings', 'flamewings', 'dragonwings'] };
+  const PART_RACE = { run: ['ears', 'leafears'], swim: ['fins', 'tentacles'], climb: ['horns', 'claws', 'spikes', 'vines', 'thorns'], fly: ['wings', 'batwings', 'fairywings', 'flamewings', 'dragonwings', 'petals'] };
   function raceRating(s, seg) {
     const stat = D.RACE_STAT[seg] || seg;
     let r = 1.5 + s.stats[stat].lv * 0.35;
     for (const p of PART_RACE[seg] || []) r += (s.parts[p] || 0) * 0.8;
     return r;
   }
-  function staminaRating(s) { return 1.5 + s.stats.stamina.lv * 0.35 + (s.parts.shell || 0) * 0.8; }
+  function staminaRating(s) { return 1.5 + s.stats.stamina.lv * 0.35 + ((s.parts.shell || 0) + (s.parts.mushcap || 0)) * 0.8; }
 
   // Pixel look for PX.sprig()
   function lookOf(s) {

@@ -67,6 +67,23 @@
 .sp-mood small{font-family:var(--f-px);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);display:flex;justify-content:space-between}
 
 .sp-sec{padding:14px}
+.sp-fold-h{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:8px;width:100%;cursor:pointer;min-height:36px}
+.sp-fold-h h2{flex:1}
+.sp-chev{flex:0 0 auto;width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:var(--slot);border:2px solid var(--line);font-size:14px;color:var(--ink-soft);transition:transform .15s}
+.sp-fold.open .sp-chev{transform:rotate(180deg)}
+.sp-fold-sum{margin-top:8px;cursor:pointer}
+.sp-more{display:block;margin-top:8px;font-size:13px;font-weight:700;color:var(--accent,#c0612a)}
+.sp-fold-less{all:unset;cursor:pointer;display:block;margin:12px auto 0;padding:6px 14px;font-size:13px;font-weight:700;color:var(--ink-soft)}
+.sp-fold-line{margin:0;font-size:14px;color:var(--ink-soft);font-weight:600;line-height:1.4}
+.sp-fold-line b{color:var(--ink)}
+.sp-mchips{display:flex;flex-wrap:wrap;gap:6px}
+.sp-mchip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px 4px 6px;border-radius:10px;background:var(--field);border:2px solid var(--line);font-family:var(--f-px);font-weight:600;font-size:13px}
+.sp-mchip i{width:8px;height:14px;border-radius:3px;display:block}
+.sp-bicons{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.sp-bico{position:relative;width:40px;height:40px;border-radius:10px;background:var(--field);border:2px solid var(--line);display:grid;place-items:center}
+.sp-bico canvas{width:36px;height:36px;image-rendering:pixelated;image-rendering:crisp-edges}
+.sp-bico i{position:absolute;right:-6px;bottom:-6px;font-style:normal;font:700 11px/16px var(--f-ui);background:var(--sun);border:2px solid var(--sun-edge);border-radius:8px;padding:0 4px;color:#4a3210}
+.sp-bmore{font-family:var(--f-px);font-weight:700;font-size:14px;color:var(--ink-soft);padding:0 4px}
 .sp-sec h2{margin:0;font-family:var(--f-px);font-weight:700;font-size:20px;color:var(--ink);display:flex;align-items:center;gap:8px}
 .sp-sec h2 .sp-aside{margin-left:auto;font-family:var(--f-ui);font-weight:600;font-size:14px;color:var(--ink-soft)}
 .sp-sec .sp-note{margin:4px 0 10px;font-size:13px;line-height:1.4;color:var(--ink-soft)}
@@ -236,10 +253,10 @@
   }
   const PART_NAMES = { wings: 'Wings', ears: 'Long ears', fins: 'Fins', horns: 'Horns', tail: 'Tail', shell: 'Shell', antennae: 'Antennae', claws: 'Claws', spikes: 'Spikes',
     batwings: 'Bat wings', fairywings: 'Fairy wings', flamewings: 'Flame wings', dragonwings: 'Dragon wings', unihorn: 'Unicorn horn', multitail: 'Nine tails', fluff: 'Fluff',
-    tentacles: 'Tentacles', spots: 'Star spots' };
+    tentacles: 'Tentacles', spots: 'Star spots', petals: 'Petal collar', mushcap: 'Mushroom cap', leafears: 'Leaf ears', vines: 'Vines', thorns: 'Thorns' };
   const partName = p => PART_NAMES[p] || (p.charAt(0).toUpperCase() + p.slice(1));
   // mirrors state.js PART_RACE, for the "helps" hint on body parts
-  const PART_HELPS = { ears: 'Run', fins: 'Swim', tentacles: 'Swim', horns: 'Climb', claws: 'Climb', spikes: 'Climb', wings: 'Fly', batwings: 'Fly', fairywings: 'Fly', flamewings: 'Fly', dragonwings: 'Fly', shell: 'Stamina' };
+  const PART_HELPS = { ears: 'Run', fins: 'Swim', tentacles: 'Swim', horns: 'Climb', claws: 'Climb', spikes: 'Climb', wings: 'Fly', batwings: 'Fly', fairywings: 'Fly', flamewings: 'Fly', dragonwings: 'Fly', shell: 'Stamina', leafears: 'Run', vines: 'Climb', thorns: 'Climb', petals: 'Fly', mushcap: 'Stamina' };
   const elChip = el => { const E = D.ELEMENTS[el] || D.ELEMENTS.normal; return `<span class="sp-chip" style="background:${E.color}">${E.label}</span>`; };
   const NATURE = { sun: 'Sun', moon: 'Moon', wild: 'Wild' };
   const creature = id => D.ANIMALS[id] || D.RARES[id];
@@ -347,6 +364,14 @@
       <div class="sp-lbl" style="margin:12px 0 0">${esc(areaName(s.area))} blooms</div><div class="sp-flowers">${trio}</div>
       ${stage < 2 ? `<p class="sp-muted">Moving it to another area before it blooms changes which flower it becomes.</p>` : ''}</section>`;
   }
+  // ---------- fold-away sections: a short summary until tapped open ----------
+  const openSecs = new Set();
+  function foldSec(id, title, aside, summary, body) {
+    const open = openSecs.has(id);
+    return `<section class="panel sp-sec sp-fold ${open ? 'open' : ''}">
+      <button class="sp-fold-h" data-fold="${id}" aria-expanded="${open}"><h2>${title}${aside ? ` <span class="sp-aside">${aside}</span>` : ''}</h2><span class="sp-chev" aria-hidden="true">\u25be</span></button>
+      ${open ? `<div class="sp-fold-body">${body}</div><button class="sp-fold-less" data-fold="${id}">Show less \u25b4</button>` : `<div class="sp-fold-sum" data-fold="${id}">${summary}<span class="sp-more">Tap to see more \u25be</span></div>`}</section>`;
+  }
   function moveHTML(id, o) {
     o = o || {};
     const m = D.MOVES[id]; if (!m) return '';
@@ -366,13 +391,14 @@
       const title = i === 0 ? `${esc(g.from)} form` : `<canvas data-sp="critter:${a ? a.aid : ''}"></canvas>${esc(g.from)}${a ? ` \u00b7 bonded ${a.n}` : ''}`;
       return `<div class="sp-grp"><h3>${title}</h3><div class="sp-moves">${g.list.map(k => moveHTML(k.id, { compact: true, locked: k.locked, unlockAt: k.unlockAt, inBattle: !k.locked && active.includes(k.id) })).join('')}</div></div>`;
     }).join('');
-    return `<section class="panel sp-sec"><h2>Moves</h2>
-      <p class="sp-note">In battle it uses its ${fi.short} form's 3 moves plus the best unlocked move of its top animal.</p>
+    const chips = active.map(id => { const m = D.MOVES[id]; if (!m) return ''; const E = D.ELEMENTS[m.el] || D.ELEMENTS.normal; return `<span class="sp-mchip"><i style="background:${E.color}"></i>${esc(m.name)}</span>`; }).join('');
+    const body = `<p class="sp-note">In battle it uses its ${fi.short} form's 3 moves plus the best unlocked move of its top animal.</p>
       <div class="sp-lbl" style="margin:0 0 6px">Battle moves</div>
       <div class="sp-moves" style="margin-top:0">${active.map(id => moveHTML(id, { active: true })).join('')}</div>
       <div class="sp-grp"><h3>Elements</h3><div style="display:flex;gap:5px;flex-wrap:wrap">${state.elementsOf(s).map(elChip).join('')}</div></div>
       <div class="sp-lbl" style="margin:16px 0 -6px">Every move it knows</div>
-      ${grp}</section>`;
+      ${grp}`;
+    return foldSec('moves', 'Moves', `${known.filter(k => !k.locked).length} known`, `<div class="sp-mchips">${chips}</div>`, body);
   }
   function bondsHTML(s) {
     const e = Object.entries(s.absorbed || {}).filter(([id]) => creature(id));
@@ -383,13 +409,16 @@
       return `<div class="sp-bond ${c.rare ? 'rare' : ''}"><span class="cnt">\u00d7${n}</span><canvas data-sp="critter:${id}" data-scale="2"></canvas><b>${esc(c.name)}</b>
         <div class="sp-pips" title="${t} of 3 moves">${[0, 1, 2].map(i => `<i class="${i < t ? 'on' : ''}"></i>`).join('')}</div><small>${c.rare ? 'Rare' : t < 3 ? `Next move at ${[1, 3, 6][t]}` : 'All moves'}</small></div>`;
     }).join('');
-    return `<section class="panel sp-sec"><h2>Bonded animals <span class="sp-aside">${e.reduce((a, x) => a + x[1], 0)}</span></h2><div class="sp-bonds">${tiles}</div></section>`;
+    const icons = e.slice(0, 8).map(([id, n]) => `<span class="sp-bico" title="${esc(creature(id).name)}"><canvas data-sp="critter:${id}" data-scale="0"></canvas>${n > 1 ? `<i>\u00d7${n}</i>` : ''}</span>`).join('') + (e.length > 8 ? `<span class="sp-bmore">+${e.length - 8}</span>` : '');
+    return foldSec('bonds', 'Bonded animals', `${e.reduce((a, x) => a + x[1], 0)}`, `<div class="sp-bicons">${icons}</div>`, `<div class="sp-bonds">${tiles}</div>`);
   }
   function partsHTML(s) {
     const e = Object.entries(s.parts || {}).filter(([, v]) => v > 0);
     const body = e.length ? `<div class="sp-parts">${e.map(([p, v]) => `<div class="sp-part"><b>${partName(p)}</b><div class="bar"><i style="width:${clamp(v, 0, 1) * 100}%;background:var(--plum)"></i></div><small>${PART_HELPS[p] ? '+' + PART_HELPS[p] : v >= 1 ? 'Full' : 'Growing'}</small></div>`).join('')}</div>`
       : `<p class="sp-muted">No extra parts yet. Animals grow them: wings from birds, fins from fish, horns from rams.</p>`;
-    return `<section class="panel sp-sec"><h2>Body parts</h2>${e.length ? '<p class="sp-note">Bigger parts help in races: ears for running, fins for swimming, horns and claws for climbing, wings for flying.</p>' : ''}${body}</section>`;
+    if (!e.length) return `<section class="panel sp-sec"><h2>Body parts</h2>${body}</section>`;
+    return foldSec('parts', 'Body parts', `${e.length} of ${D.MAX_PARTS}`, `<p class="sp-fold-line">${e.map(([p]) => partName(p)).join(', ')}</p>`,
+      `<p class="sp-note">Bigger parts help in races: ears for running, fins for swimming, horns and claws for climbing, wings for flying. A Sprout keeps up to ${D.MAX_PARTS} parts; a new one makes the oldest fall off.</p>${body}`);
   }
   function battleHTML(s) {
     const b = state.battleStats(s);
@@ -397,18 +426,17 @@
     const segs = [['run', 'Run'], ['swim', 'Swim'], ['climb', 'Climb'], ['fly', 'Fly']];
     const races = segs.map(([k, l]) => { const r = state.raceRating(s, k); return `<div class="sp-race"><span class="nm">${l}</span><div class="bar"><i style="width:${clamp(r / 15 * 100, 3, 100)}%;background:${D.STAT_META[D.RACE_STAT[k]].color}"></i></div><span class="num">${r.toFixed(1)}</span></div>`; }).join('')
       + (state.staminaRating ? (() => { const r = state.staminaRating(s); return `<div class="sp-race"><span class="nm">Stamina</span><div class="bar"><i style="width:${clamp(r / 15 * 100, 3, 100)}%;background:${D.STAT_META.stamina.color}"></i></div><span class="num">${r.toFixed(1)}</span></div>`; })() : '');
-    return `<section class="panel sp-sec"><h2>Battle stats</h2>
-      <div class="sp-bstats">${cell(b.hp, 'HP')}${cell(b.atk, 'Atk')}${cell(b.def, 'Def')}${cell(b.spd, 'Spd')}${cell(Math.round(b.eva * 100) + '%', 'Eva')}</div>
-      <p class="sp-muted">Stamina gives HP and Defense, Power gives Attack, Run gives Speed, Fly gives Evasion, Swim adds Defense.</p></section>
-      <section class="panel sp-sec"><h2>Race ratings</h2><p class="sp-note">How fast it moves on each kind of course section. Higher is faster.</p>${races}</section>`;
+    const bstats = `<div class="sp-bstats">${cell(b.hp, 'HP')}${cell(b.atk, 'Atk')}${cell(b.def, 'Def')}${cell(b.spd, 'Spd')}${cell(Math.round(b.eva * 100) + '%', 'Eva')}</div>`;
+    return foldSec('bstats', 'Battle stats', '', bstats, `${bstats}<p class="sp-muted">Stamina gives HP and Defense, Power gives Attack, Run gives Speed, Fly gives Evasion, Swim adds Defense.</p>`)
+      + foldSec('races', 'Race ratings', '', `<p class="sp-fold-line">${segs.map(([k, l]) => `${l} <b>${state.raceRating(s, k).toFixed(1)}</b>`).join(' \u00b7 ')}</p>`, `<p class="sp-note">How fast it moves on each kind of course section. Higher is faster.</p>${races}`);
   }
   function recordsHTML(s) {
     const r = s.record || {}, born = s.born ? new Date(s.born).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
     const rec = (v, l) => `<div class="sp-rec"><span class="num">${v}</span><small>${l}</small></div>`;
-    return `<section class="panel sp-sec"><h2>Records</h2><div class="sp-recs">
+    return foldSec('records', 'Records', '', `<p class="sp-fold-line">Races won <b>${r.raceWins || 0}</b> \u00b7 Battles won <b>${r.battleWins || 0}</b></p>`, `<div class="sp-recs">
       ${rec(`${r.raceWins || 0} / ${r.races || 0}`, 'Races won')}${rec(`${r.battleWins || 0} / ${r.battles || 0}`, 'Battles won')}
       ${rec(Object.values(s.absorbed || {}).reduce((a, b) => a + b, 0), 'Animals bonded')}${rec(Math.max(0, Math.floor((Date.now() - (s.born || Date.now())) / 86400000)), 'Days old')}</div>
-      ${born ? `<p class="sp-muted">Hatched ${born}${s.bornWith && creature(s.bornWith) ? `, already bonded with a ${esc(creature(s.bornWith).name)}` : ''}.</p>` : ''}</section>`;
+      ${born ? `<p class="sp-muted">Hatched ${born}${s.bornWith && creature(s.bornWith) ? `, already bonded with a ${esc(creature(s.bornWith).name)}` : ''}.</p>` : ''}`);
   }
   // ---------- style: paint tins, pattern stickers, closet ----------
   const skinOf = s => { const k = s.look && s.look.skin; return k && D.SKINS[k] ? k : null; };
@@ -587,7 +615,8 @@
   function onClick(e) {
     const q = sel => e.target.closest(sel);
     let b;
-    if ((b = q('[data-open]'))) { PX.Sound.play('pop'); openDetail(b.dataset.open); return; }
+    if ((b = q('[data-open]'))) { PX.Sound.play('pop'); openSecs.clear(); openDetail(b.dataset.open); return; }
+    if ((b = q('[data-fold]'))) { const id = b.dataset.fold; if (openSecs.has(id)) openSecs.delete(id); else openSecs.add(id); PX.Sound.play('tick'); render(true); return; }
     if (q('[data-back]')) { PX.Sound.play('tick'); view = 'list'; render(false); return; }
     if ((b = q('[data-hatch]'))) {
       const egg = PS.S.eggs.find(x => x.id === b.dataset.hatch);

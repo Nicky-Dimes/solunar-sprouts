@@ -28,7 +28,16 @@
   };
   const PART_NAMES = { wings: 'wings', ears: 'long ears', fins: 'fins', horns: 'horns', tail: 'a tail', shell: 'a shell', antennae: 'antennae',
     claws: 'claws', spikes: 'spikes', fluff: 'fluff', tentacles: 'tentacles', spots: 'star spots', batwings: 'bat wings', fairywings: 'fairy wings',
-    unihorn: 'a unicorn horn', multitail: 'extra tails', flamewings: 'flame wings', dragonwings: 'dragon wings' };
+    unihorn: 'a unicorn horn', multitail: 'extra tails', flamewings: 'flame wings', dragonwings: 'dragon wings',
+    petals: 'a petal collar', mushcap: 'a mushroom cap', leafears: 'leaf ears', vines: 'vines', thorns: 'thorns' };
+  // living plants: rooted ones sway in place and now and then pop up and move; the others waddle about in little scoots
+  const ROOTED = { sunbuddy: 1, cloverkin: 1, snapvine: 1, lollibloom: 1, cactling: 1 };
+  const PLANT_GLOW = { glowcap: '160,250,255', moonlotus: '230,205,255' };
+  const PLANT_COL = { sunbuddy: '#fbd84a', shroomy: '#e8404a', puffball: '#ffffff', cloverkin: '#99e550', cactling: '#f07aa0', kelpie: '#9cd06a', coconut: '#c48a5c',
+    glowcap: '#9ff8f0', snapvine: '#e8506a', moonlotus: '#e4c8f8', lollibloom: '#f07aa0', marshroom: '#ffe6f0', licovine: '#e0303e', sugarlily: '#ffd8ec' };
+  const isPlant = id => !!(D.ANIMALS[id] && D.ANIMALS[id].kind === 'plant');
+  const FRAME_SEQ = [0, 1, 0, 1, 0, 2];
+  const plantFrame = c => (PX.critterFrames && PX.critterFrames(c.id) > 1 ? FRAME_SEQ[Math.floor(t * 3 + c.ph * 3) % FRAME_SEQ.length] : 0);
 
   // ---------------- Area themes ----------------
   // props: [kind, x as share of width, y as share of the walkable span]. Night is an overlay colour (rgb + max alpha).
@@ -124,8 +133,8 @@
     sprCache.set(key, c); return c;
   }
   const themeOf = a => (D.AREAS[a] && D.AREAS[a].theme) || 'day';
-  const critterSpr = id => spr('c:' + id, () => PX.critter(id), () => blob(16, 12, PX.RAMPS.peach));
-  const swimSpr = id => spr('cs:' + id, () => (PX.critterSwim ? PX.critterSwim(id) : null), () => critterSpr(id));
+  const critterSpr = (id, f) => spr('c:' + id + ':' + (f || 0), () => PX.critter(id, f || 0), () => blob(16, 12, PX.RAMPS.peach));
+  const swimSpr = (id, f) => spr('cs:' + id + ':' + (f || 0), () => (PX.critterSwim ? PX.critterSwim(id, f || 0) : null), () => critterSpr(id, f));
   const itemSpr = (kind, id) => spr('i:' + kind + ':' + id, () => PX.item(kind, id), () => (kind === 'fruit' ? PX.fruit('round') : blob(11, 11, PX.RAMPS.sun)));
   const propSpr = (kind, theme) => spr('p:' + kind + ':' + theme, () => (kind === 'gumball' ? PX.gumballMachine(0) : PX.prop(kind, theme)), () => blob(14, 12));
   function propAt(p) { for (const q of Lw.props) if (q.kind === 'gumball' && Math.abs(p.x - q.x) < q.c.width / 2 + 2 && p.y <= q.y + 2 && p.y >= q.y - q.c.height) return q.kind; return null; }
@@ -1069,27 +1078,31 @@
     else if (a.where === 'air') p = { x: rand(10, ww - 10), y: rand(Lw.minY - 4, Lw.minY + Lw.span * 0.55) };
     else p = lawnPoint();
     const c = { id, where: a.where, x: p.x, y: p.y, fx: p.x, fy: p.y, tx: p.x, ty: p.y, hopT: 1, next: rand(0.6, 1.6), life: D.GROWTH.critterLifeSec, facing: Math.random() < 0.5 ? 1 : -1, ph: rand(0, 6), by: p.y, vx: rand(6, 10) * (Math.random() < 0.5 ? 1 : -1) };
+    if (a.kind === 'plant') { c.plant = true; c.rooted = !!ROOTED[id]; if (a.where === 'air') c.vx *= 0.45; }
     critters.push(c);
-    if (a.where === 'water') { burst(p.x, p.y - 2, 'drop', 6, '#cbdbfc'); } else burst(p.x, p.y - 4, 'spark', 8, '#ffffff');
+    if (a.where === 'water') { burst(p.x, p.y - 2, 'drop', 6, '#cbdbfc'); } else if (c.plant && a.where !== 'air') { burst(p.x, p.y - 2, 'dust', 6, '#b8946a'); burst(p.x, p.y - 6, 'spark', 5, PLANT_COL[id] || '#ffffff'); } else burst(p.x, p.y - 4, 'spark', 8, '#ffffff');
   }
   function updateCritters(dt) {
     if (PS.S.sprouts.length && critters.length < TUNE.maxCritters && t > nextCritter) { spawnCritter(); nextCritter = t + rand(...D.GROWTH.critterEverySec); }
     for (const c of critters) {
       c.life -= dt; c.next -= dt;
       if (c.where === 'air') {
-        c.x += c.vx * dt; c.y = c.by + Math.sin(t * 2 + c.ph) * 4;
+        c.x += c.vx * dt; c.y = c.by + (c.plant ? Math.sin(t * 1.1 + c.ph) * 6 : Math.sin(t * 2 + c.ph) * 4);
+        if (c.plant && Math.random() < dt * 1.2) parts.push({ x: c.x + rand(-4, 4), y: c.y - rand(8, 14), vx: rand(3, 8), vy: rand(-5, -2), life: rand(1.4, 2.4), type: 'seed', color: '#ffffff' });
         if (c.x < 8 || c.x > ww - 8) { c.vx *= -1; c.x = clamp(c.x, 8, ww - 8); }
         c.facing = c.vx > 0 ? 1 : -1;
         if (c.next <= 0) { c.by = clamp(c.by + rand(-8, 8), Lw.minY - 6, Lw.minY + Lw.span * 0.6); c.next = rand(1.5, 3); }
         continue;
       }
-      if (c.hopT < 1) { c.hopT = Math.min(1, c.hopT + dt / (c.where === 'water' ? 1.6 : 0.38)); c.x = lerp(c.fx, c.tx, c.hopT); c.y = lerp(c.fy, c.ty, c.hopT); }
+      if (c.hopT < 1) { c.hopT = Math.min(1, c.hopT + dt / (c.where === 'water' ? 1.6 : c.plant ? (c.rooted ? 0.5 : 0.55) : 0.38)); c.x = lerp(c.fx, c.tx, c.hopT); c.y = lerp(c.fy, c.ty, c.hopT); if (c.hopT >= 1 && c.rooted) burst(c.x, c.y - 1, 'dust', 4, '#b8946a'); }
       else if (c.next <= 0) {
         let nx, ny;
         if (c.where === 'water') { const q = waterPoint(0.1, 0.85); nx = lerp(c.x, q.x, 0.4); ny = lerp(c.y, q.y, 0.3); if (!inWater(nx, ny)) { nx = c.x; ny = c.y; } }
         else if (c.where === 'coast') { const q = coastPoint(c.y + rand(-4, 4)); nx = q.x; ny = q.y; }
         else { const a = rand(0, Math.PI * 2), d = rand(4, 9); nx = clamp(c.x + Math.cos(a) * d, 8, ww - 8); ny = clamp(c.y + Math.sin(a) * d * 0.5, Lw.minY + 3, Lw.maxY); if (nx > shoreAt(ny) - 7) { nx = c.x - 4; ny = c.y; } }
-        c.fx = c.x; c.fy = c.y; c.tx = nx; c.ty = ny; c.hopT = 0; if (Math.abs(nx - c.x) > 0.3) c.facing = nx >= c.x ? 1 : -1; c.next = rand(1.6, 3.2);
+        if (c.plant && c.where === 'land' && !c.rooted) { nx = lerp(c.x, nx, 0.6); ny = lerp(c.y, ny, 0.6); } // little scoots
+        c.fx = c.x; c.fy = c.y; c.tx = nx; c.ty = ny; c.hopT = 0; if (Math.abs(nx - c.x) > 0.3) c.facing = nx >= c.x ? 1 : -1;
+        c.next = c.rooted ? rand(3.5, 6.5) : c.plant && c.where === 'land' ? rand(0.9, 1.8) : rand(1.6, 3.2);
       }
     }
     for (const c of critters) if (c.life <= 0) { if (c.where === 'water') { burst(c.x, c.y - 2, 'drop', 6, '#cbdbfc'); } else burst(c.x, c.y - 5, 'spark', 5, '#ffffff'); }
@@ -1102,7 +1115,8 @@
     if (!ST.addToPouch(c.id)) return;
     critters.splice(critters.indexOf(c), 1);
     burst(c.x, c.y - 4, 'spark', 12, '#fbf236');
-    floater(`Caught a ${a.name}!`, '#5b4630', c.x, c.y - 14);
+    if (a.kind === 'plant') { burst(c.x, c.y - 6, 'petal', 10, PLANT_COL[c.id] || '#f7b6c8'); burst(c.x, c.y - 4, 'leaf', 5); floater(`Picked a ${a.name}!`, '#3f7a3a', c.x, c.y - 14); }
+    else floater(`Caught a ${a.name}!`, '#5b4630', c.x, c.y - 14);
     snd('chime'); buzz(10); markSeen('catch');
     nextCritter = Math.max(nextCritter, t + rand(...D.GROWTH.critterEverySec) * 0.6);
     for (const r of here) if (!busy(r) && r.state !== 'sleep' && dist(r, c) < 30) { emote(r, '!', 1); r.facing = c.x > r.x ? 1 : -1; }
@@ -1229,15 +1243,20 @@
     const a = D.ANIMALS[c.id], flip = c.facing < 0;
     if (c.where === 'water') {
       const bob = Math.floor(t * 2 + c.ph) % 2;
-      if (PX.critterSwim) { const s = swimSpr(c.id); PX.blit(bx, s, c.x, c.y + bob, flip, Math.floor(s.width / 2), s.height); } // already cut at the waterline
+      if (PX.critterSwim) { const s = swimSpr(c.id, c.plant ? plantFrame(c) : 0); PX.blit(bx, s, c.x, c.y + bob, flip, Math.floor(s.width / 2), s.height); } // already cut at the waterline
       else {
         const s = critterSpr(c.id), wl = Math.round(c.y - 3);
         bx.save(); bx.beginPath(); bx.rect(0, 0, ww, wl); bx.clip(); PX.blit(bx, s, c.x, c.y + 3 + bob, flip, Math.floor(s.width / 2), s.height - 1); bx.restore();
         waterline(c.x, wl, Math.max(4, Math.round(s.width / 2) - 1));
       }
     } else {
-      const s = critterSpr(c.id);
-      if (c.where === 'air') { const fl = Math.floor(t * 8 + c.ph) % 2; shadow(c.x, Math.min(Lw.maxY, c.y + 22), 5); PX.blit(bx, s, c.x, c.y - fl, flip, Math.floor(s.width / 2), s.height - 1); }
+      const s = critterSpr(c.id, c.plant ? plantFrame(c) : 0);
+      if (c.plant && c.where !== 'air') { // rooted plants pop up to move, walkers waddle; a little soil mound where they stand
+        const hopY = c.hopT < 1 ? Math.round(Math.sin(c.hopT * Math.PI) * (c.rooted ? 5 : 1)) : 0, wob = c.hopT < 1 && !c.rooted ? (Math.floor(c.hopT * 6) % 2) : 0;
+        shadow(c.x, c.y, Math.max(7, s.width - 8));
+        if (c.rooted && !hopY) { bx.fillStyle = '#8f6a4a'; bx.fillRect(Math.round(c.x) - 4, Math.round(c.y) - 1, 9, 1); bx.fillStyle = '#b8946a'; bx.fillRect(Math.round(c.x) - 3, Math.round(c.y) - 2, 7, 1); }
+        PX.blit(bx, s, c.x + (wob ? c.facing : 0), c.y - hopY, flip, Math.floor(s.width / 2), s.height - 1);
+      } else if (c.where === 'air') { const fl = Math.floor(t * 8 + c.ph) % 2; shadow(c.x, Math.min(Lw.maxY, c.y + 22), 5); PX.blit(bx, s, c.x, c.y - fl, flip, Math.floor(s.width / 2), s.height - 1); }
       else { const hopY = c.hopT < 1 ? Math.round(Math.sin(c.hopT * Math.PI) * (c.where === 'coast' ? 2 : 4)) : 0; shadow(c.x, c.y, Math.max(7, s.width - 8)); PX.blit(bx, s, c.x, c.y - hopY, flip, Math.floor(s.width / 2), s.height - 1); }
     }
     if (!seen('catch') && Math.floor(t * 3) % 2) { const Y = Math.round(c.y) - (a.where === 'water' ? 12 : 21); bx.fillStyle = '#ffffff'; bx.fillRect(Math.round(c.x) - 1, Y, 3, 1); bx.fillRect(Math.round(c.x), Y - 1, 1, 3); }
@@ -1406,6 +1425,8 @@
     for (const p of Lw.props) { const g = GLOWS[p.kind]; if (!g) continue; const pulse = 0.8 + Math.sin(t * 2 + p.x) * 0.2; glow(p.x, p.y - p.c.height * g[1], g[2], g[3], 0.3 * lit * pulse); }
     // the rest house's windows light up (brighter when someone is inside)
     if (Lw.home) { const H = Lw.home, full = PS.S.sprouts.some(s => s.area === area && s.home); for (const [dx, dy] of H.info.win || []) { glow(H.x + dx, H.y + dy, full ? 7 : 5, '255,236,150', (full ? 0.4 : 0.22) * lit); bx.fillStyle = full ? '#fff27a' : '#f6c83a'; bx.fillRect(H.x + dx - 1, H.y + dy - 1, 2, 2); } }
+    // glowing plants
+    for (const c of critters) { const gcol = PLANT_GLOW[c.id]; if (gcol) glow(c.x, c.y - (c.where === 'water' ? 5 : 9), 8, gcol, 0.3 * lit * (0.75 + Math.sin(t * 2.4 + c.ph) * 0.25)); }
     // spooky Sprouts glow softly at night
     if (lit > 0.3) for (const r of here) { const sp = SPOOKY[r.s.look && r.s.look.skin]; if (sp && r.state !== 'travel') glow(r.x, (r.state === 'held' ? r.feetY : r.y - (r.state === 'fall' ? r.z : 0)) - 12, 10, sp.glow, 0.13 * lit); }
     // glowing reed tips and lotus buds, the lighthouse beam, floating lanterns
@@ -1436,6 +1457,8 @@
         case 'drop': bx.drawImage(PX.fx('drop', p.color), X, Y); break;
         case 'feather': bx.drawImage(PX.fx('feather'), X, Y); break;
         case 'dust': bx.fillStyle = p.color; bx.fillRect(X, Y, 1, 1); break;
+        case 'seed': p.vx = 4 + Math.sin(t * 3 + p.y * 0.2) * 4; bx.fillStyle = p.color; bx.fillRect(X, Y, 1, 1); bx.fillStyle = '#c8d0e0'; bx.fillRect(X - 1, Y + 1, 1, 1); break;
+        case 'petal': bx.fillStyle = p.color; if (Math.floor(t * 8 + p.x) % 2) bx.fillRect(X, Y, 2, 1); else bx.fillRect(X, Y, 1, 2); break;
         case 'bat': { const up = Math.floor(t * 8 + p.x) % 2; bx.fillStyle = p.color; bx.fillRect(X - 2, Y - up, 2, 1); bx.fillRect(X + 1, Y - up, 2, 1); bx.fillRect(X, Y, 1, 1); break; }
         case 'wisp': { p.vx = Math.sin(t * 3 + p.y * 0.3) * 4; bx.fillStyle = p.color; bx.fillRect(X, Y, 1, 2); bx.fillRect(X + (Math.floor(t * 4) % 2 ? 1 : -1), Y + 2, 1, 1); break; }
         case 'ripple': { const w = Math.round(3 + (0.8 - p.life) * 10); bx.fillStyle = p.color; bx.fillRect(X - w, Y, 2, 1); bx.fillRect(X + w - 1, Y, 2, 1); break; }

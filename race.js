@@ -148,7 +148,7 @@
     try { if (PX.item) return PX.item(kind, id); } catch (e) { /* fall through */ }
     return kind === 'egg' ? safeProp('egg') : null;
   }
-  function safeCritter(kind) { try { return PX.critter(kind); } catch (e) { return null; } }
+  function safeCritter(kind, f) { try { return PX.critter(kind, f || 0); } catch (e) { return null; } }
   const sprigAX = () => (PX.SPRIG_AX == null ? 16 : PX.SPRIG_AX);
   const sprigAY = () => (PX.SPRIG_AY == null ? 31 : PX.SPRIG_AY);
   function sprig(look, pose) { return PX.sprig(look, pose || {}); }
@@ -2242,8 +2242,11 @@
   // wild animals: PX.critter at garden size (crisp), hopping on land, bobbing in water (swim sprite), flapping in the air
   function animalView(r, fy, y0, t) {
     const s = segAtC(race.C, r.x), ground = y0 + GY + 1 - elevAt(V, r.x), moving = race.state === 'run' && !r.finished;
-    const a = D.ANIMALS[r.animal] || {}; let spr = safeCritter(r.animal) || icon('itembox'), y = ground;
-    if (s.type === 'swim' && sinkAt(V, r.x) > 2 && !r.finished) { try { spr = PX.critterSwim(r.animal) || spr; } catch (e) { /* optional */ } y = ground + 2 + Math.round(Math.sin(t * 4 + r.lane) * 0.8); }
+    const a = D.ANIMALS[r.animal] || {}, plant = a.kind === 'plant', pf = plant && PX.critterFrames ? [0, 1, 0, 1, 0, 2][Math.floor(t * (moving ? 6 : 3) + r.lane) % 6] : 0;
+    let spr = safeCritter(r.animal, pf) || icon('itembox'), y = ground;
+    if (s.type === 'swim' && sinkAt(V, r.x) > 2 && !r.finished) { try { spr = PX.critterSwim(r.animal, pf) || spr; } catch (e) { /* optional */ } y = ground + 2 + Math.round(Math.sin(t * 4 + r.lane) * 0.8); }
+    else if (plant && a.where === 'air' && !r.finished) y = ground - 4 + Math.round(Math.sin(t * 2.2 + r.lane) * 2); // the dandelion floats along
+    else if (plant && moving && s.type !== 'fly') y = ground - (Math.floor(r.x / 3) % 2); // plants waddle instead of hopping
     else if (s.type === 'fly' && moving) y = ground - 3 - (a.where === 'air' ? 3 : 0) + Math.round(Math.sin(r.animT * (a.where === 'air' ? 14 : 6)) * 1.5);
     else if (moving) y = ground - (Math.floor(r.x / (s.type === 'climb' ? 3 : 5)) % 2 ? (r.tired ? 1 : 3) : 0);
     else if (r.finished) y = ground - (Math.floor(r.animT * 3) % 2 ? 2 : 0);

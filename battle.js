@@ -120,8 +120,11 @@
     return f;
   }
   const wildList = area => Object.keys(D.ANIMALS).filter(k => D.ANIMALS[k].area === area);
+  // level order inside an area: gentler creatures (smaller total gives) get the lower levels, so new additions don't all land at the top
+  const giveSum = id => Object.values(D.ANIMALS[id].gives || {}).reduce((t, v) => t + Math.abs(v), 0);
+  const wildRank = area => wildList(area).map((id, i) => [id, giveSum(id) + i * 0.001]).sort((x, y) => x[1] - y[1]).map(x => x[0]);
   function wildLv(id, step) {
-    const A = D.ANIMALS[id], W = WILD.areas.find(a => a.id === A.area) || WILD.areas[0], list = wildList(A.area), i = Math.max(0, list.indexOf(id)), [a, b] = W.lv[step];
+    const A = D.ANIMALS[id], W = WILD.areas.find(a => a.id === A.area) || WILD.areas[0], list = wildRank(A.area), i = Math.max(0, list.indexOf(id)), [a, b] = W.lv[step];
     return Math.round(a + (b - a) * (list.length > 1 ? i / (list.length - 1) : 0));
   }
   // A wild animal fighter: its own 3 moves and element, stats from a Sprout-like spread of level L that leans toward its gives.
@@ -2229,9 +2232,9 @@
   }
   // big boss sprite (whole-pixel scaled) and its glowing charge aura
   const bigCache = {};
-  function bigCritter(id, S) {
-    const key = id + S; if (bigCache[key]) return bigCache[key];
-    const c = PX.critter(id), o = document.createElement('canvas'); o.width = c.width * S; o.height = c.height * S;
+  function bigCritter(id, S, f) {
+    const key = id + S + ':' + (f || 0); if (bigCache[key]) return bigCache[key];
+    const c = PX.critter(id, f || 0), o = document.createElement('canvas'); o.width = c.width * S; o.height = c.height * S;
     const x = o.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(c, 0, 0, o.width, o.height);
     return (bigCache[key] = o);
   }
@@ -2259,7 +2262,8 @@
   function drawFighter(side) {
     const f = V.b[side], A = V.a[side], sp = spot(side), dir = side === 'p' ? 1 : -1, boss = side === 'o' && V.boss, crit = side === 'o' && !!f.critter;
     let spr, ax, ay, flip;
-    if (crit) { spr = safe(() => bigCritter(f.critter, critScale()), null); if (!spr) return; ax = Math.floor(spr.width / 2); ay = spr.height; flip = true; }
+    const pf = crit && !boss && D.ANIMALS[f.critter] && D.ANIMALS[f.critter].kind === 'plant' && !A.fainting ? [0, 1, 0, 1, 0, 2][Math.floor(V.t * 3) % 6] : 0; // living plants sway and blink
+    if (crit) { spr = safe(() => bigCritter(f.critter, critScale(), pf), null); if (!spr) return; ax = Math.floor(spr.width / 2); ay = spr.height; flip = true; }
     else { if (!f.look) return; spr = safe(() => PX.sprig(f.look, poseFor(side)), null); if (!spr) return; ax = PX.SPRIG_AX || 16; ay = spr.height - 1; flip = side === 'p'; }
     let x = sp.x, y = sp.y;
     const bob = V.phase !== 'end' && !A.fainting && Math.floor(V.t * (boss ? 1.3 : 2) + (side === 'o' ? 1 : 0)) % 2 ? -1 : 0;

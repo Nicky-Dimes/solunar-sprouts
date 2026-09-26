@@ -193,6 +193,52 @@
     licoricelash: M('Licorice Lash', 'sweet', 45, 0.95, { status: { type: 'stun', chance: 0.2 } }, 'May stun.'),
     twist: M('Twist', 'sweet', 0, 1, { buff: { stat: 'eva', n: 2 } }, 'Twists away. Sharply raises Evasion.'),
     sugarshock: M('Sugar Shock', 'water', 80, 0.9, { status: { type: 'stun', chance: 0.15 } }, 'A fizzy zap. May stun.'),
+    // living plants (meadow)
+    sunnyspin: M('Sunny Spin', 'light', 45, 0.95, {}, 'A dizzy, sunny twirl.'),
+    seedspit: M('Seed Spit', 'leaf', 18, 0.95, { hits: 3 }, 'Spits three seeds.'),
+    photosynth: M('Photosynthesis', 'light', 0, 1, { heal: 0.4 }, 'Soaks up light to heal.'),
+    sporepuff: M('Spore Puff', 'stone', 0, 0.9, { status: { type: 'sleep', chance: 0.5 } }, 'A sleepy puff. May cause sleep.'),
+    capbonk: M('Cap Bonk', 'stone', 55, 0.95, { status: { type: 'stun', chance: 0.1 } }, 'A bouncy headbutt. May stun.'),
+    shroomshield: M('Shroom Shield', 'stone', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Hides under its cap. Sharply raises Defense.'),
+    puffdrift: M('Puff Drift', 'sky', 0, 1, { buff: { stat: 'eva', n: 2 } }, 'Floats away. Sharply raises Evasion.'),
+    seedstorm: M('Seed Storm', 'sky', 16, 0.95, { hits: 4 }, 'Four fluffy seed hits.'),
+    windride: M('Wind Ride', 'sky', 70, 0.9, {}, 'Rides a gust into the target.'),
+    luckyleaf: M('Lucky Leaf', 'leaf', 40, 1, { crit: 0.3 }, 'Often lands a lucky hit.'),
+    clovercharm: M('Clover Charm', 'leaf', 0, 1, { heal: 0.25, cleanse: true }, 'Heals and clears status.'),
+    fourleaf: M('Four Leaf', 'leaf', 20, 0.95, { hits: 4 }, 'Four leafy hits.'),
+    // living plants (beach)
+    needlejab: M('Needle Jab', 'stone', 40, 1, { first: true }, 'A quick poke. Goes first.'),
+    cactusguard: M('Cactus Guard', 'stone', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Prickles up. Sharply raises Defense.'),
+    prickleburst: M('Prickle Burst', 'stone', 22, 0.9, { hits: 3 }, 'Three prickly hits.'),
+    kelpwrap: M('Kelp Wrap', 'water', 40, 1, { debuff: { stat: 'spd', n: 1 } }, 'Wraps up the target. Lowers Speed.'),
+    tidetangle: M('Tide Tangle', 'water', 0, 0.9, { status: { type: 'stun', chance: 0.5 } }, 'Tangles the target. May stun.'),
+    seasway: M('Sea Sway', 'water', 0, 1, { heal: 0.3, buff: { stat: 'eva', n: 1 } }, 'Sways with the waves. Heals.'),
+    coconutbonk: M('Coconut Bonk', 'stone', 60, 0.9, { status: { type: 'stun', chance: 0.15 } }, 'Ouch! May stun.'),
+    palmfan: M('Palm Fan', 'sky', 35, 1, { buff: { stat: 'spd', n: 1 } }, 'A breezy fan. Raises Speed.'),
+    hardshell: M('Hard Shell', 'stone', 0, 1, { buff: { stat: 'def', n: 3 } }, 'Hugely raises Defense.'),
+    // living plants (moonlit)
+    glowspore: M('Glow Spore', 'light', 35, 1, { status: { type: 'stun', chance: 0.3 } }, 'Glittering spores. May stun.'),
+    capglow: M('Cap Glow', 'light', 0, 1, { heal: 0.25, buff: { stat: 'atk', n: 1 } }, 'Heals and raises Attack.'),
+    lanternpuff: M('Lantern Puff', 'light', 65, 0.95, {}, 'A bright puff of light.'),
+    snapjaw: M('Snap Jaw', 'shadow', 55, 0.95, { crit: 0.15 }, 'Snap! Crits often.'),
+    thornlash: M('Thorn Lash', 'shadow', 45, 0.95, { status: { type: 'poison', chance: 0.3 } }, 'May poison.'),
+    devour: M('Gobble', 'shadow', 50, 0.95, { drain: 0.5 }, 'Gobbles energy. Heals half the damage.'),
+    lunarpetal: M('Lunar Petal', 'shadow', 50, 1, {}, 'A silver petal slice.'),
+    lotusrest: M('Lotus Rest', 'water', 0, 1, { heal: 0.45 }, 'Rests on the water. Heals a lot.'),
+    moonripple: M('Moon Ripple', 'water', 60, 0.95, { debuff: { stat: 'acc', n: 1 } }, 'Lowers accuracy.'),
+    // living plants (candy)
+    lollispin: M('Lolli Spin', 'sweet', 45, 0.95, {}, 'A swirly spin.'),
+    sugarpetal: M('Sugar Petal', 'sweet', 20, 1, { hits: 3 }, 'Three sugary petals.'),
+    sweetscent: M('Sweet Scent', 'sweet', 0, 1, { debuff: { stat: 'eva', n: 2 } }, 'Sharply lowers Evasion.'),
+    marshpuff: M('Marsh Puff', 'sweet', 0, 1, { buff: { stat: 'def', n: 2 }, heal: 0.1 }, 'Puffs up soft. Raises Defense.'),
+    gooeycap: M('Gooey Cap', 'sweet', 45, 1, { debuff: { stat: 'spd', n: 1 } }, 'Sticky! Lowers Speed.'),
+    sleepyspore: M('Sleepy Spore', 'sweet', 0, 0.9, { status: { type: 'sleep', chance: 0.55 } }, 'Often causes sleep.'),
+    twirlwhip: M('Twirl Whip', 'sweet', 50, 0.95, {}, 'A twirly vine whip.'),
+    stickyvine: M('Sticky Vine', 'sweet', 0, 1, { debuff: { stat: 'spd', n: 2 } }, 'Sharply lowers Speed.'),
+    licoknot: M('Licorice Knot', 'sweet', 75, 0.9, { status: { type: 'stun', chance: 0.1 } }, 'Ties the target in knots.'),
+    fizzbloom: M('Fizz Bloom', 'water', 40, 1, { status: { type: 'stun', chance: 0.2 } }, 'A fizzy flower pop. May stun.'),
+    lilyfloat: M('Lily Float', 'water', 0, 1, { heal: 0.3, buff: { stat: 'spd', n: 1 } }, 'Heals and raises Speed.'),
+    candyrain: M('Candy Rain', 'sweet', 16, 0.95, { hits: 4 }, 'Four candy drops.'),
     // rare creatures
     pixiedust: M('Pixie Dust', 'light', 40, 1, { status: { type: 'sleep', chance: 0.4 } }, 'May cause sleep.'),
     fairykiss: M('Fairy Kiss', 'light', 0, 1, { heal: 0.55, cleanse: true }, 'Big heal. Clears status.'),
@@ -228,6 +274,7 @@
   // part: body part grown (+0.34 size per absorb, max 1). moves: 3 moves, unlocked at 1 / 3 / 6 absorbed.
   // nature: shift toward Sun (+) or Moon (-). happy: mood change.
   const A = (name, area, where, time, gives, part, el, moves, nature, blurb) => ({ name, area, where, time, gives, part, el, moves, nature: nature || 0, blurb });
+  const P = (...a) => Object.assign(A(...a), { kind: 'plant' }); // living plants and flowers
   const ANIMALS = {
     sparrow: A('Sparrow', 'meadow', 'land', 'day', { fly: 14, run: 5 }, 'wings', 'sky', ['peck', 'gust', 'skydive'], 1, 'Quick little flier.'),
     hare: A('Hare', 'meadow', 'land', 'day', { run: 14, stamina: 5 }, 'ears', 'normal', ['quickhop', 'doublekick', 'burrowdash'], 0, 'Fast, springy legs.'),
@@ -269,6 +316,21 @@
     moondeer: A('Moon Deer', 'moonlit', 'land', 'any', { run: 12, stamina: 6 }, 'horns', 'light', ['antlerram', 'moonleap', 'starcharge'], 2, 'Silver spots like stars.'),
     marshbunny: A('Marsh Bunny', 'candy', 'land', 'day', { run: 11, stamina: 7 }, 'ears', 'sweet', ['marshhop', 'puffpunch', 'toasty'], 2, 'Squishy as a marshmallow.'),
     chocomouse: A('Choco Mouse', 'candy', 'land', 'night', { run: 10, power: 7 }, 'ears', 'sweet', ['nibble', 'cocoadust', 'fudgeslam'], -1, 'Smells like cocoa.'),
+    // living plants: caught and bonded just like animals (kind: 'plant')
+    sunbuddy: P('Sunny Sunflower', 'meadow', 'land', 'day', { stamina: 8, power: 6 }, 'petals', 'light', ['sunnyspin', 'seedspit', 'photosynth'], 3, 'Always turns to face the sun.'),
+    shroomy: P('Shroomy', 'meadow', 'land', 'night', { stamina: 10, power: 5 }, 'mushcap', 'stone', ['sporepuff', 'capbonk', 'shroomshield'], -2, 'A little walking mushroom.'),
+    puffball: P('Dandelion Puff', 'meadow', 'air', 'day', { fly: 12, run: 4 }, 'fluff', 'sky', ['puffdrift', 'seedstorm', 'windride'], 1, 'Drifts wherever the wind goes.'),
+    cloverkin: P('Lucky Clover', 'meadow', 'land', 'any', { run: 8, stamina: 6 }, 'leafears', 'leaf', ['luckyleaf', 'clovercharm', 'fourleaf'], 2, 'Four leaves, lots of luck.'),
+    cactling: P('Cactling', 'beach', 'coast', 'day', { power: 10, stamina: 6, swim: -3 }, 'spikes', 'stone', ['needlejab', 'cactusguard', 'prickleburst'], 0, 'Prickly outside, soft inside.'),
+    kelpie: P('Kelpie', 'beach', 'water', 'any', { swim: 11, stamina: 6 }, 'vines', 'water', ['kelpwrap', 'tidetangle', 'seasway'], 1, 'A wiggly bunch of kelp.'),
+    coconut: P('Coco Sprout', 'beach', 'land', 'day', { power: 9, stamina: 7 }, 'leafears', 'stone', ['coconutbonk', 'palmfan', 'hardshell'], 1, 'A coconut with a palm-leaf hairdo.'),
+    glowcap: P('Glowcap', 'moonlit', 'land', 'any', { stamina: 9, fly: 5 }, 'mushcap', 'light', ['glowspore', 'capglow', 'lanternpuff'], 1, 'A mushroom that glows in the dark.'),
+    snapvine: P('Snapvine', 'moonlit', 'land', 'night', { power: 12, run: 4 }, 'thorns', 'shadow', ['snapjaw', 'thornlash', 'devour'], -3, 'A snappy flytrap. Friendly, mostly.'),
+    moonlotus: P('Moon Lotus', 'moonlit', 'water', 'night', { swim: 8, stamina: 8 }, 'petals', 'water', ['lunarpetal', 'lotusrest', 'moonripple'], -1, 'Opens only under the moon.'),
+    lollibloom: P('Lollibloom', 'candy', 'land', 'day', { run: 8, power: 6 }, 'petals', 'sweet', ['lollispin', 'sugarpetal', 'sweetscent'], 2, 'A flower made of lollipop.'),
+    marshroom: P('Marshroom', 'candy', 'land', 'night', { stamina: 11, power: 4 }, 'mushcap', 'sweet', ['marshpuff', 'gooeycap', 'sleepyspore'], -1, 'A squishy marshmallow mushroom.'),
+    licovine: P('Licorice Vine', 'candy', 'land', 'any', { power: 9, run: 6 }, 'vines', 'sweet', ['twirlwhip', 'stickyvine', 'licoknot'], 0, 'Twists and curls everywhere.'),
+    sugarlily: P('Sugar Lily', 'candy', 'water', 'day', { swim: 10, fly: 4 }, 'petals', 'water', ['fizzbloom', 'lilyfloat', 'candyrain'], 1, 'Floats on the soda sea.'),
     licoriceeel: A('Licorice Eel', 'candy', 'water', 'any', { swim: 12, run: 6 }, 'fins', 'sweet', ['licoricelash', 'twist', 'sugarshock'], -1, 'Long, twisty and chewy.'),
   };
 
@@ -495,7 +557,8 @@
 
   const PART_NAMES = { wings: 'Wings', ears: 'Long ears', fins: 'Fins', horns: 'Horns', tail: 'Tail', shell: 'Shell', antennae: 'Antennae', claws: 'Claws',
     spikes: 'Spikes', unihorn: 'Unicorn horn', fairywings: 'Fairy wings', flamewings: 'Flame wings', batwings: 'Bat wings', dragonwings: 'Dragon wings',
-    fluff: 'Fluff', tentacles: 'Tentacles', multitail: 'Nine tails', spots: 'Star spots' };
+    fluff: 'Fluff', tentacles: 'Tentacles', multitail: 'Nine tails', spots: 'Star spots',
+    petals: 'Petal collar', mushcap: 'Mushroom cap', leafears: 'Leaf ears', vines: 'Vines', thorns: 'Thorns' };
 
   // ---------- Day / night ----------
   const CLOCK = { phaseMinutes: 15, fadeSeconds: 45 }; // switches every 15 real minutes
