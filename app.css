@@ -17,7 +17,7 @@
 #nav{flex:0 0 auto;display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));background:var(--panel);
   border-top:3px solid var(--edge);position:relative;z-index:5}
 #nav button{position:relative;border:0;background:transparent;border-radius:12px;padding:4px 0 3px;display:flex;flex-direction:column;align-items:center;gap:1px;
-  font-family:var(--f-px);font-weight:600;font-size:12px;color:var(--ink-soft);min-height:48px}
+  font-family:var(--f-ui);font-weight:600;font-size:14px;color:var(--ink-soft);min-height:48px}
 #nav button canvas{width:32px;height:32px}
 #nav button[aria-current="page"]{background:var(--sun);color:#4a3210;box-shadow:inset 0 -3px 0 var(--sun-edge)}
 #nav .badge{position:absolute;top:2px;right:calc(50% - 22px);width:12px;height:12px;border-radius:50%;background:var(--berry);border:2px solid var(--panel)}
@@ -32,7 +32,7 @@
 .modal-btns.row{flex-direction:row}
 .modal-btns.row .btn{flex:1}
 .chips-list{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
-.chip-el{display:inline-flex;align-items:center;gap:4px;border-radius:8px;padding:2px 8px;font-family:var(--f-px);font-weight:600;font-size:12px;color:#fff}
+.chip-el{display:inline-flex;align-items:center;gap:4px;border-radius:8px;padding:2px 8px;font-family:var(--f-ui);font-weight:600;font-size:14px;color:#fff}
 
 /* sprout picker list (PS.ui.pickSprout) */
 .pick-list{display:grid;gap:8px;margin-top:8px}
@@ -41,7 +41,7 @@
 .pick-item b{font-family:var(--f-px);font-size:17px;display:block}
 .pick-item small{color:var(--ink-soft);font-size:13px;display:block;line-height:1.3}
 .pick-item[disabled]{opacity:.45}
-.pick-item .tag{font-family:var(--f-px);font-weight:600;font-size:12px;background:var(--slot);border-radius:8px;padding:2px 8px}
+.pick-item .tag{font-family:var(--f-ui);font-weight:600;font-size:14px;background:var(--slot);border-radius:8px;padding:2px 8px}
 
 /* dev panel */
 .dev-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -61,4 +61,4 @@
 .bk-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .bk-actions .btn{flex:1 1 140px}
 .bk-code{font:500 12px ui-monospace,Menlo,monospace;word-break:break-all;resize:none}
-.bk-ver{font-size:12px;color:var(--ink-soft);margin-top:14px}
+.bk-ver{font-size:13px;color:var(--ink-soft);margin-top:14px}

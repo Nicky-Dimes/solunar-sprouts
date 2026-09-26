@@ -44,7 +44,7 @@
   .mm-tools .field-input{margin:4px 6px 0}
   .mm-foot{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .mm-foot.solo{grid-template-columns:1fr}
-  .mm-ver{text-align:center;font-size:12px;font-weight:600;color:#fff;text-shadow:0 1px 0 #222034;margin:0}
+  .mm-ver{text-align:center;font-size:13px;font-weight:600;color:#fff;text-shadow:0 1px 0 #222034;margin:0}
   `;
   document.head.appendChild(style);
 
