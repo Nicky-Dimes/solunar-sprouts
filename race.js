@@ -2239,7 +2239,7 @@
     if (big === 2) lx.drawImage(spr, x - AX * 2, y - AY * 2 - 1, spr.width * 2, spr.height * 2);
     else PX.blit(lx, spr, x, y, false, AX, AY);
   }
-  // wild animals: PX.critter at 2x (crisp), hopping on land, bobbing in water (swim sprite), flapping in the air
+  // wild animals: PX.critter at garden size (crisp), hopping on land, bobbing in water (swim sprite), flapping in the air
   function animalView(r, fy, y0, t) {
     const s = segAtC(race.C, r.x), ground = y0 + GY + 1 - elevAt(V, r.x), moving = race.state === 'run' && !r.finished;
     const a = D.ANIMALS[r.animal] || {}; let spr = safeCritter(r.animal) || icon('itembox'), y = ground;
@@ -2248,7 +2248,7 @@
     else if (moving) y = ground - (Math.floor(r.x / (s.type === 'climb' ? 3 : 5)) % 2 ? (r.tired ? 1 : 3) : 0);
     else if (r.finished) y = ground - (Math.floor(r.animT * 3) % 2 ? 2 : 0);
     else y = ground - (Math.floor(r.animT * 2 + r.lane) % 2);
-    return { spr, y, k: spr.width >= 24 ? 1 : 2 };
+    return { spr, y, k: race.mods && race.mods.giant ? 2 : 1 }; // same size as in the garden (Giant Mode doubles everyone)
   }
   function blitAnimal(spr, x, y, k) { lx.drawImage(spr, Math.round(x - spr.width * k / 2), Math.round(y - spr.height * k + k), spr.width * k, spr.height * k); }
   function drawSled(sx, fy, big) { // a little wooden sled drawn in front of the rider

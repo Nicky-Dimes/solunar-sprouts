@@ -62,7 +62,7 @@
       { id: 'moonlit', unlock: 'tide', lv: [[30, 40], [48, 60], [70, 86]] },
       { id: 'candy', unlock: 'moon', lv: [[44, 54], [64, 78], [95, 112]] },
     ],
-    steps: [{ name: 'Little', mult: 0.7, smart: 0.3, scale: 2, moves: 2 }, { name: 'Big', mult: 0.95, smart: 0.55, scale: 2 }, { name: 'Alpha', mult: 1.1, smart: 0.8, scale: 3 }],
+    steps: [{ name: 'Little', mult: 0.7, smart: 0.3, scale: 1, moves: 2 }, { name: 'Big', mult: 0.95, smart: 0.55, scale: 1 }, { name: 'Alpha', mult: 1.1, smart: 0.8, scale: 1 }], // garden-sized animals (bosses stay giant)
     coins: lv => Math.max(6, Math.round(0.09 * Math.pow(lv, 1.9))),
     xp: lv => (0.75 * lv + 5) * 0.6,
   };
@@ -2184,7 +2184,7 @@
     }
     // arena pads
     for (const side of ['o', 'p']) {
-      const s = spot(side), big = side === 'o' && V.boss, wild = side === 'o' && V.wild, rx = big ? 32 : wild ? (V.wild.step === 2 ? 26 : 20) : side === 'o' ? 18 : 22, ry = big ? 6 : wild && V.wild.step === 2 ? 5 : side === 'o' ? 4 : 5;
+      const s = spot(side), big = side === 'o' && V.boss, wild = side === 'o' && V.wild, rx = big ? 32 : wild ? 12 : side === 'o' ? 18 : 22, ry = big ? 6 : wild ? 3 : side === 'o' ? 4 : 5;
       ellipse(g, s.x, s.y - 1, rx, ry, G(T.pad[1]), G(T.pad[0]), G(T.pad[2]));
       if (T.ground === 'tiles') { for (let a = 0; a < 6.28; a += 0.8) px(g, Math.round(s.x + Math.cos(a) * rx * 0.6), Math.round(s.y - 1 + Math.sin(a) * ry * 0.5), 1, 1, T.pad[2]); }
     }
