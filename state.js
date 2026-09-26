@@ -491,7 +491,10 @@
     if (!PS.S.activeId) PS.S.activeId = s.id;
     emit('egg:hatch', { egg, s }); save(); return s;
   }
-  function moveSprout(s, area) { if (!D.AREAS[area]) return; s.area = area; emit('sprout:update', { s }); save(); }
+  function moveSprout(s, area) { if (!D.AREAS[area]) return; s.area = area; delete s.home; emit('sprout:update', { s }); save(); }
+  // each area has a little house where Sprouts can rest (s.home = true; no field = playing outside)
+  const HOME_NAMES = { meadow: 'Mushroom House', beach: 'Beach Hut', moonlit: 'Crystal Cave', candy: 'Gingerbread House' };
+  const homeName = area => HOME_NAMES[area] || 'House';
   function renameSprout(s, name) { s.name = String(name || '').trim().slice(0, 12) || s.name; emit('sprout:update', { s }); save(); }
   const get = id => PS.S.sprouts.find(s => s.id === id);
   const active = () => get(PS.S.activeId) || PS.S.sprouts[0] || null;
@@ -591,7 +594,7 @@
       makeSprout, addXp, gain, totalLevels, natureKind, domStat, formInfo, movesOf, knownMoves, elementsOf, battleStats,
       raceRating, staminaRating, lookOf, absorb, feed, pet, roughHandle, creature, tierOf, topAnimal,
       canCatch, addToPouch, takeFromPouch, addCoins, spend, buy, useFruit, addFruit, rollDrop,
-      addEgg, hatchEgg, moveSprout, renameSprout, get, active, setActive,
+      addEgg, hatchEgg, moveSprout, homeName, renameSprout, get, active, setActive,
       raceProgress, raceUnlocked, raceRivals, finishRace,
       leagueProgress, leagueUnlocked, makeNPC, finishBattle, checkEvolve, evolveTo, flowerFor, PART_RACE, esc,
       sellPrice, canSell, sellSprout, gumball, items, usePaint, usePattern, ownsHat, wear,

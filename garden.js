@@ -43,7 +43,8 @@
       water: ['#9fe6f7', '#5fcde4', '#3f9fd0', '#2f7fb8'], foam: '#ffffff', hl: '#d6f5fd', cloud: ['#ffffff', '#dfeafc', '#bccdf0'],
       path: ['#f2e9cf', '#e2d3ae', '#c4ae86'], night: [20, 18, 64, 0.36], dim: 0, tree: 'bigtree', house: true, deco: 'meadow', fish: '32,70,120',
       props: [['bush', 0.5, 0.0], ['fence', 0.33, 0.01], ['rock', 0.2, 0.7], ['flowerbed', 0.42, 0.9], ['bush', 0.05, 0.22], ['stump', 0.16, 0.44],
-        ['flowerbed', 0.1, 0.96], ['bench', 0.28, 0.62], ['mushrooms', 0.44, 0.78], ['bush', 0.48, 0.99], ['rock', 0.05, 0.39]],
+        ['flowerbed', 0.1, 0.96], ['bench', 0.28, 0.62], ['mushrooms', 0.5, 0.8], ['bush', 0.48, 0.99], ['rock', 0.05, 0.39]],
+      home: ['shroomhouse', 0.42, 0.72],
       fruitTrees: [['tree', 0.5, 0.56], ['tree', 0.06, 0.66], ['tree', 0.26, 0.88]],
     },
     beach: {
@@ -55,7 +56,8 @@
       path: null, night: [20, 18, 64, 0.36], dim: 0, tree: 'palm', surf: true, openSea: true, deco: 'beach', fish: '20,60,120',
       props: [['umbrella', 0.44, 0.04], ['sandcastle', 0.33, 0.86], ['shells', 0.08, 0.62], ['rockpool', 0.47, 0.97], ['shells', 0.34, 0.3],
         ['umbrella', 0.12, 0.93], ['driftwood', 0.2, 0.7], ['surfboard', 0.47, 0.6], ['bucket', 0.42, 0.88], ['ball', 0.28, 0.08],
-        ['towel', 0.25, 0.5], ['rock', 0.47, 0.36], ['shells', 0.46, 0.76]],
+        ['towel', 0.44, 0.46], ['rock', 0.47, 0.36], ['shells', 0.46, 0.76]],
+      home: ['beachhut', 0.14, 0.52],
       fruitTrees: [['palm', 0.06, 0.34], ['palm', 0.05, 0.8], ['palm', 0.32, 0.68]],
     },
     moonlit: {
@@ -66,8 +68,9 @@
       dots: ['#9fd8ff', '#c9a2f0', '#a6f2d3', '#fff6c9'], dotC: '#ffffff', sand: '#b9b3cc', wet: '#8f88a8', sandEdge: '#7a7496',
       water: ['#6a7cb8', '#4a5a98', '#36427e', '#283068'], foam: '#cbdbfc', hl: '#9fb0e8', cloud: ['#9a88c8', '#7e6cb0', '#665498'],
       path: ['#c0c0d8', '#9a9ab8', '#6a6a8e'], night: [26, 14, 60, 0.32], dim: 0.16, tree: 'glowtree', bigMoon: true, deco: 'moonlit', fish: '10,10,40',
-      props: [['crystal', 0.44, 0.0], ['glowshroom', 0.16, 0.56], ['lantern', 0.37, 0.86], ['glowshroom', 0.48, 0.5], ['crystal', 0.08, 0.95], ['lantern', 0.3, 0.3],
-        ['mushrooms', 0.22, 0.84], ['moonstone', 0.12, 0.4], ['fern', 0.3, 0.72], ['fern', 0.04, 0.2], ['moonstone', 0.49, 0.96]],
+      props: [['crystal', 0.44, 0.0], ['glowshroom', 0.16, 0.56], ['lantern', 0.44, 0.9], ['glowshroom', 0.48, 0.5], ['crystal', 0.08, 0.95], ['lantern', 0.3, 0.3],
+        ['mushrooms', 0.16, 0.9], ['moonstone', 0.12, 0.4], ['fern', 0.3, 0.72], ['fern', 0.04, 0.2], ['moonstone', 0.49, 0.96]],
+      home: ['crystalcave', 0.3, 0.9],
       fruitTrees: [['glowtree', 0.08, 0.76], ['glowtree', 0.46, 0.72]],
     },
     candy: {
@@ -80,6 +83,7 @@
       path: ['#ffffff', '#fcd8e8', '#e8a2c4'], night: [40, 16, 70, 0.36], dim: 0, tree: 'lollitree', house: true, fizz: true, deco: 'candy', fish: '150,40,100',
       props: [['candycane', 0.5, 0.03], ['cupcake', 0.07, 0.74], ['gumdrops', 0.2, 0.9], ['gumball', 0.12, 0.46], ['candycane', 0.14, 0.98], ['gumdrops', 0.1, 0.2],
         ['donut', 0.47, 0.62], ['lollipop', 0.26, 0.72], ['lollipop', 0.47, 0.45], ['icecream', 0.3, 0.98], ['donut', 0.2, 0.6], ['gumdrops', 0.48, 0.97]],
+      home: ['gingerhouse', 0.5, 0.83],
       fruitTrees: [['lollitree', 0.36, 0.84], ['lollitree', 0.06, 0.92], ['lollitree', 0.45, 0.2]],
     },
   };
@@ -169,6 +173,10 @@
   const ptr = { x: 0, y: 0, vx: 0, px: 0, py: 0 };
   let press = null, drag = null, trayPress = null;
   const egw = new Map();             // egg id -> wobble timer
+  // Sprouts can rest inside the area's house (s.home = true); they don't walk around the garden while inside
+  const entering = new Set();        // walking to the door right now (still drawn until they pop in)
+  const isOut = s => s.area === area && (!s.home || entering.has(s.id));
+  let hintUntil = 0, hintReset = true;
 
   // ---------------- geometry ----------------
   const shoreAt = y => Lw.shore[clamp(Math.round(y), 0, Lw.shore.length - 1)] || ww * 0.6;
@@ -199,11 +207,18 @@
   }
   function buildProps() {
     const th = TH[area], theme = themeOf(area);
+    Lw.home = null;
+    if (th.home) {
+      const [kind, fx, fy] = th.home, c = propSpr(kind, theme), y = Math.round(Lw.minY + Lw.span * fy), info = (PX.HOMES && PX.HOMES[kind]) || { door: [0, 0], win: [], w: c.width - 8, h: c.height - 2 };
+      const x = Math.max(Math.round(c.width / 2) + 1, Math.round(Math.min(ww * fx, shoreAt(y) - c.width / 2 - 3)));
+      Lw.home = { kind, x, y, c, info, w: info.w, h: info.h, door: { x: x + info.door[0], y: y + info.door[1] } };
+    }
+    const H = Lw.home;
     Lw.props = th.props.map(([kind, fx, fy]) => {
       const c = propSpr(kind, theme), y = Math.round(Lw.minY + Lw.span * fy);
       const x = Math.round(Math.min(ww * fx, shoreAt(y) - c.width / 2 - 3));
       return { kind, x: Math.max(Math.round(c.width / 2) + 1, x), y, c };
-    });
+    }).filter(p => !H || Math.abs(p.x - H.x) > (p.c.width + H.w) / 2 - 2 || p.y < H.y - H.h + 4 || p.y - p.c.height > H.y - 2);
     // fruit trees: the area's main tree first (its 3 fruit slots are the ones old saves already have), then the others
     Lw.trees = [{ kind: th.tree, x: Lw.tree.x, y: Lw.tree.y }].concat((th.fruitTrees || []).map(([kind, fx, fy]) => {
       const c = propSpr(kind, theme), y = Math.round(Lw.minY + Lw.span * fy);
@@ -219,6 +234,7 @@
     for (let i = 0; i < 40; i++) {
       const y = rand(Lw.minY + 2, Lw.maxY), x = rand(8, shoreAt(y) - 8);
       if ((Lw.trees || []).some(T => Math.abs(x - T.x) < 8 && Math.abs(y - T.y) < 6)) continue;
+      if (Lw.home && Math.abs(x - Lw.home.x) < Lw.home.w / 2 + 3 && y > Lw.home.y - 12 && y < Lw.home.y + 6) continue;
       if (Lw.props.some(p => Math.abs(x - p.x) < p.c.width / 2 && Math.abs(y - p.y) < 4)) continue;
       return { x, y };
     }
@@ -580,9 +596,9 @@
   // start the view on your partner (or an egg) in this area
   function focusCamera() {
     let fx = ww * 0.42, fy = Lw.minY + Lw.span * 0.5;
-    const mine = PS.S.sprouts.filter(x => x.area === area), act = ST.active();
+    const mine = PS.S.sprouts.filter(isOut), act = ST.active();
     const s0 = mine.includes(act) ? act : mine[0], r = s0 && RT.get(s0.id);
-    if (r) { fx = r.x; fy = r.y - 10; } else { const e = PS.S.eggs.find(x => x.area === area); if (e) fy = Lw.minY + Lw.span * 0.46; }
+    if (r) { fx = r.x; fy = r.y - 10; } else { const e = PS.S.eggs.find(x => x.area === area); if (e) fy = Lw.minY + Lw.span * 0.46; else if (Lw.home && PS.S.sprouts.some(x => x.area === area)) { fx = Lw.home.x; fy = Lw.home.y - 20; } }
     camX = fx - viewW() * 0.45; camY = fy - viewH() * 0.52; camV.x = camV.y = 0; zoomAnim = null;
     clampCam();
   }
@@ -705,7 +721,7 @@
   function lookFor(r) { if (!r.look || t > r.lookT) { r.look = ST.lookOf(r.s); r.lookT = t + 1.2; } return r.look; }
   function emote(r, e, dur) { r.emote = e; r.emoteT = dur || 1.6; }
   function hop(r) { r.hopT = 0.35; }
-  const busy = r => ['held', 'fall', 'travel', 'arrive', 'cocoon', 'wait'].includes(r.state);
+  const busy = r => ['held', 'fall', 'travel', 'arrive', 'cocoon', 'wait', 'enter'].includes(r.state);
   function headY(r) { const base = r.state === 'held' ? r.feetY : r.state === 'fall' ? r.y - r.z : r.y; return base - (r.s.stage === 2 ? 30 : 23); }
   function addXp(r, stat, amt) { r.acc[stat] = (r.acc[stat] || 0) + amt; }
   function flushXp(r) {
@@ -799,6 +815,10 @@
         if (r.x > ww + 12) finishMove(s, r.dest);
         break;
       }
+      case 'enter': // walking home to rest
+        r.tx = Lw.home ? Lw.home.door.x : r.x; r.ty = Lw.home ? Lw.home.door.y + 1 : r.y;
+        if (!Lw.home || moveTo(speed * 1.3)) finishInside(r);
+        break;
       case 'arrive':
         if (moveTo(speed * 0.6)) { const q = lawnPoint(); goTo(r, q.x, q.y, null); emote(r, 'sparkle', 1.4); }
         break;
@@ -850,6 +870,7 @@
   function safeHeight(s) { const p = s.parts || {}; const wingy = Math.max(p.wings || 0, p.batwings || 0, p.fairywings || 0, p.flamewings || 0, p.dragonwings || 0); return Math.round((Lw.minY - 14) * 0.72) + s.stats.fly.lv * 2 + wingy * 20; }
   function heldGround(r) { return clamp(r.feetY + TUNE.holdLift, Lw.minY, Lw.maxY); }
   function release(r) {
+    if (overHome(r.x, r.feetY - 4)) { r.x = Lw.home.door.x; r.y = Lw.home.door.y + 1; r.state = 'idle'; goInside(r.s, true); return; }
     const gy = heldGround(r);
     r.z = Math.max(0, gy - r.feetY); r.z0 = r.z; r.y = gy; r.vz = 0;
     r.flutter = r.z > TUNE.flutterAt && r.z <= safeHeight(r.s); r.state = 'fall';
@@ -930,6 +951,73 @@
     ST.moveSprout(s, dest); RT.delete(s.id); arrivals.add(s.id);
     PS.ui.toast(`${s.name} swam to ${toArea(dest)}`, 2800);
     markSeen('travel'); updatePill();
+  }
+
+  // ---------------- the rest house (pet storage) ----------------
+  function overHome(x, y) { const H = Lw.home; return !!H && Math.abs(x - H.x) < H.w / 2 && y > H.y - H.h && y < H.y + 3; }
+  function goInside(s, now) {
+    const r = RT.get(s.id);
+    if (r && ['travel', 'arrive', 'cocoon', 'wait', 'fall'].includes(r.state)) { PS.ui.toast(`${s.name} is busy right now.`, 1800); return false; }
+    s.home = true; PS.save();
+    if (!r || !Lw.home) { RT.delete(s.id); updatePill(); return true; }
+    entering.add(s.id); r.target = null; r.eat = null; r.mood = null;
+    if (now) finishInside(r); else { r.state = 'enter'; emote(r, 'heart', 1.2); }
+    return true;
+  }
+  function finishInside(r) {
+    const H = Lw.home;
+    if (H) { burst(H.door.x, H.door.y - 6, 'spark', 10, '#fff27a'); floater(`${r.s.name} is resting`, '#5b4630', H.door.x, H.door.y - H.h - 4); }
+    snd('pop'); flushXp(r); entering.delete(r.id); RT.delete(r.id);
+    if (sel === r.id) closeCard();
+    markSeen('home'); updatePill();
+  }
+  function comeOut(s) {
+    delete s.home; entering.delete(s.id); PS.save();
+    const H = Lw.home; if (!H) { updatePill(); return; }
+    RT.delete(s.id); spawnAt.set(s.id, { x: H.door.x, y: H.door.y + 1 });
+    const r = getRT(s); hop(r); emote(r, 'sparkle', 1.4); r.cheerT = 0.8;
+    goTo(r, H.door.x + rand(-22, 22), H.door.y + rand(8, 18), null);
+    burst(H.door.x, H.door.y - 6, 'spark', 10, '#ffffff'); snd('coo'); updatePill();
+  }
+  function openHome() {
+    const H = Lw.home; if (!H) return;
+    closeCard(); markSeen('home');
+    const name = ST.homeName(area);
+    PS.ui.modal({
+      eyebrow: name, title: 'Who wants to rest?', buttons: [{ label: 'Done', kind: 'primary' }],
+      html: `<p>Tap a Sprout to send it inside to rest, or call it back out to play. Resting Sprouts can still race and battle.</p><div class="g-home"></div>`,
+      mount(card) {
+        const box = card.querySelector('.g-home');
+        const render = () => {
+          box.innerHTML = '';
+          const mine = PS.S.sprouts.filter(s => s.area === area);
+          for (const [title, inside] of [['Playing outside', false], ['Resting inside', true]]) {
+            const list = mine.filter(s => !!s.home === inside), h = document.createElement('h3'); h.className = 'g-hh'; h.textContent = `${title} (${list.length})`; box.appendChild(h);
+            if (!list.length) { const p = document.createElement('p'); p.className = 'g-hempty'; p.textContent = inside ? 'Nobody is resting right now.' : 'Everyone is inside.'; box.appendChild(p); }
+            for (const s of list) {
+              const b = document.createElement('button'); b.className = 'pick-item'; b.type = 'button';
+              b.innerHTML = `<canvas class="px"></canvas><span><b>${ST.esc(s.name)}</b><small>${ST.formInfo(s).name} · Lv ${ST.totalLevels(s)}${s.id === PS.S.activeId ? ' · Partner' : ''}</small></span><span class="tag">${inside ? 'Play' : 'Rest'}</span>`;
+              PS.ui.drawSproutTo(b.querySelector('canvas'), s, inside ? { eyes: 'closed', mouth: 'o' } : { eyes: 'happy', mouth: 'open' });
+              b.onclick = () => { if (inside) comeOut(s); else if (!goInside(s, false)) return; snd('pop'); render(); };
+              box.appendChild(b);
+            }
+          }
+        };
+        render();
+      },
+    });
+  }
+  // 3x5 digits for the little sign by the door
+  const DIGITS = ['111101101101111', '010110010010111', '111001111100111', '111001111001111', '101101111001001', '111100111001111', '111100111101111', '111001001001001', '111101111101111', '111101111001111'];
+  function drawHome() {
+    const H = Lw.home; shadow(H.x, H.y, H.w + 4); PX.blit(bx, H.c, H.x, H.y);
+    // sign: how many Sprouts are resting inside
+    const n = PS.S.sprouts.filter(s => s.area === area && s.home && !entering.has(s.id)).length, str = String(Math.min(99, n));
+    const w = str.length * 4 + 3, sx = Math.round(H.x - H.w / 2 - w - 1), sy = H.y - 12, wood = area === 'candy' ? ['#fff4f8', '#f7b6c8'] : area === 'moonlit' ? ['#9a9ab8', '#6a6a8e'] : ['#e4b27a', '#b8743a'];
+    bx.fillStyle = INK; bx.fillRect(sx + Math.floor(w / 2) - 1, sy + 7, 3, 6); bx.fillRect(sx - 1, sy - 1, w + 2, 9);
+    bx.fillStyle = wood[1]; bx.fillRect(sx + Math.floor(w / 2), sy + 7, 1, 5); bx.fillStyle = wood[0]; bx.fillRect(sx, sy, w, 7); bx.fillStyle = wood[1]; bx.fillRect(sx, sy + 6, w, 1);
+    bx.fillStyle = INK;
+    [...str].forEach((d, k) => { const bits = DIGITS[+d]; for (let i = 0; i < 15; i++) if (bits[i] === '1') bx.fillRect(sx + 2 + k * 4 + (i % 3), sy + 1 + Math.floor(i / 3), 1, 1); });
   }
 
   // ---------------- eggs ----------------
@@ -1069,7 +1157,7 @@
     if (r.blinkT < 0) S.eyes = 'blink';
     if (r.mood === 'happy') { S.eyes = 'happy'; S.mouth = 'open'; }
     if (r.mood === 'sad') { S.eyes = 'sad'; S.mouth = 'flat'; }
-    if (r.state === 'walk') { S.walk = true; S.frame = Math.floor(t * 7) % 2; }
+    if (r.state === 'walk' || r.state === 'enter') { S.walk = true; S.frame = Math.floor(t * 7) % 2; }
     if (r.cheerT > 0) { S.arms = 'up'; S.eyes = 'happy'; S.mouth = 'open'; }
     if (r.state === 'held') { S.arms = 'out'; S.mouth = 'o'; delete S.eyes; }
     if (r.state === 'fall') { S.arms = r.flutter ? 'up' : 'out'; S.flap = r.flutter; S.frame = Math.floor(t * 12) % 2; S.mouth = 'open'; }
@@ -1316,6 +1404,8 @@
     if (Lw.lamp) { glow(Lw.lamp.x, Lw.lamp.y, 7, '255,236,150', 0.35 * lit); bx.fillStyle = '#fff27a'; bx.fillRect(Lw.lamp.x - 1, Lw.lamp.y - 1, 3, 3); }
     if (Lw.house) { const hc = Lw.house.c, X = Lw.house.x - Math.floor(hc.width / 2) + Math.round(hc.width * 0.64), Y = Lw.house.y - hc.height + Math.round(hc.height * 0.62); glow(X, Y, 5, '255,236,150', 0.4 * lit); bx.fillStyle = '#fff27a'; bx.fillRect(X - 1, Y - 1, 2, 2); }
     for (const p of Lw.props) { const g = GLOWS[p.kind]; if (!g) continue; const pulse = 0.8 + Math.sin(t * 2 + p.x) * 0.2; glow(p.x, p.y - p.c.height * g[1], g[2], g[3], 0.3 * lit * pulse); }
+    // the rest house's windows light up (brighter when someone is inside)
+    if (Lw.home) { const H = Lw.home, full = PS.S.sprouts.some(s => s.area === area && s.home); for (const [dx, dy] of H.info.win || []) { glow(H.x + dx, H.y + dy, full ? 7 : 5, '255,236,150', (full ? 0.4 : 0.22) * lit); bx.fillStyle = full ? '#fff27a' : '#f6c83a'; bx.fillRect(H.x + dx - 1, H.y + dy - 1, 2, 2); } }
     // spooky Sprouts glow softly at night
     if (lit > 0.3) for (const r of here) { const sp = SPOOKY[r.s.look && r.s.look.skin]; if (sp && r.state !== 'travel') glow(r.x, (r.state === 'held' ? r.feetY : r.y - (r.state === 'fall' ? r.z : 0)) - 12, 10, sp.glow, 0.13 * lit); }
     // glowing reed tips and lotus buds, the lighthouse beam, floating lanterns
@@ -1357,7 +1447,7 @@
   // ---------------- update + render ----------------
   function update(dt) {
     const night = PS.clock.isNight();
-    here = PS.S.sprouts.filter(s => s.area === area).map(getRT);
+    here = PS.S.sprouts.filter(isOut).map(getRT);
     for (const r of here) updateSprout(r, dt, night);
     updateCritters(dt);
     // drops
@@ -1371,7 +1461,7 @@
     // periodic XP flush + save
     flushT -= dt; if (flushT <= 0) { flushT = TUNE.xpFlushSec; flushAll(); }
     saveT -= dt; if (saveT <= 0) { saveT = 6; PS.save(); }
-    cleanT -= dt; if (cleanT <= 0) { cleanT = 5; for (const id of RT.keys()) if (!ST.get(id)) RT.delete(id); }
+    cleanT -= dt; if (cleanT <= 0) { cleanT = 5; for (const id of RT.keys()) { const s2 = ST.get(id); if (!s2 || (s2.home && !entering.has(id))) RT.delete(id); } }
   }
   function render(dt) {
     const n = PS.clock.night(), th = TH[area];
@@ -1384,6 +1474,7 @@
     drawWater(dt, n);
     const hintT = hintTree(), list = Lw.trees.map((T, ti) => ({ y: T.y, fn: () => drawTree(ti, hintT) }));
     for (const p of Lw.props) list.push({ y: p.y, fn: () => PX.blit(bx, p.c, p.x, p.y) });
+    if (Lw.home) list.push({ y: Lw.home.y, fn: drawHome });
     for (const o of eggsHere()) list.push({ y: o.y, fn: () => drawEgg(o) });
     const emQ = [], top = [];
     for (const r of here) { if (r.state === 'held' || r.state === 'fall') top.push(r); else list.push({ y: r.y, fn: () => drawSprout(r, emQ) }); }
@@ -1439,7 +1530,9 @@
     };
     lab('Swim', s + (ww - s) * 0.2, false);
     lab('Travel', s + (ww - s) * 0.72, true);
+    if (Lw.home) { const H = Lw.home, p = worldToScreen(H.x, H.y - H.h - 6), X = Math.round(clamp(p.x, 40, W - 40)), Y = Math.round(clamp(p.y, 70, H0() - 150)); ctx.font = '700 13px "Pixelify Sans", monospace'; const w = ctx.measureText('Rest').width + 14; ctx.fillStyle = 'rgba(255,248,230,.85)'; roundRect(X - w / 2, Y - 12, w, 20, 8); ctx.fill(); ctx.fillStyle = '#8f563b'; ctx.fillText('Rest', X, Y + 3); }
   }
+  const H0 = () => H;
   function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 
   // ---------------- input: world ----------------
@@ -1447,7 +1540,7 @@
   function sproutAt(p, k) {
     let best = null, bd = 1e9;
     for (const r of here) {
-      if (r.state === 'travel' || r.state === 'arrive' || r.state === 'held' || r.state === 'cocoon') continue;
+      if (r.state === 'travel' || r.state === 'arrive' || r.state === 'held' || r.state === 'cocoon' || r.state === 'enter') continue;
       const hx = r.x, hy = (r.state === 'fall' ? r.y - r.z : r.y) - 10, d = Math.hypot(p.x - hx, p.y - hy);
       if (d < 12 * (k || 1) && d < bd) { bd = d; best = r; }
     }
@@ -1477,6 +1570,7 @@
     const r = sproutAt(p);
     if (r) { press = Object.assign({ kind: 'sprout', r, t0: t, x0: p.x, y0: p.y, mode: 'pending', rub: 0 }, base); return; }
     if (propAt(p) === 'gumball') { press = Object.assign({ kind: 'gumball' }, base); return; }
+    if (overHome(p.x, p.y)) { press = Object.assign({ kind: 'home' }, base); return; }
     press = Object.assign({ kind: 'bg', lx: e.clientX, ly: e.clientY, cam0: camX, cam0y: camY, vx: 0, vy: 0, lt: performance.now() }, base);
   }
   function beginPinch() {
@@ -1554,6 +1648,7 @@
       else if (pr.mode === 'hold' && pr.r.state === 'held') release(pr.r);
       return;
     }
+    if (pr.kind === 'home') { if (Math.hypot(e.clientX - pr.sx, e.clientY - pr.sy) < 12) { snd('pop'); openHome(); } return; }
     if (pr.kind === 'gumball') { if (Math.hypot(e.clientX - pr.sx, e.clientY - pr.sy) < 12) { snd('pop'); PS.ui.go('shop', { tab: 'gumball' }); } return; }
     if (pr.kind === 'bg') {
       const dx = e.clientX - pr.sx, dy = e.clientY - pr.sy, ms = performance.now() - pr.ms;
@@ -1715,17 +1810,18 @@
   function updatePill() {
     if (!mounted) return;
     const A = D.AREAS[area], n = PS.S.sprouts.filter(s => s.area === area).length, e = PS.S.eggs.filter(x => x.area === area).length;
+    const rest = PS.S.sprouts.filter(s => s.area === area && s.home).length;
     pillName.textContent = A.name;
-    pillSub.textContent = `${n} Sprout${n === 1 ? '' : 's'}${e ? ` · ${e} egg${e === 1 ? '' : 's'}` : ''} · ${A.water}`;
+    pillSub.textContent = `${n} Sprout${n === 1 ? '' : 's'}${rest ? ` · ${rest} resting` : ''}${e ? ` · ${e} egg${e === 1 ? '' : 's'}` : ''} · ${A.water}`;
     [...dotsEl.children].forEach((d, i) => { d.className = AREA_IDS[i] === area ? 'on' : PS.S.eggs.some(x => x.area === AREA_IDS[i]) ? 'egg' : ''; });
     root.querySelectorAll('.g-arrow').forEach(b => { const a = AREA_IDS[(AREA_IDS.indexOf(area) + (+b.dataset.d) + AREA_IDS.length) % AREA_IDS.length]; b.setAttribute('aria-label', 'Go to ' + areaName(a)); });
   }
   function hintText() {
     const eggs = PS.S.eggs.filter(e => e.area === area);
-    const mine = PS.S.sprouts.filter(s => s.area === area);
+    const mine = PS.S.sprouts.filter(isOut);
     if (eggs.length) { const e = eggs[0], left = eggNeed(e) - (e.taps || 0); return e.taps ? `Keep tapping! ${left} more` : 'Tap the egg to hatch it'; }
     if (!PS.S.sprouts.length) { const e = PS.S.eggs[0]; return e ? `Your egg is waiting in ${toArea(e.area)}` : 'Get an egg from the Shop'; }
-    if (!mine.length) return `No Sprouts live here yet. Send one swimming from another area.`;
+    if (!mine.length) return PS.S.sprouts.some(s => s.area === area) ? `Everyone is resting in the ${ST.homeName(area)}. Tap it to call them out.` : `No Sprouts live here yet. Send one swimming from another area.`;
     if (here.some(r => r.state === 'held')) return 'Drop in the shallows to swim, or in the deep water to travel';
     if (critters.length && ST.canCatch() && !seen('catch')) return 'An animal! Tap it to catch it';
     if (PS.S.pouch.length && !seen('give')) return 'Drag an animal from your pouch onto a Sprout';
@@ -1738,12 +1834,14 @@
     if (!seen('zoom')) return 'Pinch with two fingers to zoom in and out';
     if (!seen('drop-fruit') && Object.keys(PS.S.fruits || {}).length) return 'Drag fruit onto the grass to leave a snack';
     if (!seen('area')) return 'Use the arrows to visit other areas';
+    if (!seen('home') && Lw.home) return `Tap the ${ST.homeName(area)} to let Sprouts rest inside`;
     return '';
   }
   function switchArea(dir) { const i = AREA_IDS.indexOf(area); setArea(AREA_IDS[(i + dir + AREA_IDS.length) % AREA_IDS.length], dir); }
   function settleAll() {
     press = null;
     for (const r of here) {
+      if (r.state === 'enter') { finishInside(r); continue; }
       if (r.state === 'travel') { finishMove(r.s, r.dest); continue; }
       if (r.state === 'held' || r.state === 'fall') { r.y = r.state === 'held' ? heldGround(r) : clamp(r.y, Lw.minY, Lw.maxY); r.z = 0; r.state = inWater(r.x, r.y) ? 'swim' : 'idle'; r.timer = 1; }
       if (r.state === 'eat' || r.state === 'cocoon' || r.state === 'arrive') { r.state = 'idle'; r.eat = null; r.timer = 1; }
@@ -1757,8 +1855,8 @@
     area = a; PS.S.area = a; PS.save(); PS.emit('area', { area: a });
     critters = []; fizz = []; parts = []; floaters = [];
     nextCritter = t + rand(...D.GROWTH.critterEverySec) * 0.35;
-    here = PS.S.sprouts.filter(s => s.area === area).map(getRT);
-    closeCard(); buildProps(); skyKey = ''; bgKey = ''; focusCamera();
+    here = PS.S.sprouts.filter(isOut).map(getRT);
+    closeCard(); buildProps(); skyKey = ''; bgKey = ''; focusCamera(); hintReset = true;
     cv.classList.remove('g-in-l', 'g-in-r'); void cv.offsetWidth; cv.classList.add(dir < 0 ? 'g-in-l' : 'g-in-r');
     updatePill(); snd('whoosh'); markSeen('area');
   }
@@ -1820,6 +1918,9 @@
 .g-destbtn b{font-family:var(--f-px);font-size:16px}
 .g-destbtn small{font-size:12px;color:var(--ink-soft);font-weight:600}
 .g-destbtn[disabled]{opacity:.5}
+.g-home{display:grid;gap:6px;margin-top:4px;max-height:52vh;overflow-y:auto}
+.g-hh{font-family:var(--f-px);font-size:15px;margin:6px 0 0}
+.g-hempty{font-size:13px;color:var(--ink-soft);margin:0}
 .g-a-meadow{background:#e6f6d6}.g-a-beach{background:#fdf1cf}.g-a-moonlit{background:#e6def7}.g-a-candy{background:#fde4f0}
 `;
   function injectCSS() { if (document.getElementById('g-style')) return; const st = document.createElement('style'); st.id = 'g-style'; st.textContent = CSS; document.head.appendChild(st); }
@@ -1904,9 +2005,10 @@
     renderTray(); updatePill();
     if (nextCritter < t) nextCritter = t + 6;
     if (nextDrop < t) nextDrop = t + rand(...D.GROWTH.dropEverySec) * 0.4;
-    here = PS.S.sprouts.filter(x => x.area === area).map(getRT);
+    here = PS.S.sprouts.filter(isOut).map(getRT);
     if (!shownOnce) { shownOnce = true; focusCamera(); }
-    if (params && params.id) { const s = ST.get(params.id); if (s && s.area === area) { const r = getRT(s); openCard(r); camX = r.x - viewW() / 2; camY = r.y - viewH() * 0.45; clampCam(); } }
+    hintReset = true;
+    if (params && params.id) { const s = ST.get(params.id); if (s && s.area === area && s.home && Lw.home) { camX = Lw.home.x - viewW() / 2; camY = Lw.home.y - 20 - viewH() * 0.45; clampCam(); } else if (s && s.area === area) { const r = getRT(s); openCard(r); camX = r.x - viewW() / 2; camY = r.y - viewH() * 0.45; clampCam(); } }
   }
   let shownOnce = false;
   function hide() {
@@ -1926,7 +2028,10 @@
     uiT -= dt;
     if (uiT <= 0) {
       uiT = 0.4;
-      const h = cardEl.hidden ? hintText() : '';
+      // hints pop up briefly on arrival; the holding hint and a new player's first-egg hint stay while they apply
+      if (hintReset) { hintReset = false; hintUntil = t + 4; }
+      const holding = here.some(r => r.state === 'held'), firstEgg = !PS.S.sprouts.length && PS.S.eggs.some(e => e.area === area);
+      const h = !cardEl.hidden ? '' : holding ? 'Drop in the shallows to swim, in deep water to travel, or on the house to rest' : (firstEgg || t < hintUntil) ? hintText() : '';
       if (hintEl.textContent !== h) hintEl.textContent = h;
       hintEl.style.opacity = h ? 1 : 0;
       if (sel) renderCard();

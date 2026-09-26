@@ -57,18 +57,44 @@
       mix: { run: 1, swim: 6, climb: 1, fly: 2 }, length: 1250, unlock: { race: 'candy', tier: 0 }, eggs: ['beach', 'beach', 'moonlit'], mult: 1.45 },
     { id: 'cloud', name: 'Cloud Circuit', area: 'cloud', extra: true, seed: 2, body: 'sun', blurb: 'Sky islands',
       mix: { run: 2, climb: 3, fly: 5 }, length: 1300, unlock: { race: 'coral', tier: 0 }, eggs: ['meadow', 'candy', 'golden'], mult: 1.6 },
+    // the long grind, after the Grand Prix. ratingMul makes rivals (and the course pace) faster than the base tiers.
+    { id: 'jungle', name: 'Jungle Trail', area: 'jungle', extra: true, seed: 3, body: 'leaf', blurb: 'Vines and river swims',
+      mix: { run: 3, swim: 3, climb: 3, fly: 1 }, length: 1300, unlock: { race: 'cloud', tier: 0 }, eggs: ['meadow', 'candy', 'beach'], mult: 1.65, ratingMul: 1.06 },
+    { id: 'volcano', name: 'Volcano Run', area: 'volcano', extra: true, seed: 4, body: 'clay', blurb: 'Lava rocks and hot springs',
+      mix: { run: 4, swim: 2, climb: 4, fly: 1 }, length: 1350, unlock: { race: 'jungle', tier: 1 }, eggs: ['candy', 'moonlit', 'golden'], mult: 1.75, ratingMul: 1.13 },
+    { id: 'snowy', name: 'Snowy Summit', area: 'snowy', extra: true, seed: 5, body: 'cloud', blurb: 'Icy climbs and sledding',
+      mix: { run: 2, swim: 1, climb: 4, fly: 4 }, length: 1400, unlock: { race: 'volcano', tier: 1 }, eggs: ['beach', 'moonlit', 'golden'], mult: 1.85, ratingMul: 1.21 },
+    { id: 'starlight', name: 'Starlight Sky', area: 'starlight', extra: true, seed: 6, body: 'night', blurb: 'A race among the stars',
+      mix: { run: 2, swim: 1, climb: 2, fly: 6 }, length: 1450, unlock: { race: 'snowy', tier: 1 }, eggs: ['moonlit', 'candy', 'rainbow'], mult: 2.0, ratingMul: 1.3 },
   ];
-  const ALL = D.RACES.concat(EXTRA_RACES);
+  // WILD RACES: race the animals of each island (rivals come from D.ANIMALS of that area). friendCoins: pouch full on a first win.
+  const WILD_RACES = [
+    { id: 'wmeadow', name: 'Meadow Wild Run', area: 'meadow', extra: true, wild: true, seed: 11, blurb: 'Race the Meadow animals',
+      mix: { run: 5, swim: 1, climb: 1, fly: 2 }, length: 1100, unlock: null, mult: 1.0 },
+    { id: 'wbeach', name: 'Beach Wild Splash', area: 'beach', extra: true, wild: true, seed: 12, blurb: 'Race the Beach animals',
+      mix: { run: 2, swim: 6, climb: 1, fly: 1 }, length: 1150, unlock: { race: 'beach', tier: 0 }, mult: 1.15 },
+    { id: 'wmoonlit', name: 'Moonlit Wild Flight', area: 'moonlit', extra: true, wild: true, seed: 13, blurb: 'Race the Moonlit Grove animals',
+      mix: { run: 2, swim: 1, climb: 3, fly: 4 }, length: 1200, unlock: { race: 'moonlit', tier: 0 }, mult: 1.3 },
+    { id: 'wcandy', name: 'Candy Wild Dash', area: 'candy', extra: true, wild: true, seed: 14, blurb: 'Race the Candy Isle animals',
+      mix: { run: 3, swim: 2, climb: 2, fly: 2 }, length: 1250, unlock: { race: 'candy', tier: 0 }, mult: 1.45 },
+  ];
+  const FRIEND_COINS = [20, 50, 120]; // instead of the animal when the pouch is full
+  const ALL = D.RACES.concat(EXTRA_RACES, WILD_RACES);
   const byId = id => ALL.find(R => R.id === id);
-  // hub order: the original area series, then the new series, then the Grand Prix finale
+  const tierRating = (R, tier) => { const r = D.RACE_TIERS[tier].rating, k = R.ratingMul || 1; return [r[0] * k, r[1] * k]; };
+  // hub order: the original area series, Coral + Cloud, the Grand Prix, then the late-game series
   const HUB_ORDER = (() => {
     const o = []; D.RACES.forEach((R, i) => { if (R.id !== 'grand') o.push(i); });
-    EXTRA_RACES.forEach(R => o.push(ALL.indexOf(R)));
+    EXTRA_RACES.slice(0, 2).forEach(R => o.push(ALL.indexOf(R)));
     D.RACES.forEach((R, i) => { if (R.id === 'grand') o.push(i); });
+    EXTRA_RACES.slice(2).forEach(R => o.push(ALL.indexOf(R)));
     return o;
   })();
+  const WILD_ORDER = WILD_RACES.map(R => ALL.indexOf(R));
   // themed words for the segment pop-ups
-  const SEG_POP = { coral: { fly: 'Ride the current!', climb: 'Reef climb!' }, cloud: { climb: 'Rainbow bridge!', fly: 'Glide!' } };
+  const SEG_POP = { coral: { fly: 'Ride the current!', climb: 'Reef climb!' }, cloud: { climb: 'Rainbow bridge!', fly: 'Glide!' },
+    jungle: { climb: 'Vine climb!', swim: 'River swim!', fly: 'Swing!' }, volcano: { swim: 'Hot spring!', climb: 'Lava rocks!' },
+    snowy: { climb: 'Icy climb!', fly: 'Sled down!', swim: 'Brrr, chilly!' }, starlight: { fly: 'Fly to the stars!', swim: 'Star pool!' } };
 
   // =====================================================================
   // ITEMS. Odds depend on your place (1st .. 4th): leaders get defence, stragglers get speed.
@@ -203,6 +229,30 @@
       water: ['#dff4ff', '#8fd0ff', '#5fa8e0', '#ffffff'], rock: ['#e5535f', '#f6a91a', '#fbf236', '#6abe30', '#639bff', '#9a6ad0'],
       cloud: ['#dceefc', '#ffffff', '#f4f9ff'], puff: ['#ffffff', '#e6f2fc'], crowd: ['sparrow', 'butterfly', 'seagull', 'bee', 'cottonsheep', 'sugarfinch'],
       props: [['bush', 2], ['flowerbed', 3], ['r:windmill', 1], ['r:pillar', 1.5], ['r:balloon', 2]] },
+    jungle: { prop: 'day', birds: true, parrots: true, vines: true, fence: null,
+      sky: ['#7cc8e0', '#94d4d8', '#aedcc8', '#c8e8c0'], far2: 'canopy', far2C: ['#4f9a6a', '#5fa878'], far: 'hills', farTop: '#3f8a5a', farC: ['#37946e', '#2f7f60'], nearC: ['#2a6a4a', '#1f5a3f'], near: 'trees',
+      top: ['#8ee04a', '#4fae3a', '#4fae3a', '#2f7a3a'], soil: '#6a4a2a', soilDot: '#4f3520', tuft: '#4fae3a', dots: ['#e5535f', '#fbf236'],
+      water: ['#c8e8b0', '#4f9a7a', '#2f6a5a', '#e6f6d0'], rock: ['#6b7088', '#4a4f68', '#8c93a8', '#b7c2cc', '#6abe30'], moss: true,
+      cloud: ['#37946e', '#6abe30', '#2a6a4a'], puff: ['#ffffff', '#e6f6ea'], crowd: ['frog', 'squirrel', 'butterfly', 'bee', 'raccoon', 'dinosaur'],
+      props: [['r:fern', 3], ['r:bigleaf', 3], ['r:bamboo', 2], ['r:totem', 1], ['flowerbed', 1]] },
+    volcano: { prop: 'day', noSun: true, embers: true, steam: true, cracks: true,
+      sky: ['#3a1f3f', '#62283f', '#a0402f', '#e0703a'], far2: 'volcanoes', far2C: ['#3a2530', '#4a2f38', '#ff8a2a'], far: 'peaks', farTop: '#6a3040', farC: ['#2a1a24', '#3a2230'], nearC: ['#2f2228', '#40303a'],
+      top: ['#7a6a6a', '#4a3f45', '#4a3f45', '#2f2830'], soil: '#3a2f35', soilDot: '#ff7a2a', tuft: null, dots: ['#ff7a2a', '#fbf236'],
+      water: ['#e6fff6', '#4fc8b0', '#2f8f88', '#ffffff'], rock: ['#4a3f45', '#2f2830', '#6a5a60', '#8a7a80', '#ff7a2a'], lava: true,
+      cloud: ['#6a5a60', '#9a8a90', '#50424a'], puff: ['#9a8a90', '#6a5a60'], crowd: ['dinosaur', 'ram', 'hedgehog', 'fox', 'dragon', 'phoenix'],
+      props: [['r:lavarock', 3], ['r:vent', 2], ['r:charred', 2], ['r:obsidian', 2, 1]] },
+    snowy: { prop: 'day', snow: true, sled: true, birds: false,
+      sky: ['#8fbce6', '#a8cdee', '#c2dcf2', '#dcebf8'], far2: 'mountains', far2C: ['#b8cce4', '#d4e2f2', '#ffffff'], far: 'hills', farTop: '#ffffff', farC: ['#dfe9f5', '#eef4fb'], nearC: ['#3f6f78', '#2f5a62'], near: 'pines', nearTop: '#ffffff',
+      top: ['#ffffff', '#e6f0fa', '#e6f0fa', '#b8cce0'], soil: '#8c93a8', soilDot: '#6b7088', tuft: null, dots: ['#9fd8ff', '#ffffff'],
+      water: ['#f0fbff', '#7fc8e8', '#4f98c8', '#ffffff'], rock: ['#bfe6f5', '#8fc8e8', '#e6f8ff', '#ffffff', '#9fd8ff'], ice: true,
+      cloud: ['#c8d8ea', '#ffffff', '#eef4fb'], puff: ['#ffffff', '#e6eef8'], crowd: ['yeti', 'seal', 'wolf', 'owl', 'hare', 'moondeer'],
+      props: [['r:snowpine', 4], ['r:snowman', 2], ['r:igloo', 1], ['rock', 1]] },
+    starlight: { prop: 'night', dark: true, shooting: true, sparkleFloor: true,
+      sky: ['#0b0a26', '#15123a', '#1f1a52', '#2c2468'], far2: 'planets', far: 'peaks', farTop: '#6a5ab8', farC: ['#2a2060', '#352a78'], nearC: ['#3a2f80', '#4a3a98'],
+      top: ['#f0e2ff', '#c9a2f0', '#c9a2f0', '#8c6cc4'], soil: '#2c2458', soilDot: '#fff27a', tuft: null, dots: ['#fff27a', '#9fd8ff'],
+      water: ['#f0c8ff', '#9a6ad0', '#5e3a8e', '#ffffff'], rock: ['#8c93a8', '#595a70', '#b7c2cc', '#dfe8fb', '#fff27a'],
+      cloud: ['#3a2f7a', '#6a5ab8', '#2c2468'], puff: null, crowd: ['fairy', 'unicorn', 'moth', 'firefly', 'owl', 'moondeer'],
+      props: [['r:starlamp', 2, 1], ['crystal', 3, 1], ['r:moonrock', 3], ['glowshroom', 1, 1]] },
   };
   const GRAND_ZONES = ['meadow', 'beach', 'moonlit', 'candy'];
 
@@ -216,7 +266,7 @@
     const si = R.extra ? 40 + R.seed : ri;
     const rng = mulberry(opt.seed != null ? opt.seed : 9001 + si * 131 + tier * 17);
     const mix = R.mix, W = SEGS.reduce((a, k) => a + (mix[k] || 0), 0) || 1;
-    const m = opt.m || mulOf((Tr.rating[0] + Tr.rating[1]) / 2);
+    const TR = tierRating(R, D.RACE_TIERS[tier] ? tier : 0), m = opt.m || mulOf((TR[0] + TR[1]) / 2);
     const dur = T.targetSec * Math.pow(R.length / 1100, T.targetExp);
     const time = k => dur * (mix[k] || 0) / W;
     let nS = mix.swim ? clamp(Math.round(time('swim') / 6), 1, 5) : 0;
@@ -469,19 +519,73 @@
   function playerRatings(s) { const o = {}; for (const k of SEGS) o[k] = ST.raceRating(s, k); return o; }
   // rivals for the extra series: same recipe as state.raceRivals, own seed
   function extraRivals(R, tier) {
-    const Tr = D.RACE_TIERS[tier];
+    const Tr = D.RACE_TIERS[tier], TR = tierRating(R, tier);
     let seed = (40 + R.seed) * 97 + tier * 13; const sr = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
     const names = D.NAMES.slice().sort(() => sr() - 0.5).slice(0, 3);
     const bodies = ['clay', 'plum', 'sky', 'rose', 'leaf', 'slate', 'sun', 'berry', 'night', 'cocoa', 'teal', 'coral'];
     return names.map((name, i) => {
-      const base = Tr.rating[0] + (Tr.rating[1] - Tr.rating[0]) * (i / 2);
+      const base = TR[0] + (TR[1] - TR[0]) * (i / 2);
       const rt = () => +(base * (0.8 + sr() * 0.4)).toFixed(2);
       const parts = {}; const specialty = ['wings', 'fins', 'ears', 'horns'][Math.floor(sr() * 4)]; if (tier > 0) parts[specialty] = tier >= 2 ? 1 : 0.5;
       return { name, look: Object.assign(PX.cloneLook(PX.DEFAULT_LOOK), { body: bodies[Math.floor(sr() * bodies.length)], parts: Object.assign({ wings: 0, ears: 0, fins: 0, horns: 0, tail: 0, shell: 0 }, parts), eyes: ['round', 'brave', 'dot'][Math.floor(sr() * 3)] }),
         rating: { run: rt(), swim: rt(), climb: rt(), fly: rt(), stamina: rt() }, cheer: Tr.cheerSkill };
     });
   }
+  // ---------------- wild animal rivals ----------------
+  // Each animal's speed per segment comes from what it's good at (D.ANIMALS gives; climb uses power) and where it lives.
+  const WHERE_MUL = {
+    water: { run: 0.7, climb: 0.75, swim: 1.15, fly: 0.85 },
+    air: { run: 0.95, climb: 0.9, swim: 0.75, fly: 1.12 },
+    land: { run: 1, climb: 1, swim: 0.85, fly: 1 },
+    coast: { run: 1, climb: 1, swim: 1.05, fly: 1 },
+  };
+  function animalFactors(id) {
+    const a = D.ANIMALS[id] || {}, g = a.gives || {}, wm = WHERE_MUL[a.where] || WHERE_MUL.land, f = {};
+    for (const k of SEGS) f[k] = clamp(0.8 + (g[D.RACE_STAT[k]] || 0) * 0.03, 0.6, 1.3) * wm[k];
+    f.stamina = clamp(0.85 + (g.stamina || 0) * 0.025, 0.7, 1.25);
+    return f;
+  }
+  // Beginner animals are poor fits for the course and Master ones are specialists, so the level is nudged to keep the curve fair
+  const WILD_TIER_K = [1.12, 1.0, 0.92];
+  const wildLevel = (R, tier) => tierRating(R, tier).map(v => v * WILD_TIER_K[tier]);
+  const wildCache = {};
+  // the 3 animals of a wild race tier: slow-fitting animals in Beginner, the best fits for this course in Master
+  function wildAnimals(R, tier) {
+    const key = R.id; if (!wildCache[key]) {
+      const W = SEGS.reduce((a, k) => a + (R.mix[k] || 0), 0);
+      const ids = Object.keys(D.ANIMALS).filter(id => D.ANIMALS[id].area === R.area);
+      const fit = id => { const f = animalFactors(id); return SEGS.reduce((a, k) => a + f[k] * (R.mix[k] || 0) / W, 0); };
+      wildCache[key] = ids.sort((a, b) => fit(a) - fit(b) || (a < b ? -1 : 1));
+    }
+    const list = wildCache[key], n = list.length; if (!n) return [];
+    const start = [0, Math.max(0, Math.round(n / 2) - 2), Math.max(0, n - 3)][tier];
+    const out = []; for (let i = 0; i < 3; i++) out.push(list[Math.min(n - 1, start + i)]);
+    return out;
+  }
+  const friendOf = (R, tier) => { const a = wildAnimals(R, tier); return a[a.length - 1]; };
+  const animalColor = {};
+  function critterColor(id) {
+    if (animalColor[id]) return animalColor[id];
+    let best = '#8c93a8';
+    try {
+      const c = safeCritter(id), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data, n = {};
+      for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200 && !(d[i] === 34 && d[i + 1] === 32 && d[i + 2] === 52)) { const k = '#' + [d[i], d[i + 1], d[i + 2]].map(v => v.toString(16).padStart(2, '0')).join(''); n[k] = (n[k] || 0) + 1; }
+      best = Object.keys(n).sort((a, b) => n[b] - n[a])[0] || best;
+    } catch (e) { /* canvas may be unavailable headless */ }
+    return (animalColor[id] = best);
+  }
+  function wildRivals(R, tier) {
+    const TR = wildLevel(R, tier), cheer = cheerOf(D.RACE_TIERS[tier].cheerSkill);
+    return wildAnimals(R, tier).map((id, i) => {
+      const base = TR[0] + (TR[1] - TR[0]) * (i / 2), f = animalFactors(id), rating = {};
+      for (const k of SEGS) rating[k] = +(base * f[k]).toFixed(2);
+      const r = makeRacer({ name: (D.ANIMALS[id] || {}).name || id, look: PX.DEFAULT_LOOK, rating, stamR: base * f.stamina, cheer });
+      r.animal = id; r.color = critterColor(id);
+      return r;
+    });
+  }
   function rivalRacers(R, tier) {
+    if (R.wild) return wildRivals(R, tier);
     const list = R.extra ? extraRivals(R, tier) : ST.raceRivals(R.id, tier);
     return list.map(rv => makeRacer({ name: rv.name, look: rv.look, rating: rv.rating, stamR: rv.rating.stamina, cheer: cheerOf(rv.cheer || D.RACE_TIERS[tier].cheerSkill) }));
   }
@@ -525,7 +629,7 @@
   // [bronze, silver, gold] seconds for a course: a low / mid / top rival of that tier running alone
   function medalTimes(ri, tier) {
     const key = ri + '-' + tier; if (medalCache[key]) return medalCache[key];
-    const Tr = D.RACE_TIERS[tier], lo = Tr.rating[0], hi = Tr.rating[1], mid = (lo + hi) / 2;
+    const TR = tierRating(ALL[ri], tier), lo = TR[0], hi = TR[1], mid = (lo + hi) / 2;
     const up = v => Math.ceil(v * 2) / 2;
     const b = up(simSolo(ri, tier, lo, [0.05, 0.3, 0.15], 101 + key.length)), s = up(simSolo(ri, tier, mid, [0.2, 0.35, 0.1], 202)), g = up(simSolo(ri, tier, hi, [0.4, 0.35, 0.05], 303));
     return (medalCache[key] = [Math.max(b, s + 0.5), Math.max(s, g + 0.5), g]);
@@ -543,7 +647,9 @@
     let modId = b.mod; if (modId === cupBase(yd).mod) modId = b.ids[(b.ids.indexOf(modId) + 1) % b.ids.length]; // no repeat two days running
     if (DBG.cupMod && MODS[DBG.cupMod]) modId = DBG.cupMod; // testing only
     const r = mulberry(seed + 7);
-    const R = ALL[Math.floor(r() * ALL.length)];
+    // course pool: the first 7 series until the late-game series shipped (keeps each past day's cup the same), then every non-wild series
+    const pool = key < '2026-09-27' ? ALL.slice(0, D.RACES.length + 2) : ALL.filter(x => !x.wild);
+    const R = pool[Math.floor(r() * pool.length)];
     const egg = ['meadow', 'beach', 'moonlit', 'candy'][Math.floor(r() * 4)];
     return { key, seed, R, ri: ALL.indexOf(R), mod: modId, M: MODS[modId], egg };
   }
@@ -574,8 +680,8 @@
   .r-head{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin:2px 4px 10px}
   .r-head h2{font-size:28px;margin:2px 0 0;color:var(--ink)}
   .r-head .r-count{font-family:var(--f-px);font-weight:600;font-size:13px;color:var(--ink-soft);background:var(--slot);border:2px solid var(--line);border-radius:10px;padding:3px 9px;white-space:nowrap}
-  .r-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:0 0 12px}
-  .r-tab{position:relative;display:flex;flex-direction:column;align-items:center;gap:1px;min-height:64px;font-family:var(--f-px);font-weight:700;font-size:15px;line-height:1.1;
+  .r-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 12px}
+  .r-tab{position:relative;display:flex;flex-direction:column;align-items:center;gap:1px;min-height:64px;font-family:var(--f-px);font-weight:700;font-size:14px;line-height:1.1;white-space:nowrap;
     background:var(--panel);border:2px solid var(--line);border-bottom-width:5px;border-radius:16px;color:var(--ink-soft);padding:6px 2px 5px}
   .r-tab canvas{width:32px;height:32px}
   .r-tab[aria-selected="true"]{background:var(--sun);border-color:var(--sun-edge);color:#4a3210}
@@ -628,6 +734,11 @@
   .r-lock canvas{width:22px;height:22px}
   .r-medals{display:flex;gap:2px}
   .r-medals canvas{width:22px;height:28px}
+  .r-vs{display:flex;align-items:center;gap:2px;margin-top:3px;font-family:var(--f-px);font-weight:600;font-size:11px;color:var(--ink-soft)}
+  .r-vs canvas{width:27px;height:27px;background:var(--slot);border-radius:7px}
+  .r-friendic{background:#e4f6d8;border-color:#6abe30}
+  .r-friendic canvas{width:27px;height:27px}
+  .r-lockline{display:flex;align-items:center;gap:6px;margin-top:4px}
   .r-medals canvas.off{opacity:.45}
   .r-empty{text-align:center;padding:22px 18px;margin-top:20px}
   .r-empty canvas{width:96px;height:96px;display:block;margin:0 auto 6px}
@@ -701,6 +812,7 @@
   .r-xpchip b{background:#fff27a;color:#4a3210;border-radius:5px;padding:0 4px;margin-left:4px}
   .r-eggbox{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:center;background:#fff1b8;border:2px solid var(--sun-edge);border-radius:14px;padding:8px 10px;margin:0 0 10px}
   .r-eggbox canvas{width:40px;height:48px}
+  .r-eggbox canvas.r-friendcv{width:40px;height:40px}
   .r-eggbox b{font-family:var(--f-px);font-size:17px;display:block;line-height:1.1}
   .r-eggbox span{font-size:13px;color:var(--ink-soft)}
   .r-note{font-size:13px;color:var(--ink-soft);margin:0 0 10px;text-align:center;line-height:1.35}
@@ -837,6 +949,23 @@
       g.px([[3, 3], [4, 4], [16, 3], [15, 4], [3, 16], [4, 15], [16, 16], [15, 15]], '#ffffff'); return g; },
     pillar() { const g = new PX.Grid(11, 25); g.rect(1, 0, 9, 3, '#f6c83a'); g.rect(2, 3, 7, 19, '#ffffff'); g.rect(1, 22, 9, 3, '#f6c83a'); g.outline(); for (let y = 4; y < 22; y++) g.px([[4, y], [6, y]], '#dfe8fb'); g.px([[2, 1], [3, 1]], '#fff9c0'); return g; },
     balloon() { const g = new PX.Grid(11, 26); const c = ['#f07a84', '#d24552', '#8a2433']; g.ell(5.5, 5.5, 4.6, 5.2, c); g.poly([[4, 10], [7, 10], [5.5, 12]], c[1]); g.outline(); for (let y = 13; y < 26; y++) g.set(5 + (y % 4 === 0 ? 1 : 0), y, '#8c93a8'); g.px([[3, 3], [3, 4], [4, 2]], '#ffffff'); return g; },
+    // volcano
+    lavarock() { const g = new PX.Grid(15, 10); g.ell(7.5, 6.5, 6.5, 4, ['#6a5a60', '#4a3f45', '#2f2830']); g.outline(); PX.line(g, 4, 5, 7, 7, '#ff7a2a'); PX.line(g, 7, 7, 10, 5, '#ff7a2a'); g.px([[7, 7], [10, 5]], '#ffcc44'); g.px([[5, 3], [6, 3]], '#8a7a80'); return g; },
+    vent() { const g = new PX.Grid(13, 8); g.ell(6.5, 7, 6, 3, ['#6a5a60', '#4a3f45', '#2f2830'], 0, (x, y) => y <= 7); g.rect(5, 4, 3, 1, '#ff7a2a'); g.outline(); g.px([[6, 4]], '#ffcc44'); return g; },
+    charred() { const g = new PX.Grid(15, 24); g.rect(7, 6, 2, 18, '#3a2f35'); PX.line(g, 7, 12, 3, 7, '#3a2f35'); PX.line(g, 8, 9, 12, 4, '#3a2f35'); PX.line(g, 3, 7, 2, 4, '#3a2f35'); g.outline(); g.px([[7, 16], [8, 20]], '#ff7a2a'); return g; },
+    obsidian() { const g = new PX.Grid(11, 14); g.poly([[1, 13], [3, 4], [5.5, 0.5], [7, 5], [10, 13]], '#5e3a8e'); g.poly([[3, 13], [5.5, 3], [6.5, 13]], '#8c6cc4'); g.outline(); g.px([[5, 3], [4, 7]], '#e0c8ff'); return g; },
+    // snowy summit
+    snowpine() { const g = new PX.Grid(17, 26); g.rect(7, 21, 3, 5, '#8f563b'); for (let i = 0; i < 3; i++) g.poly([[8.5, 1 + i * 6], [1 + i, 11 + i * 5], [16 - i, 11 + i * 5]], '#2f6a5a'); g.outline(); for (let i = 0; i < 3; i++) { g.px([[8, 2 + i * 6], [9, 2 + i * 6], [8, 3 + i * 6]], '#ffffff'); PX.line(g, 3 + i, 10 + i * 5, 14 - i, 10 + i * 5, '#ffffff'); } return g; },
+    snowman() { const g = new PX.Grid(13, 20); g.ell(6.5, 15, 5, 4.5, ['#ffffff', '#e6f0fa', '#b8cce0']); g.ell(6.5, 7.5, 3.6, 3.4, ['#ffffff', '#e6f0fa', '#b8cce0']); g.rect(3, 3, 7, 1, '#3f3f74'); g.rect(4, 0, 5, 3, '#3f3f74'); g.outline(); g.px([[5, 7], [8, 7]], INK); g.px([[7, 8], [8, 8], [9, 9]], '#df7126'); g.px([[6, 13], [6, 16]], INK); g.rect(4, 10, 5, 1, '#e5535f'); return g; },
+    igloo() { const g = new PX.Grid(21, 12); g.ell(10.5, 12, 9.5, 10, ['#ffffff', '#e6f0fa', '#b8cce0'], 0, (x, y) => y <= 11); g.outline(); g.ell(10.5, 12, 3, 4, INK, 0, (x, y) => y <= 11); for (let x = 3; x < 19; x += 4) g.px([[x, 7], [x + 2, 4]], '#b8cce0'); g.rect(2, 9, 17, 1, '#b8cce0'); g.ell(10.5, 12, 3, 4, '#2c2c66', 0, (x, y) => y <= 11 && y > 8); return g; },
+    // jungle
+    fern() { const g = new PX.Grid(17, 12); for (let i = 0; i < 5; i++) PX.stroke(g, [[8.5, 11], [2 + i * 3.2, 2 + Math.abs(i - 2) * 2]], 0.9, 0.6, i % 2 ? '#37946e' : '#4fae3a'); g.outline(); g.px([[8, 6], [5, 5], [12, 5]], '#8ee04a'); return g; },
+    bigleaf() { const g = new PX.Grid(15, 18); g.rect(7, 10, 1, 8, '#2f7a3a'); g.ell(5, 7, 4.5, 2.4, ['#8ee04a', '#4fae3a', '#2f7a3a'], -0.6); g.ell(10.5, 5, 4.5, 2.4, ['#8ee04a', '#4fae3a', '#2f7a3a'], 0.6); g.outline(); PX.line(g, 2, 9, 7, 6, '#2f7a3a'); PX.line(g, 13, 7, 8, 4, '#2f7a3a'); return g; },
+    bamboo() { const g = new PX.Grid(11, 28); for (const [x, h] of [[3, 27], [7, 22]]) { g.rect(x, 28 - h, 2, h, '#8ee04a'); for (let y = 28 - h + 4; y < 28; y += 6) g.rect(x, y, 2, 1, '#4fae3a'); } g.ell(8, 5, 2.5, 1, '#4fae3a', -0.5); g.ell(2, 2, 2.5, 1, '#4fae3a', 0.5); g.outline(); return g; },
+    totem() { const g = new PX.Grid(11, 24); g.rect(2, 2, 7, 22, '#b8743a'); g.rect(0, 9, 11, 2, '#b8743a'); g.outline(); g.rect(3, 4, 2, 2, '#fbf236'); g.rect(6, 4, 2, 2, '#fbf236'); g.rect(4, 7, 3, 1, '#e5535f'); g.rect(3, 13, 2, 1, INK); g.rect(6, 13, 2, 1, INK); g.rect(4, 16, 3, 2, '#639bff'); g.rect(3, 20, 5, 1, '#6abe30'); return g; },
+    // starlight sky
+    starlamp() { const g = new PX.Grid(9, 22); g.rect(4, 6, 1, 16, '#8c93a8'); g.rect(2, 20, 5, 2, '#595a70'); g.poly(PX.starPts(4.5, 4, 4, 1.8, 5), '#fff27a'); g.outline(); g.px([[4, 3]], '#ffffff'); return g; },
+    moonrock() { const g = new PX.Grid(15, 9); g.ell(7.5, 6, 6.5, 3.5, ['#b7c2cc', '#8c93a8', '#595a70']); g.outline(); g.ell(5, 5, 1.4, 0.9, '#595a70'); g.ell(10, 6.5, 1.2, 0.8, '#595a70'); g.px([[4, 4], [9, 6]], '#dfe8fb'); return g; },
     arch() { // finish arch: poles + checkered banner + balloons
       const g = new PX.Grid(26, 34); g.rect(2, 7, 2, 27, '#eec39a'); g.rect(22, 7, 2, 27, '#eec39a');
       for (let y = 0; y < 3; y++) for (let x = 0; x < 9; x++) g.rect(4 + x * 2, 8 + y * 2, 2, 2, (x + y) % 2 ? '#3f3f74' : '#ffffff');
@@ -931,6 +1060,34 @@
     }
     // far-far layer (parallax .12)
     const f2 = Math.floor(camX * 0.12), c2 = th.far2C;
+    if (th.far2 === 'volcanoes') { // smoking volcanoes with glowing craters
+      for (let sx = 0; sx < W; sx++) {
+        const a = sx + f2, P = 120, k = Math.floor(a / P), h = hash(k + 51), c = k * P + 40 + h % 40, d = Math.abs(a - c), w = 34 + h % 16;
+        const hh = Math.round(Math.min(Math.max(0, w - d) * 0.75, (w - 6) * 0.75) * sc) + Math.round(3 * sc); const top = GY - hh - 2;
+        px(g, sx, top, 1, GY - top, a < c ? c2[1] : c2[0]);
+        if (hh > (w - 7) * 0.75 * sc) { px(g, sx, top, 1, 2, c2[2]); if ((a + Math.floor(t * 4)) % 5 === 0) px(g, sx, top + 2 + (hash(a) % 4), 1, 1, c2[2]); }
+      }
+      for (let k = Math.floor((f2 - 40) / 120); k <= Math.floor((f2 + W + 40) / 120); k++) { // smoke puffs
+        const h = hash(k + 51), c = k * 120 + 40 + h % 40 - f2, w = 34 + h % 16, ty = GY - Math.round((w - 6) * 0.75 * sc) - Math.round(3 * sc) - 4;
+        for (let i = 0; i < 4; i++) { const age = mod(t * 0.35 + i * 0.25, 1), r = 2 + Math.round(age * 4); g.globalAlpha = 0.5 * (1 - age); disc(g, c + Math.round(age * 10 + Math.sin(t + i) * 2), ty - Math.round(age * 22 * sc), r, '#8a7a80'); }
+        g.globalAlpha = 1;
+      }
+    }
+    if (th.far2 === 'canopy') { // distant jungle tree crowns
+      for (let sx = 0; sx < W; sx++) {
+        const a = sx + f2, P = 23, k = Math.floor(a / P), d = a - (k * P + 11), r = 9 + hash(k + 61) % 5;
+        const hh = Math.round((6 + Math.sqrt(Math.max(0, r * r - d * d))) * sc), top = GY - hh - 4;
+        px(g, sx, top, 1, GY - top, c2[hash(k + 61) % 2]); if (hash(a * 7) % 9 === 0) px(g, sx, top + 1, 1, 1, '#7fc88a');
+      }
+    }
+    if (th.far2 === 'planets') { // a ringed planet and a little moon
+      const p1 = mod(Math.round(70 - camX * 0.03), W + 60) - 30, p2 = mod(Math.round(20 - camX * 0.05), W + 40) - 20, py = Math.round(16 * sc);
+      for (let sx = 0; sx < W; sx++) { const a = sx + camX * 0.04, y0 = Math.round(GY * 0.3 + 5 * Math.sin(a * 0.03) + 3 * Math.sin(a * 0.071)); g.fillStyle = Math.sin(a * 0.013) > 0 ? '#c86ab8' : '#6a8ae0'; for (let k = 0; k < 9; k++) { g.globalAlpha = 0.13 - Math.abs(k - 4) * 0.025; g.fillRect(sx, y0 + k, 1, 1); } }
+      g.globalAlpha = 1;
+      const ringPts = front => { for (let i = 0; i < 90; i++) { const an = i / 90 * Math.PI * 2, x = Math.cos(an) * 13, y = Math.sin(an) * 3.2; if ((y > 0) !== front) continue; px(g, p1 + Math.round(x), py + 1 + Math.round(y - x * 0.22), 1, 1, i % 3 ? '#fff27a' : '#f6c83a'); } };
+      ringPts(false); disc(g, p1, py, 8, '#c86a9a'); disc(g, p1 - 2, py - 2, 5, '#e89ac0'); px(g, p1 - 4, py - 4, 2, 1, '#ffd8ea'); ringPts(true);
+      disc(g, p2, Math.round(30 * sc), 3, '#9fd8ff'); px(g, p2 - 1, Math.round(30 * sc) - 1, 1, 1, '#ffffff');
+    }
     if (th.far2 === 'mountains' || th.far2 === 'softserve' || th.far2 === 'reefs' || th.far2 === 'isles') {
       for (let sx = 0; sx < W; sx++) {
         const a = sx + f2;
@@ -994,7 +1151,7 @@
       const a = sx + hA, b = sx + hB;
       if (th.far === 'hills') {
         const hh = Math.round((8 + 3 * Math.sin(a * 0.07) + 2 * Math.sin(a * 0.19 + 1.3)) * small);
-        px(g, sx, GY - hh, 1, 1, '#6aa878'); px(g, sx, GY - hh + 1, 1, hh, fc[1]);
+        px(g, sx, GY - hh, 1, 1, th.farTop || '#6aa878'); px(g, sx, GY - hh + 1, 1, hh, fc[1]);
       } else if (th.far === 'sea') {
         const hz = GY - Math.round(8 * small);
         px(g, sx, hz, 1, GY - hz, fc[0]); px(g, sx, hz, 1, 1, fc[2]);
@@ -1002,7 +1159,7 @@
         const isl = ((a % 150) + 150) % 150; if (isl > 20 && isl < 44) { const ih = Math.round(Math.sqrt(144 - (isl - 32) * (isl - 32)) / 3); if (ih > 0) px(g, sx, hz - ih, 1, ih, fc[1]); }
       } else if (th.far === 'peaks') {
         const hh = Math.round((6 + 9 * tri(a / 23) + 3 * tri(a / 9 + 0.3)) * small);
-        px(g, sx, GY - hh, 1, 1, '#5a5ab8'); px(g, sx, GY - hh + 1, 1, hh, fc[0]);
+        px(g, sx, GY - hh, 1, 1, th.farTop || '#5a5ab8'); px(g, sx, GY - hh + 1, 1, hh, fc[0]);
       } else if (th.far === 'gumdrops') {
         const P = 26, k = Math.floor(a / P), d = a - k * P - P / 2, r = 9 + hash(k) % 4;
         const hh = Math.round(Math.sqrt(Math.max(0, r * r - d * d)) * small * 0.9);
@@ -1028,7 +1185,7 @@
         let top = GY - h2;
         if (th.near === 'trees') { const P = 17, k = Math.floor(b / P), d = b - (k * P + 8 + hash(k + 1) % 4), r = 3 + hash(k + 1) % 3; if (hash(k + 1) % 3 && Math.abs(d) <= r) top -= Math.round(Math.sqrt(r * r - d * d) * 1.2 * small); }
         if (th.near === 'pines') { const P = 13, k = Math.floor(b / P), d = b - (k * P + 6), r = 3 + hash(k + 2) % 2; if (hash(k + 2) % 4 && Math.abs(d) <= r) top -= Math.round((r - Math.abs(d)) * 2.4 * small + 1); }
-        px(g, sx, top, 1, 1, nc[0]); px(g, sx, top + 1, 1, GY - top - 1, nc[1]);
+        px(g, sx, top, 1, 1, th.nearTop && top < GY - h2 ? th.nearTop : nc[0]); px(g, sx, top + 1, 1, GY - top - 1, nc[1]);
       }
     }
     if (th.style === 'island' && V.H > GY) { px(g, 0, GY, W, V.H - GY, nc[1]); for (let sx = 0; sx < W; sx++) if (hash(sx + hB + 7) % 9 === 0) px(g, sx, GY + 2 + hash(sx + hB) % Math.max(1, V.H - GY - 3), 1, 1, '#ffffff'); }
@@ -1047,6 +1204,30 @@
         const h = hash(k + 401), bx = mod(Math.floor((h % 300) - camX * 0.2 + t * (6 + k * 2)), W + 40) - 20, by = 4 + (h >> 7) % Math.max(4, Math.round(GY * 0.35)) + Math.round(Math.sin(t + k) * 1.5), up = (Math.floor(t * 5) + k) & 1;
         g.fillStyle = th.dark ? '#9fd8ff' : '#3f3f74'; g.fillRect(bx, by, 1, 1); g.fillRect(bx - 1, by - up, 1, 1); g.fillRect(bx + 1, by - up, 1, 1); g.fillRect(bx - 2, by - 1 + up * 0, 1, 1); g.fillRect(bx + 2, by - 1, 1, 1);
       }
+    }
+    if (th.vines) { // vines hanging from the canopy
+      const o = Math.floor(camX * 0.8);
+      for (let k = Math.floor(o / 17) - 1; k <= Math.floor((o + W) / 17) + 1; k++) {
+        const h = hash(k + 123); if (h % 3 === 0) continue;
+        const bx = k * 17 + h % 9 - o, len = Math.round((6 + h % 14) * sc);
+        for (let y = 0; y < len; y++) { const x = bx + Math.round(Math.sin(t * 1.1 + y * 0.3 + k) * y / len * 1.5); px(g, x, y, 1, 1, '#2f7a3a'); if (y % 4 === 2) px(g, x + ((y >> 2) & 1 ? 1 : -1), y, 1, 1, '#6abe30'); }
+      }
+    }
+    if (th.parrots && n < 0.5) for (let k = 0; k < 2; k++) { // colourful parrots
+      const h = hash(k + 811), bx = mod(Math.floor((h % 300) - camX * 0.3 + t * (9 + k * 3)), W + 40) - 20, by = 8 + (h >> 7) % Math.max(4, Math.round(GY * 0.3)) + Math.round(Math.sin(t * 2 + k) * 2), up = (Math.floor(t * 6) + k) & 1, cc = k ? '#e5535f' : '#639bff';
+      px(g, bx, by, 3, 2, cc); px(g, bx + 3, by, 1, 1, '#fbf236'); px(g, bx - 1, by + 1, 1, 1, '#6abe30'); px(g, bx + 1, by - 1 - up, 1, 1 + up, cc);
+    }
+    if (th.embers) for (let k = 0; k < 14; k++) { // rising embers
+      const h = hash(k + 707), ex = mod((h % 500) - Math.floor(camX * 0.5) + Math.round(Math.sin(t * 1.5 + k) * 3), W), ey = GY - mod(Math.floor(t * (10 + h % 10)) + (h >> 5), GY + 4);
+      px(g, ex, ey, 1, 1, (h & 1) ? '#ffcc44' : '#ff7a2a');
+    }
+    if (th.snow) for (let k = 0; k < 26; k++) { // snowfall
+      const h = hash(k + 919), ex = mod((h % 600) - Math.floor(camX * 0.6) + Math.round(Math.sin(t * 1.2 + k) * 3), W), ey = mod(Math.floor(t * (8 + h % 8)) + (h >> 5), GY + 6);
+      px(g, ex, ey, (h % 5 === 0) ? 2 : 1, (h % 5 === 0) ? 2 : 1, '#ffffff');
+    }
+    if (th.shooting) { // a shooting star now and then
+      const cyc = Math.floor(t / 2.6), ph = t / 2.6 - cyc, h = hash(cyc + 5);
+      if (ph < 0.3) { const x0 = h % W, y0 = 3 + (h >> 8) % Math.max(4, GY >> 1), q = ph / 0.3; for (let i = 0; i < 6; i++) { g.globalAlpha = (1 - i / 6) * (1 - q); px(g, x0 - Math.round(q * 30) + i * 2, y0 + Math.round(q * 12) - i, 1, 1, '#ffffff'); } g.globalAlpha = 1; }
     }
     if (th.fireflies || (n > 0.6 && th.near === 'trees')) {
       for (let k = 0; k < 9; k++) {
@@ -1077,12 +1258,16 @@
             continue;
           }
           if (th.stripes) { if (((wx + y) >> 1) % 4 === 0) px(g, sx, y, 1, 1, R[4]); else if (((wx + y) >> 1) % 4 === 1) px(g, sx, y, 1, 1, R[2]); continue; }
+          if (th.ice) { const q = mod(wx - y * 2, 13); if (q === 0) px(g, sx, y, 1, 1, R[3]); else if (q === 1) px(g, sx, y, 1, 1, R[2]); else if ((y - GY) % 5 === 4 && hash(wx) % 3 === 0) px(g, sx, y, 1, 1, R[1]); continue; }
+          if (th.lava && hash(wx * 3 + y * 7) % 23 === 0) { px(g, sx, y, 1, 1, R[4]); if (y + 1 < H) px(g, sx, y + 1, 1, 1, '#ffcc44'); continue; }
           const bx = (wx + (((y - GY) >> 2) & 1) * 3);
           if ((y - GY) % 4 === 3 || bx % 6 === 0) px(g, sx, y, 1, 1, R[1]);
           else if (bx % 6 === 1 && (y - GY) % 4 === 0) px(g, sx, y, 1, 1, R[2]);
         }
         px(g, sx, top, 1, 1, R[3]); px(g, sx, top - 1, 1, 1, INK);
         if (hs % 9 === 0 && e > 1) px(g, sx, top - 1, 1, 1, R[4]);
+        if (th.moss && hs % 3 === 0) { px(g, sx, top, 1, 1, '#6abe30'); if (hs % 7 === 0) px(g, sx, top + 1, 1, 2, '#37946e'); }
+        if (th.ice && hs % 4 === 0) px(g, sx, top, 1, 1, '#ffffff');
         if (st === 'reef' && hs % 5 === 0) px(g, sx, top - 2, 1, 1, R[4]);
         if (wx === s.x1 - 1) px(g, sx, top - 1, 1, H - top + 1, INK);
       } else if (s.type === 'fly') {
@@ -1095,11 +1280,13 @@
         const c = th.cloud, ct = GY + 2 + Math.round(1.2 * Math.sin(wx * 0.33) + Math.sin(wx * 0.13 + t * 0.8));
         px(g, sx, ct - 1, 1, 1, c[0]); px(g, sx, ct, 1, 1, c[1]); px(g, sx, ct + 1, 1, H - ct, c[2]);
         if (hs % 5 === 0) px(g, sx, ct + 2, 1, 1, c[1]);
+        if (th.sparkleFloor && hs % 11 === 0 && (Math.floor(t * 3) + hs) % 3) px(g, sx, ct + 2 + (hs >> 4) % Math.max(1, H - ct - 3), 1, 1, '#fff27a');
         if (wx === s.x1 - 1) px(g, sx, GY - 1, 1, H - GY + 1, INK);
       } else if (s.type === 'swim') {
         const w = th.water;
         px(g, sx, GY + 1, 1, 1, w[0]); px(g, sx, GY + 2, 1, H - GY - 4, w[1]); px(g, sx, H - 2, 1, 2, w[2]);
         if (hs % 17 === 0) px(g, sx, H - 3, 1, 1, st === 'reef' ? '#f7806a' : w[2]);
+        if (th.steam && hs % 7 === 0) { const age = mod(t * 0.8 + (hs >> 5) % 10 / 10, 1); g.globalAlpha = 0.55 * (1 - age); px(g, sx + Math.round(Math.sin(t * 2 + wx) * 1.5), GY - Math.round(age * 12), 1, 2, '#ffffff'); g.globalAlpha = 1; }
         if (wx === s.x0 || wx === s.x1 - 1) px(g, sx, GY, 1, H - GY, INK);
       } else {
         const tp = th.top;
@@ -1126,6 +1313,8 @@
             if (th.tuft && hs % 23 === 0) for (let y = 0; y < 3 + hs % 4; y++) px(g, sx + (y >> 1), GY + 4 + y, 1, 1, th.soilDot);
           }
           if (st === 'reef' && hs % 23 === 0) px(g, sx, GY + 1, 1, 1, '#f7806a');
+          if (th.cracks && hs % 13 === 0) { px(g, sx, GY + 2, 1, 2, (Math.floor(t * 3) + hs) % 4 ? '#ff7a2a' : '#ffcc44'); }
+          if (th.sparkleFloor && hs % 9 === 0 && (Math.floor(t * 2) + hs) % 3) px(g, sx, GY + 4 + (hs >> 3) % Math.max(1, H - GY - 5), 1, 1, '#fff27a');
         }
         if (th.tuft && hs % 7 === 0) px(g, sx, GY - 1, 1, 1, th.tuft);
         if (th.tuft && hs % 19 === 0) px(g, sx, GY - 2, 1, 2, th.tuft);
@@ -1275,7 +1464,7 @@
   function show(params) {
     visible = true; params = params || {};
     if (race) { abortRace(); }
-    if (params.tab && ['races', 'cup', 'trial'].includes(params.tab)) hubTab = params.tab;
+    if (params.tab && ['races', 'wild', 'cup', 'trial'].includes(params.tab)) hubTab = params.tab;
     showHub();
     if (params.race) { const ri = ALL.findIndex(r => r.id === params.race); if (ri >= 0) startRace(ri, params.tier || 0); }
   }
@@ -1316,9 +1505,9 @@
   }
   function matchOf(s, ri, tier) {
     if (!s) return null;
-    const R = ALL[ri], Tr = D.RACE_TIERS[tier];
+    const R = ALL[ri], TR = R.wild ? wildLevel(R, tier) : tierRating(R, tier);
     const p = avgRating(s, R);
-    const mid = (Tr.rating[0] + Tr.rating[1]) / 2, top = Tr.rating[1];
+    const mid = (TR[0] + TR[1]) / 2, top = TR[1];
     const ratio = mulOf(p) / mulOf(mid), vsTop = mulOf(p) / mulOf(top);
     if (vsTop >= 1.12) return { t: 'Easy', c: '#2b8243' };
     if (ratio >= 1.0) return { t: 'Good match', c: '#5a9a2e' };
@@ -1334,10 +1523,11 @@
     hubDirty = false;
     const s = ST.active();
     const scroll = hubEl.scrollTop;
-    const openSeries = ALL.filter(R => unlocked(R, 0)).length;
+    const openSeries = HUB_ORDER.filter(ri => unlocked(ALL[ri], 0)).length, friends = WILD_RACES.reduce((a, R) => a + [0, 1, 2].filter(t => prog(R, t).wins).length, 0);
     const cup = cupToday();
-    const chip = hubTab === 'races' ? `${openSeries} of ${ALL.length} open` : hubTab === 'cup' ? 'New every day' : `${medalCount()} medal${medalCount() === 1 ? '' : 's'}`;
-    let html = `<div class="r-head"><div><div class="label">${hubTab === 'races' ? 'Race series' : hubTab === 'cup' ? 'Special race' : 'Beat your best'}</div><h2 class="px-title">${hubTab === 'races' ? 'Races' : hubTab === 'cup' ? 'Daily Cup' : 'Time Trial'}</h2></div><span class="r-count">${chip}</span></div>`;
+    const HEAD = { races: ['Race series', 'Races', `${openSeries} of ${HUB_ORDER.length} open`], wild: ['Island animals', 'Wild Races', `${friends} of ${WILD_RACES.length * 3} won`],
+      cup: ['Special race', 'Daily Cup', 'New every day'], trial: ['Beat your best', 'Time Trial', `${medalCount()} medal${medalCount() === 1 ? '' : 's'}`] }[hubTab] || [];
+    let html = `<div class="r-head"><div><div class="label">${HEAD[0]}</div><h2 class="px-title">${HEAD[1]}</h2></div><span class="r-count">${HEAD[2]}</span></div>`;
     if (!s) {
       html += `<div class="card r-empty"><canvas class="px r-ecv"></canvas><h3>No racer yet</h3><p>Hatch your first egg in the Garden, then come back to race.</p><button class="btn go wide r-togarden">Go to the Garden</button></div>`;
       hubEl.innerHTML = html;
@@ -1345,8 +1535,8 @@
       hubEl.querySelector('.r-togarden').onclick = () => { PX.Sound.play('pop'); PS.ui.go('garden'); };
       partnerCv = null; return;
     }
-    html += `<div class="r-tabs" role="tablist">${[['races', 'Races'], ['cup', 'Daily Cup'], ['trial', 'Time Trial']].map(([id, label]) =>
-      `<button class="r-tab" role="tab" data-tab="${id}" aria-selected="${hubTab === id}"><canvas class="px" data-tic="tab-${id}"></canvas>${label}${id === 'cup' && cup.best == null ? '<i class="r-badge" title="Today’s cup is ready"></i>' : ''}</button>`).join('')}</div>`;
+    html += `<div class="r-tabs" role="tablist">${[['races', 'Races'], ['wild', 'Wild'], ['cup', 'Daily Cup'], ['trial', 'Time Trial']].map(([id, label]) =>
+      `<button class="r-tab" role="tab" data-tab="${id}" aria-selected="${hubTab === id}"><canvas class="px" data-tic="tab-${id}"></canvas>${label}${(id === 'cup' && cup.best == null) || (id === 'wild' && wildNew()) ? '<i class="r-badge"></i>' : ''}</button>`).join('')}</div>`;
     const fi = ST.formInfo(s), rate = k => (k === 'stamina' ? ST.staminaRating(s) : ST.raceRating(s, k)).toFixed(1);
     html += `<div class="panel r-partner"><canvas class="px r-pc" width="40" height="40"></canvas><div>
       <div class="r-ptop"><div><div class="label">Your racer</div><div class="r-pname">${esc(s.name)}</div></div><button class="btn r-change">Change</button></div>
@@ -1354,6 +1544,7 @@
       <div class="r-rates">${['run', 'swim', 'climb', 'fly', 'stamina'].map(k => `<div class="r-rate"><small>${k === 'stamina' ? 'Stam' : k === 'fly' ? 'Fly' : SEG_META[k].label}</small><b>${rate(k)}</b></div>`).join('')}</div>
     </div></div>`;
     if (hubTab === 'cup') html += cupHtml(s, cup);
+    else if (hubTab === 'wild') html += wildHtml(s);
     else if (hubTab === 'trial') html += trialHtml(s);
     else html += racesHtml(s);
     hubEl.innerHTML = html;
@@ -1365,10 +1556,11 @@
         onPick: x => { ST.setActive(x.id); hubDirty = true; } });
     };
     hubEl.querySelectorAll('.r-tab').forEach(b => { b.onclick = () => { if (hubTab === b.dataset.tab) return; PX.Sound.play('tick'); hubTab = b.dataset.tab; hubEl.scrollTop = 0; hubDirty = true; renderHub(); hubEl.scrollTop = 0; }; });
-    hubEl.querySelectorAll('canvas[data-tic]').forEach(c => paintTo(c, icon(c.dataset.tic), 16, 16));
+    hubEl.querySelectorAll('canvas[data-tic]').forEach(c => { if (c.dataset.tic === 'tab-wild') { const cr = safeCritter('hare'); if (cr) paintTo(c, cr, 18, 18); } else paintTo(c, icon(c.dataset.tic), 16, 16); });
+    hubEl.querySelectorAll('canvas[data-critter]').forEach(c => { const cr = safeCritter(c.dataset.critter); if (cr) paintTo(c, cr, 18, 18); });
     hubEl.querySelectorAll('canvas[data-ic]').forEach(c => paintTo(c, icon(c.dataset.ic), 12, 12));
     hubEl.querySelectorAll('.r-prize canvas, .r-cupprize canvas.r-cc').forEach(c => paintTo(c, icon('coin'), 11, 11));
-    hubEl.querySelectorAll('.r-eggic canvas').forEach(c => { const e = safeItem('egg', c.dataset.area); if (e) paintTo(c, e, 20, 24); });
+    hubEl.querySelectorAll('.r-eggic canvas[data-area]').forEach(c => { const e = safeItem('egg', c.dataset.area); if (e) paintTo(c, e, 20, 24); });
     hubEl.querySelectorAll('.r-lock canvas').forEach(c => paintTo(c, icon('lock'), 13, 13));
     hubEl.querySelectorAll('canvas[data-medal]').forEach(c => paintTo(c, icon('medal' + c.dataset.medal), 11, 14));
     hubEl.querySelectorAll('canvas[data-mod]').forEach(c => paintTo(c, icon('mod-' + c.dataset.mod), c.dataset.mod === 'giant' ? 32 : 16, c.dataset.mod === 'giant' ? 32 : 16));
@@ -1392,10 +1584,30 @@
     const area = D.AREAS[R.area] ? D.AREAS[R.area].name : '';
     return `${R.id === 'grand' ? 'Every area in one long course.' : R.extra ? esc(R.blurb) : esc(area) + ' course'} · ${order.map(k => SEG_META[k].label.toLowerCase()).join(', ')}`;
   }
+  function wildNew() { return WILD_RACES.some(R => unlocked(R, 0) && !prog(R, 0).runs); }
+  // a locked series shows as a small card: banner, name and what to win
+  function lockedCard(ri, label) {
+    const R = ALL[ri];
+    return `<div class="panel r-card locked" data-ri="${ri}"><div class="r-banner"><canvas class="px r-bn" data-ri="${ri}" data-h="20"></canvas><span class="r-num">${label}</span><span class="r-lockchip">Locked</span></div>
+      <div class="r-body"><div class="r-title">${esc(R.name)}</div><div class="r-tsub r-lockline"><span class="r-lock"><canvas class="px"></canvas></span>${esc(lockReason(R, 0))}</div></div></div>`;
+  }
+  function wildHtml(s) {
+    let html = '<p class="r-intro">Race the animals that live on each island! Win a race the first time and the fastest animal becomes your friend.</p><div class="r-list">';
+    WILD_ORDER.forEach(ri => {
+      const R = ALL[ri]; if (!unlocked(R, 0)) { html += lockedCard(ri, D.AREAS[R.area] ? D.AREAS[R.area].name : 'Wild'); return; }
+      const fresh = !prog(R, 0).runs;
+      html += `<div class="panel r-card" data-ri="${ri}">
+        <div class="r-banner"><canvas class="px r-bn" data-ri="${ri}"></canvas><span class="r-num">${esc(D.AREAS[R.area] ? D.AREAS[R.area].name : '')}</span>${fresh ? '<span class="r-new">New!</span>' : ''}</div>
+        <div class="r-body"><div class="r-title">${esc(R.name)}</div><div class="r-sub">${seriesSub(R)}</div>
+        <div class="r-tiers">${D.RACE_TIERS.map((Tr, ti) => tierRow(s, ri, ti)).join('')}</div></div></div>`;
+    });
+    return html + '</div><p class="r-foot">Each island opens after you win its first race series. Full pouch? The animal leaves you coins instead.</p>';
+  }
   function racesHtml(s) {
     let html = '<div class="r-list">';
     HUB_ORDER.forEach((ri, n) => {
       const R = ALL[ri], open = unlocked(R, 0);
+      if (!open) { html += lockedCard(ri, `Series ${n + 1}`); return; }
       const W = SEGS.reduce((a, k) => a + (R.mix[k] || 0), 0);
       const order = SEGS.filter(k => R.mix[k]).sort((a, b) => R.mix[b] - R.mix[a]);
       const fresh = open && R.extra && !prog(R, 0).runs;
@@ -1413,18 +1625,18 @@
   }
   function tierRow(s, ri, ti) {
     const R = ALL[ri], Tr = D.RACE_TIERS[ti], open = unlocked(R, ti), p = prog(R, ti);
-    const eggArea = eggKindOf(R, ti), eName = eggName(eggArea);
+    const eggArea = R.wild ? null : eggKindOf(R, ti), fr = R.wild ? friendOf(R, ti) : null, eName = R.wild ? `a ${(D.ANIMALS[fr] || {}).name || 'friend'}` : eggName(eggArea);
     const m = open ? matchOf(s, ri, ti) : null;
     let sub;
     if (!open) sub = esc(lockReason(R, ti));
     else if (!p.runs) sub = p.wins ? '' : `First win: <b>${eName}!</b>`;
     else sub = `Best <b>${p.best ? p.best.toFixed(1) + 's' : '—'}</b> · ${p.wins} win${p.wins === 1 ? '' : 's'}${p.wins ? '' : ` · First win: <b>${eName}!</b>`}`;
     const right = open
-      ? `${!p.wins ? `<span class="r-eggic" title="First win earns an egg"><canvas class="px" data-area="${eggArea}"></canvas></span>` : ''}<span class="r-go">Race</span>`
+      ? `${!p.wins ? (R.wild ? `<span class="r-eggic r-friendic" title="First win: a new friend"><canvas class="px" data-critter="${fr}"></canvas></span>` : `<span class="r-eggic" title="First win earns an egg"><canvas class="px" data-area="${eggArea}"></canvas></span>`) : ''}<span class="r-go">Race</span>`
       : `<span class="r-lock"><canvas class="px"></canvas></span>`;
     return `<button class="r-tier" data-ri="${ri}" data-tier="${ti}" ${open ? '' : 'disabled'} aria-label="${esc(R.name + ' ' + Tr.name)}${open ? '' : ' (locked)'}">
       <span><span class="r-tname">${Tr.name}${m ? `<span class="r-match" style="background:${m.c}">${m.t}</span>` : ''}</span>
-      <span class="r-tsub">${sub}</span></span>
+      <span class="r-tsub">${sub}</span>${R.wild && open ? `<span class="r-vs">vs ${wildAnimals(R, ti).map(id => `<canvas class="px" data-critter="${id}" title="${esc((D.ANIMALS[id] || {}).name || id)}"></canvas>`).join('')}</span>` : ''}</span>
       <span class="r-right"><span class="r-prize"><canvas class="px"></canvas>${prizeOf(R, ti)}</span>${right}</span></button>`;
   }
   function cupHtml(s, cup) {
@@ -1495,7 +1707,9 @@
     const spr = sprig(look, { walk: true, frame: 1, mouth: 'grin', arms: md === 'lowgrav' ? 'up' : undefined }), sx = Math.round(W * 0.28), wx = camX + sx;
     const half = md !== 'giant', sw = half ? 16 : 32, sh = half ? Math.ceil(spr.height / 2) : spr.height;
     const fy = V.GY + 1 - elevAt(V, wx) + Math.min(2, sinkAt(V, wx)) - (md === 'lowgrav' ? 7 : 0);
-    g.drawImage(spr, sx - sw / 2, fy - sh + 1, sw, sh);
+    if (R.wild && !opt.look) { // wild race banner: the Beginner animals running along
+      wildAnimals(R, 0).forEach((id, i) => { const cr = safeCritter(id); if (!cr || cr.height > V.GY) return; const x = sx - 4 + i * 26, wx2 = camX + x; PX.blit(g, cr, x, V.GY + 1 - elevAt(V, wx2) + Math.min(2, sinkAt(V, wx2))); });
+    } else g.drawImage(spr, sx - sw / 2, fy - sh + 1, sw, sh);
     const f = document.createElement('canvas'); f.width = W; f.height = H; const fvg = f.getContext('2d');
     drawWaterFront({ g: fvg, W, H, GY: GYb, CH: 7, C, camX, t: 0, tint: V.tint });
     g.drawImage(f, 0, 0);
@@ -1777,10 +1991,16 @@
     const res = ST.gain(s, gives);
     if (s.record) { s.record.races = (s.record.races || 0) + 1; if (place === 0) s.record.raceWins = (s.record.raceWins || 0) + 1; }
     if (PS.S.totals) { PS.S.totals.races = (PS.S.totals.races || 0) + 1; if (place === 0) PS.S.totals.raceWins = (PS.S.totals.raceWins || 0) + 1; }
-    let egg = null;
-    if (firstWin) { egg = ST.addEgg(R.eggs[tier], `${R.name} ${Tr.name}`); PS.S.bestTier = Math.max(PS.S.bestTier || 0, tier + 1); }
+    let egg = null, friend = null;
+    if (firstWin) {
+      if (R.wild) { // the fastest animal you beat comes home with you (if the pouch has room)
+        const id = friendOf(R, tier), added = !!id && ST.addToPouch(id);
+        friend = { id, name: (D.ANIMALS[id] || {}).name || 'animal', added, coins: added ? 0 : ST.addCoins(FRIEND_COINS[tier], 'race') };
+      } else egg = ST.addEgg(R.eggs[tier], `${R.name} ${Tr.name}`);
+      PS.S.bestTier = Math.max(PS.S.bestTier || 0, tier + 1);
+    }
     PS.save();
-    return { coins, gives, ups: res.ups, evolved: res.evolved, egg, firstWin, unlockedNext: firstWin };
+    return { coins: coins + (friend ? friend.coins : 0), gives, ups: res.ups, evolved: res.evolved, egg, friend, firstWin, unlockedNext: firstWin };
   }
   function finishCup(s, place) {
     const X = xs(), info = race.info, day = info.key;
@@ -1843,6 +2063,10 @@
     if (!sum.egg) return '';
     return `<div class="r-eggbox"><canvas class="px r-eggcv"></canvas><div><b>New ${esc(eggName(sum.egg.kind))}!</b><span>${text || 'It’s waiting in the Garden.'}</span></div></div>`;
   }
+  function friendBoxHtml(sum) {
+    const f = sum.friend; if (!f) return '';
+    return `<div class="r-eggbox"><canvas class="px r-friendcv"></canvas><div><b>${f.added ? `The ${esc(f.name)} wants to be friends!` : `The ${esc(f.name)} says well done!`}</b><span>${f.added ? 'It hopped into your pouch. Find it in the Garden.' : `Your pouch is full, so it gave you ${f.coins} coins instead.`}</span></div></div>`;
+  }
   function showResults() {
     const sum = settle();
     if (race.mode === 'trial') return showTrialResults(sum);
@@ -1863,15 +2087,17 @@
       <div class="eyebrow">${cup ? 'Daily Cup · ' + esc(race.info.M.name) : esc(R.name) + ' · ' + Tr.name}</div>
       <h1>${title}</h1>
       <div class="r-rows">${order.map((r, i) => `<div class="r-row${r === p ? ' me' : ''}"><span class="pl">${ORD[i]}</span><canvas class="px" data-i="${i}"></canvas>
-        <span class="nm">${esc(r.name)}<small>${r === p ? 'Your Sprout' : 'Rival'}</small></span><span class="num">${r.finished ? '' : '~'}${finalTime(r).toFixed(1)}s</span></div>`).join('')}</div>
+        <span class="nm">${esc(r.name)}<small>${r === p ? 'Your Sprout' : r.animal ? 'Wild animal' : 'Rival'}</small></span><span class="num">${r.finished ? '' : '~'}${finalTime(r).toFixed(1)}s</span></div>`).join('')}</div>
       ${rew}
       ${eggBoxHtml(sum, cup ? 'A lucky egg from the Daily Cup! It’s in the Garden.' : '')}
+      ${friendBoxHtml(sum)}
       ${newNames.length ? `<p class="r-note">Unlocked: <b>${newNames.map(esc).join(', ')}</b></p>` : ''}
       ${tip ? `<p class="r-note">${tip}</p>` : ''}
       <div class="r-btns stack"><button class="btn go wide r-again">${cup ? 'Race the cup again' : 'Race again'}</button><button class="btn wide r-back">Back to races</button></div>
     </div>`;
-    ov.querySelectorAll('canvas[data-i]').forEach(c => { const i = +c.dataset.i; spriteBox(c, order[i].look, i === 0 ? { eyes: 'happy', mouth: 'open', arms: 'up' } : i === 3 ? { eyes: 'sad', mouth: 'flat' } : {}, 36); c.style.height = (38 * c.height / c.width) + 'px'; });
+    ov.querySelectorAll('canvas[data-i]').forEach(c => { const i = +c.dataset.i; if (order[i].animal) { const cr = safeCritter(order[i].animal); if (cr) paintTo(c, cr); return; } spriteBox(c, order[i].look, i === 0 ? { eyes: 'happy', mouth: 'open', arms: 'up' } : i === 3 ? { eyes: 'sad', mouth: 'flat' } : {}, 36); c.style.height = (38 * c.height / c.width) + 'px'; });
     const cc = ov.querySelector('.r-coincv'); if (cc) paintTo(cc, icon('coin'), 11, 11);
+    const fc = ov.querySelector('.r-friendcv'); if (fc && sum.friend) { const cr = safeCritter(sum.friend.id); if (cr) paintTo(fc, cr); }
     const ec = ov.querySelector('.r-eggcv'); if (ec) { const e = safeItem('egg', sum.egg.kind) || safeItem('egg', sum.egg.area); if (e) paintTo(ec, e, 20, 24); }
     const ri = race.ri, tier = race.tier;
     ov.querySelector('.r-back').onclick = () => { PX.Sound.play('pop'); endRaceUI(); showHub(); };
@@ -2013,8 +2239,30 @@
     if (big === 2) lx.drawImage(spr, x - AX * 2, y - AY * 2 - 1, spr.width * 2, spr.height * 2);
     else PX.blit(lx, spr, x, y, false, AX, AY);
   }
-  function drawRacer(r, P, sx, fy, t) {
-    const spr = sprig(r.look, P), big = race.mods.giant ? 2 : 1;
+  // wild animals: PX.critter at 2x (crisp), hopping on land, bobbing in water (swim sprite), flapping in the air
+  function animalView(r, fy, y0, t) {
+    const s = segAtC(race.C, r.x), ground = y0 + GY + 1 - elevAt(V, r.x), moving = race.state === 'run' && !r.finished;
+    const a = D.ANIMALS[r.animal] || {}; let spr = safeCritter(r.animal) || icon('itembox'), y = ground;
+    if (s.type === 'swim' && sinkAt(V, r.x) > 2 && !r.finished) { try { spr = PX.critterSwim(r.animal) || spr; } catch (e) { /* optional */ } y = ground + 2 + Math.round(Math.sin(t * 4 + r.lane) * 0.8); }
+    else if (s.type === 'fly' && moving) y = ground - 3 - (a.where === 'air' ? 3 : 0) + Math.round(Math.sin(r.animT * (a.where === 'air' ? 14 : 6)) * 1.5);
+    else if (moving) y = ground - (Math.floor(r.x / (s.type === 'climb' ? 3 : 5)) % 2 ? (r.tired ? 1 : 3) : 0);
+    else if (r.finished) y = ground - (Math.floor(r.animT * 3) % 2 ? 2 : 0);
+    else y = ground - (Math.floor(r.animT * 2 + r.lane) % 2);
+    return { spr, y, k: spr.width >= 24 ? 1 : 2 };
+  }
+  function blitAnimal(spr, x, y, k) { lx.drawImage(spr, Math.round(x - spr.width * k / 2), Math.round(y - spr.height * k + k), spr.width * k, spr.height * k); }
+  function drawSled(sx, fy, big) { // a little wooden sled drawn in front of the rider
+    const b = big, x0 = sx - 10 * b, y = fy - 1;
+    px(lx, x0 - 1, y - 4 * b, 22 * b + 2, 4 * b + 2, INK);
+    px(lx, x0, y - 3 * b, 20 * b, 2 * b, '#b8743a'); px(lx, x0, y - 3 * b, 20 * b, 1, '#e5535f'); px(lx, x0, y - b, 20 * b, b, '#8f563b');
+    px(lx, x0 + 20 * b, y - 5 * b, 2 * b, 3 * b, INK); px(lx, x0 + 20 * b, y - 4 * b, b, 2 * b, '#e5535f');
+    px(lx, x0 + 1, y + 1, 21 * b, 1, '#595a70');
+  }
+  function drawRacer(r, P, sx, fy, t, y0) {
+    const big = race.mods.giant ? 2 : 1;
+    let spr, blit;
+    if (r.animal) { const av = animalView(r, fy, y0 || 0, t); spr = av.spr; fy = av.y; blit = (c, x, y) => blitAnimal(c, x, y, av.k); }
+    else { spr = sprig(r.look, P); blit = (c, x, y) => blitSpr(c, x, y, big); }
     if (r.itemT > 0 && r.starT <= 0) { // speed lines
       for (let k = 0; k < 3; k++) {
         const ln = 6 + ((Math.floor(t * 20) + k * 2) % 5), x0 = sx - 9 * big - ln - k * 2, y = fy - (5 + k * 6) * big;
@@ -2023,12 +2271,13 @@
     }
     if (r.starT > 0) { // rainbow glow outline
       const s2 = silhouette(spr, RAINBOW[Math.floor(t * 12) % 6]);
-      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) blitSpr(s2, sx + dx, fy + dy, big);
+      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) blit(s2, sx + dx, fy + dy);
     }
     if (r.isGhost) {
       const s2 = silhouette(spr, '#cbe4ff');
-      lx.globalAlpha = 0.28; blitSpr(s2, sx, fy, big); lx.globalAlpha = 0.45 + 0.08 * Math.sin(t * 5); blitSpr(spr, sx, fy, big); lx.globalAlpha = 1;
-    } else blitSpr(spr, sx, fy, big);
+      lx.globalAlpha = 0.28; blit(s2, sx, fy); lx.globalAlpha = 0.45 + 0.08 * Math.sin(t * 5); blit(spr, sx, fy); lx.globalAlpha = 1;
+    } else blit(spr, sx, fy);
+    if (!r.animal && !r.finished && TH[themeAt(race.C, r.x)].sled && segAtC(race.C, r.x).type === 'fly') drawSled(sx, fy, big);
     if (r.shieldT > 0 && (r.shieldT > 2 || Math.floor(t * 8) % 2)) { // bubble
       const cx = sx, cy = fy - 12 * big, R = 14 * big;
       lx.globalAlpha = 0.25; disc(lx, cx, cy, R, '#7fd0ff'); lx.globalAlpha = 1;
@@ -2091,7 +2340,7 @@
       if (!r.none && sx > -40 && sx < WW + 40) {
         const gy = GY + 1 - elevAt(V, r.x) + sinkAt(V, r.x);
         if (race.mods.lowgrav && gy - y > 3) { const w = Math.max(3, 9 - ((gy - y) >> 1)); lx.globalAlpha = 0.3; px(lx, sx - w, y0 + gy, w * 2, 1, INK); lx.globalAlpha = 1; }
-        drawRacer(r, P, sx, y0 + y, t);
+        drawRacer(r, P, sx, y0 + y, t, y0);
       }
       lx.drawImage(fgC, 0, y0);
       for (const p of race.parts) if (p.lane === i) {
@@ -2101,7 +2350,7 @@
       if (race.mods.rain) drawRain(y0, t, camX);
       if (race.mods.night) drawDark(r, y0, camX, sx, y);
       const big = race.mods.giant ? 2 : 1;
-      if (r.emote && sx > -20 && sx < WW + 10) { try { PX.blit(lx, PX.emote(r.emote), sx + 8 * big, y0 + y - 12 * big - (big - 1) * 14, false, 0, 13); } catch (e) { /* optional */ } }
+      if (r.emote && sx > -20 && sx < WW + 10) { try { PX.blit(lx, PX.emote(r.emote), sx + 8 * big + (r.animal ? 6 : 0), y0 + y - 12 * big - (big - 1) * 14 - (r.animal ? 14 : 0), false, 0, 13); } catch (e) { /* optional */ } }
       lx.restore();
       if (r === race.player) { px(lx, 0, y0, WW, 1, '#fbf236'); px(lx, 0, y0 + LH - 1, WW, 1, '#fbf236'); px(lx, 0, y0, 1, LH, '#fbf236'); px(lx, WW - 1, y0, 1, LH, '#fbf236'); }
       else if (i > 0 && race.lanes[i - 1] !== race.player) px(lx, 0, y0, WW, 1, INK);

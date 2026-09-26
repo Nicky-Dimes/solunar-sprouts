@@ -400,6 +400,23 @@
       O('Aurora', 75, 2, 80, { phoenix: 1, dolphin: 6 }, 'sunflower', { body: 'sun' }),
       O('Tempest', 85, 2, -80, { griffin: 1, bat: 6 }, 'moonflower', { body: 'night' }),
       O('Wyrm', 100, 2, -20, { dragon: 1, dinosaur: 1 }, 'hibiscus', { body: 'berry' }) ] },
+    // late game: 4 more leagues to grind through, ending with the Champion (a Sprout close to the max level of 250)
+    { id: 'mythic', name: 'Mythic League', coins: 1000, xp: 75, egg: 'golden', unlock: 'legend', opponents: [
+      O('Onyx', 112, 2, -60, { kitsune: 1, raccoon: 6 }, 'nightshade', { body: 'charcoal', pattern: 'mask', patternColor: '#c9a2f0' }),
+      O('Seraphine', 122, 2, 70, { unicorn: 1, butterfly: 6 }, 'sunflower', { body: 'cream', hat: 'flower' }),
+      O('Abyssa', 132, 2, -70, { kraken: 1, anglerfish: 6 }, 'sealily', { body: 'ocean', pattern: 'spots', patternColor: '#9fd8ff' }) ] },
+    { id: 'starfall', name: 'Starfall League', coins: 1150, xp: 82, egg: 'crystal', unlock: 'mythic', opponents: [
+      O('Comet', 146, 2, 50, { fairy: 1, moondeer: 6 }, 'primrose', { body: 'lilac', pattern: 'star', patternColor: '#fff27a' }),
+      O('Nebula', 160, 2, -50, { phoenix: 1, pelican: 6 }, 'moonflower', { body: 'night', hat: 'wizard' }),
+      O('Meteor', 166, 2, 0, { dinosaur: 1, pufferfish: 6 }, 'beachrose', { body: 'tangerine', pattern: 'freckles', patternColor: '#fbf3dc' }) ] },
+    { id: 'titan', name: 'Titan League', coins: 1300, xp: 90, egg: 'rainbow', unlock: 'starfall', opponents: [
+      O('Boulder', 188, 2, 10, { yeti: 1, squirrel: 6, frog: 3 }, 'daisy', { body: 'moss', hat: 'leafcap' }),
+      O('Gale', 202, 2, -30, { griffin: 1, seahorse: 6, frog: 2 }, 'bluebell', { body: 'sky', pattern: 'stripes', patternColor: '#ffffff' }),
+      O('Inferno', 208, 2, -10, { dragon: 1, chocomouse: 6, marshbunny: 3 }, 'hibiscus', { body: 'cherry', hat: 'tophat' }) ] },
+    { id: 'champion', name: 'Champion League', coins: 1500, xp: 100, egg: 'dragon', unlock: 'titan', opponents: [
+      O('Tsunami', 228, 2, -40, { kraken: 1, licoriceeel: 6, pufferfish: 3 }, 'sealily', { body: 'aqua', pattern: 'twotone', patternColor: '#ffffff' }),
+      O('Aurelia', 238, 2, 90, { phoenix: 1, unicorn: 1, butterfly: 6 }, 'sunflower', { body: 'sun', extra: 'halo' }),
+      O('Solara', 248, 2, 0, { dragon: 1, griffin: 1, moondeer: 6 }, 'candytulip', { body: 'bubblegum', hat: 'crown', eyes: 'sparkle' }) ] },
   ];
   const BATTLE = {
     hpBase: 40, hpPerStamina: 5, hpPerLevel: 1,

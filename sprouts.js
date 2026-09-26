@@ -276,7 +276,7 @@
       return `<button class="sp-row ${partner ? 'partner' : ''}" data-open="${s.id}">
         <div class="sp-pic"><canvas data-anim="${s.id}"></canvas></div>
         <div><b>${esc(s.name)}${partner ? '<span class="sp-tag">Partner</span>' : ''}</b>
-          <small>${esc(fi.name)} \u00b7 ${esc(areaName(s.area))}</small>
+          <small>${esc(fi.name)} \u00b7 ${esc(areaName(s.area))}</small>${s.home ? `<small>Resting in the ${esc(state.homeName(s.area))}</small>` : ''}
           <div class="sp-chips">${state.elementsOf(s).map(elChip).join('')}${skinBadge(s)}</div></div>
         <div class="sp-lv"><span class="num">${tl}</span><span>Level</span></div>
       </button>`;
@@ -535,7 +535,7 @@
     return `<div class="sp-scroll"><div class="sp-wrap">
       <div class="sp-top"><button class="btn sp-back" data-back>\u2039 All Sprouts</button></div>
       <section class="panel sp-hero">
-        <div class="sp-stagebox ${esc(s.area)}"><span class="sp-where">${esc(areaName(s.area))}</span><canvas data-hero title="Pet"></canvas></div>
+        <div class="sp-stagebox ${esc(s.area)}"><span class="sp-where">${esc(areaName(s.area))}${s.home ? ` \u00b7 resting in the ${esc(state.homeName(s.area))}` : ''}</span><canvas data-hero title="Pet"></canvas></div>
         <div class="sp-namebox"><input class="sp-name-in" maxlength="12" value="${esc(s.name)}" aria-label="Name" enterkeyhint="done" autocomplete="off" spellcheck="false"></div>
         <div class="sp-form"><b>${esc(fi.name)}</b> \u00b7 Stage ${fi.stage + 1} of 3</div><div class="sp-els">${state.elementsOf(s).map(elChip).join('')}${skinBadge(s)}</div>
         <div class="sp-mood">

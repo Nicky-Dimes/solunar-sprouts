@@ -53,6 +53,19 @@
     coins: f => Math.max(8, Math.round(0.085 * Math.pow(TOWER.lv(f), 1.9))),
     xp: f => (0.75 * TOWER.lv(f) + 5) * 0.5,
   };
+  // Wild Battles: fight the real animals of each island. lv: [little, big, alpha] level ranges, spread across the area's animals
+  // in data order. An animal's stats lean toward what it `gives` (a Sparrow is a dodgy flier, a Ram hits hard).
+  const WILD = {
+    areas: [
+      { id: 'meadow', unlock: null, lv: [[2, 10], [14, 24], [28, 40]] },
+      { id: 'beach', unlock: 'thorn', lv: [[18, 26], [32, 44], [50, 64]] },
+      { id: 'moonlit', unlock: 'tide', lv: [[30, 40], [48, 60], [70, 86]] },
+      { id: 'candy', unlock: 'moon', lv: [[44, 54], [64, 78], [95, 112]] },
+    ],
+    steps: [{ name: 'Little', mult: 0.7, smart: 0.3, scale: 2, moves: 2 }, { name: 'Big', mult: 0.95, smart: 0.55, scale: 2 }, { name: 'Alpha', mult: 1.1, smart: 0.8, scale: 3 }],
+    coins: lv => Math.max(6, Math.round(0.09 * Math.pow(lv, 1.9))),
+    xp: lv => (0.75 * lv + 5) * 0.6,
+  };
   const STAT_FRUITS = ['swiftberry', 'wingseed', 'seakelp', 'powernut', 'heartyroot'];
   const FRIEND = { coinsWin: 12, coinsLose: 6, perDay: 5 };
   const SNACK = '__snack';
@@ -67,11 +80,11 @@
   const TUNE = {
     dmgK: 0.104, lvBase: 1.5, dmgLv: 45, ratioExp: 0.65, rand: [0.9, 1.1],
     accStage: [0.6, 0.7, 0.85, 1, 1.15, 1.3, 1.45], // hit-chance multiplier for (acc stage − eva stage), −3..+3
-    npcMult: [0.75, 0.92, 1, 1, 1, 1],               // opponent HP/Attack scale per league (keeps Pebble gentle for a fresh Sprout)
+    npcMult: [0.75, 0.92, 1, 1, 1, 1, 1, 1, 1, 1],   // opponent HP/Attack scale per league (keeps Pebble gentle for a fresh Sprout)
     poisonFrac: 1 / 10, burnFrac: 1 / 12, dotTurns: 4, sleepTurns: [1, 3],
     typeCap: [0.5, 2],
     healFade: 0.75, healFloor: 0.25, // each heal a fighter uses is weaker than the last (stops heal-stalling)
-    aiSmart: [0.2, 0.45, 0.6, 0.72, 0.85, 0.95],     // per league index (Pebble → Legend)
+    aiSmart: [0.2, 0.45, 0.6, 0.72, 0.85, 0.95, 0.95, 0.96, 0.97, 0.98], // per league index (Pebble → Champion)
     tireAt: 14, tireFrac: 1 / 10,                    // from this round on, both lose HP each round (no endless stalls)
     braceMult: 0.3, bossDot: 0.3, bossTireAt: 22,    // bosses: blocked giant attacks deal 30%; poison/burn/tiring hurt bosses 30% as much
     snackHeal: 0.3,
@@ -104,6 +117,27 @@
       atk: Math.round((12 + 0.44 * L) * B.atkK), def: Math.round((10 + 0.4 * L) * B.defK), spd: Math.round((10 + 0.4 * L) * B.spdK), eva: 0,
     });
     f.max = f.hp = Math.round((40 + 2 * L) * B.hpK);
+    return f;
+  }
+  const wildList = area => Object.keys(D.ANIMALS).filter(k => D.ANIMALS[k].area === area);
+  function wildLv(id, step) {
+    const A = D.ANIMALS[id], W = WILD.areas.find(a => a.id === A.area) || WILD.areas[0], list = wildList(A.area), i = Math.max(0, list.indexOf(id)), [a, b] = W.lv[step];
+    return Math.round(a + (b - a) * (list.length > 1 ? i / (list.length - 1) : 0));
+  }
+  // A wild animal fighter: its own 3 moves and element, stats from a Sprout-like spread of level L that leans toward its gives.
+  function makeWild(id, step) {
+    const A = D.ANIMALS[id], S = WILD.steps[step], L = wildLv(id, step), B = D.BATTLE;
+    const w = { swim: 1, fly: 1, run: 1, power: 1, stamina: 1.2 };
+    for (const [st, v] of Object.entries(A.gives || {})) if (v > 0 && w[st]) w[st] += v / 5;
+    const wt = Object.values(w).reduce((a, b) => a + b, 0), lv = {};
+    for (const st of D.STATS) lv[st] = Math.min(D.GROWTH.maxLevel, Math.round(L * w[st] / wt));
+    const m = S.mult;
+    const f = Object.assign(baseFighter('o'), {
+      s: null, name: `${S.name} ${A.name}`, npc: true, look: null, critter: id, wild: { id, step }, moves: A.moves.filter(x => D.MOVES[x]).slice(0, S.moves || 3), els: [A.el || 'normal'], lv: L,
+      atk: Math.round((B.atkBase + lv.power * B.atkPerPower) * m), def: Math.round((B.defBase + lv.stamina * B.defPerStamina + lv.swim * B.defPerSwim) * m),
+      spd: Math.round(B.spdBase + lv.run * B.spdPerRun), eva: Math.min(B.evaMax, lv.fly * B.evaPerFly),
+    });
+    f.max = f.hp = Math.round((B.hpBase + lv.stamina * B.hpPerStamina + L * B.hpPerLevel) * m);
     return f;
   }
   const effAtk = f => f.atk * sm(f.st.atk - (f.status === 'burn' ? 1 : 0));
@@ -151,9 +185,9 @@
   // opts: npcMult, smart, rng, boss (boss id: the 'o' side is that boss instead of sO), tireAt
   function newBattle(sP, sO, opts) {
     opts = opts || {};
-    const o = opts.boss ? makeBoss(opts.boss) : makeFighter(sO, 'o', opts.npcMult);
+    const o = opts.boss ? makeBoss(opts.boss) : opts.wild ? makeWild(opts.wild.id, opts.wild.step) : makeFighter(sO, 'o', opts.npcMult);
     const b = { p: makeFighter(sP, 'p'), o, turn: 0, over: false, winner: null, rng: opts.rng || Math.random,
-      smart: opts.smart == null ? (o.boss ? o.boss.smart : 0.6) : opts.smart, tireAt: opts.tireAt || (o.boss ? TUNE.bossTireAt : TUNE.tireAt) };
+      smart: opts.smart == null ? (o.boss ? o.boss.smart : o.wild ? WILD.steps[o.wild.step].smart : 0.6) : opts.smart, tireAt: opts.tireAt || (o.boss ? TUNE.bossTireAt : TUNE.tireAt) };
     b.p.foe = b.o; b.o.foe = b.p;
     return b;
   }
@@ -397,6 +431,14 @@
     return genNPC(seed * 31 + f * 977, TOWER.lv(f), { area, hat: star ? 'crown' : null, rare });
   }
 
+  // League opponents come from state.makeNPC, which doesn't cap stats. Real Sprouts max out at 50 per stat, so the late leagues
+  // move any extra into the other stats (total level unchanged). The original six leagues never go over 50, so they're untouched.
+  function leagueNPC(leagueId, index) {
+    const s = ST.makeNPC(leagueId, index), M = D.GROWTH.maxLevel; let spill = 0;
+    for (const st of D.STATS) if (s.stats[st].lv > M) { spill += s.stats[st].lv - M; s.stats[st].lv = M; }
+    for (const st of D.STATS.slice().sort((a, b) => s.stats[b].lv - s.stats[a].lv)) { if (spill <= 0) break; const add = Math.min(spill, M - s.stats[st].lv); s.stats[st].lv += add; spill -= add; }
+    return s;
+  }
   // ---------------- headless sim (balance) ----------------
   function simBattle(sP, sO, oppSmart, pSmart, maxTurns, npcMult) {
     const b = newBattle(sP, sO, { npcMult });
@@ -404,7 +446,7 @@
     return { won: b.winner === 'p', turns: b.turn, hpLeft: b.p.hp / b.p.max };
   }
   function sim(sP, leagueId, index, n, pSmart) {
-    const li = D.LEAGUES.findIndex(l => l.id === leagueId); const o = ST.makeNPC(leagueId, index);
+    const li = D.LEAGUES.findIndex(l => l.id === leagueId); const o = leagueNPC(leagueId, index);
     let w = 0, turns = 0; n = n || 300;
     for (let i = 0; i < n; i++) { const r = simBattle(sP, o, TUNE.aiSmart[li], pSmart == null ? 0.85 : pSmart, 40, TUNE.npcMult[li]); w += r.won; turns += r.turns; }
     return { win: +(w / n).toFixed(2), turns: +(turns / n).toFixed(1) };
@@ -440,14 +482,21 @@
     return { avg: +(floors.reduce((a, b) => a + b, 0) / n).toFixed(1), median: floors[Math.floor(n / 2)], best: floors[n - 1], worst: floors[0] };
   }
 
-  const engine = { TUNE, BOSSES, TOWER, makeFighter, makeBoss, newBattle, resolveRound, aiChoose, scoreMove, typeMult, hitChance, baseDamage, isBrace,
+  function simWild(sP, id, step, n, pSmart) {
+    let w = 0, turns = 0; n = n || 200;
+    for (let i = 0; i < n; i++) { const b = newBattle(sP, null, { wild: { id, step } }); while (!b.over && b.turn < 40) resolveRound(b, aiChoose(b, b.p, pSmart == null ? 0.85 : pSmart), aiChoose(b, b.o, b.smart)); w += b.winner === 'p'; turns += b.turn; }
+    return { win: +(w / n).toFixed(2), turns: +(turns / n).toFixed(1), lv: wildLv(id, step) };
+  }
+
+  const engine = { TUNE, BOSSES, TOWER, WILD, makeWild, wildLv, wildList, simWild, makeFighter, makeBoss, newBattle, resolveRound, aiChoose, scoreMove, typeMult, hitChance, baseDamage, isBrace,
     simBattle, sim, simBoss, simTower, genNPC, towerNPC, SNACK };
   window.__battle = { engine };
 
   // ======================================================================
   // Save helpers (new, optional fields only)
   // ======================================================================
-  // PS.S.progress.battleExtra = { bosses:{id:{wins,tries,best}}, tower:{best,runs,run}, friend:{day,paid,played}, snack, seen:{} }
+  // PS.S.progress.battleExtra = { bosses:{id:{wins,tries,best}}, tower:{best,runs,run}, friend:{day,paid,played}, snack, seen:{},
+  //                             wild:{animals:{id:[littleWins,bigWins,alphaWins]}, areas:{areaId:true when every Alpha is beaten}} }
   function extra() {
     const p = PS.S.progress || (PS.S.progress = { races: {}, leagues: {} });
     let e = p.battleExtra;
@@ -457,6 +506,9 @@
     const T = e.tower; if (typeof T.best !== 'number') T.best = 0; if (typeof T.runs !== 'number') T.runs = 0; if (T.run === undefined) T.run = null;
     if (!e.friend || typeof e.friend !== 'object') e.friend = {};
     if (!e.seen || typeof e.seen !== 'object') e.seen = {};
+    if (!e.wild || typeof e.wild !== 'object') e.wild = {};
+    if (!e.wild.animals || typeof e.wild.animals !== 'object') e.wild.animals = {};
+    if (!e.wild.areas || typeof e.wild.areas !== 'object') e.wild.areas = {};
     return e;
   }
   const bossRec = id => Object.assign({ wins: 0, tries: 0, best: null }, extra().bosses[id]);
@@ -482,7 +534,7 @@
   PS.scenes = PS.scenes || {};
   const PX = window.PX;
   const INK = '#222034';
-  const LEAGUE_AREA = { pebble: 'meadow', thorn: 'meadow', tide: 'beach', moon: 'moonlit', sugar: 'candy' };
+  const LEAGUE_AREA = { pebble: 'meadow', thorn: 'meadow', tide: 'beach', moon: 'moonlit', sugar: 'candy', mythic: 'peak', starfall: 'moonlit', titan: 'volcano', champion: 'tower' };
   const safe = (fn, fb) => { try { const v = fn(); return v == null ? fb : v; } catch (e) { return fb; } };
   const sfx = n => safe(() => PX.Sound.play(n));
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -496,8 +548,8 @@
 .b-top{display:flex;align-items:flex-end;justify-content:space-between;margin:2px 4px 10px}
 .b-top h1{font-family:var(--f-px);font-weight:700;font-size:26px;margin:0;color:var(--ink)}
 .b-top .b-rec{font-family:var(--f-px);font-weight:600;font-size:13px;color:var(--ink-soft)}
-.b-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 12px}
-.b-tab{position:relative;display:flex;flex-direction:column;align-items:center;gap:1px;min-height:62px;padding:5px 2px 4px;border-radius:14px;border:2px solid var(--line);border-bottom-width:5px;background:var(--panel);font-family:var(--f-px);font-weight:700;font-size:14px;color:var(--ink-soft)}
+.b-tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:0 0 12px}
+.b-tab{position:relative;display:flex;flex-direction:column;align-items:center;gap:1px;min-height:62px;padding:5px 1px 4px;border-radius:14px;border:2px solid var(--line);border-bottom-width:5px;background:var(--panel);font-family:var(--f-px);font-weight:700;font-size:13px;color:var(--ink-soft);min-width:0}
 .b-tab canvas{width:32px;height:32px}
 .b-tab[aria-selected="true"]{background:var(--sun);border-color:var(--sun-edge);color:#4a3210}
 .b-tab:active{transform:translateY(3px);border-bottom-width:2px;margin-bottom:3px}
@@ -537,6 +589,32 @@
 .b-lockline canvas{width:14px;height:16px}
 .b-empty{text-align:center;padding:30px 20px}
 .b-empty p{font-size:15px}
+.b-areas{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 10px}
+.b-area{position:relative;display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 2px 4px;border-radius:12px;border:2px solid var(--line);border-bottom-width:4px;background:var(--field);font-family:var(--f-px);font-weight:700;font-size:12.5px;color:var(--ink)}
+.b-area canvas{width:36px;height:36px}
+.b-area small{font-family:var(--f-ui);font-weight:600;font-size:11px;color:var(--ink-soft)}
+.b-area.on{background:#eef8e6;border-color:var(--accent);box-shadow:0 0 0 2px #99e550 inset}
+.b-area.locked canvas{filter:brightness(0) opacity(.4)}
+.b-area.locked{color:var(--ink-soft)}
+.b-area .done{position:absolute;top:2px;right:3px;width:14px;height:14px}
+.b-wgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.b-wc{position:relative;display:flex;flex-direction:column;align-items:center;background:var(--field);border:2px solid var(--line);border-bottom-width:4px;border-radius:14px;padding:3px 2px 6px;min-width:0}
+.b-wc:active{transform:translateY(3px);border-bottom-width:1px;margin-bottom:3px}
+.b-wc canvas{width:48px;height:48px}
+.b-wc b{font-family:var(--f-px);font-weight:600;font-size:13.5px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.b-wc small{font-size:11px;color:var(--ink-soft);line-height:1.2}
+.b-wc.done{background:#fff6d6;border-color:var(--sun-edge)}
+.b-stars{display:flex;gap:2px;margin:2px 0 1px}
+.b-stars canvas{width:14px;height:14px}
+.b-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0 6px}
+.b-stp{display:flex;flex-direction:column;align-items:center;gap:0;border-radius:12px;border:2px solid var(--line);border-bottom-width:4px;background:var(--field);padding:5px 2px;font-family:var(--f-px);font-weight:700;font-size:14px;color:var(--ink)}
+.b-stp small{font-family:var(--f-ui);font-weight:600;font-size:11.5px;color:var(--ink-soft)}
+.b-stp.on{background:#eef8e6;border-color:var(--accent);box-shadow:0 0 0 2px #99e550 inset}
+.b-stp[disabled]{opacity:.45}
+.b-champ{display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,#fff1bf,#ffe08a);border:2px solid var(--sun-edge);border-bottom-width:5px;border-radius:18px;padding:8px 12px;margin:0 0 12px}
+.b-champ canvas{width:48px;height:48px}
+.b-champ b{font-family:var(--f-px);font-size:18px;color:#4a3210;display:block}
+.b-champ small{font-size:13px;color:#6a4a10;line-height:1.3;display:block}
 .b-intro{font-size:14px;line-height:1.4;color:var(--ink-soft);margin:-2px 4px 10px}
 .b-intro b{color:var(--ink)}
 .b-legs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
@@ -696,6 +774,9 @@
     g = new G(16, 16); g.ell(4.8, 10.5, 3.8, 3.8, ['#a6f2d3', '#52c7a8', '#2f8078']); g.ell(11.2, 10.5, 3.8, 3.8, ['#f7b6c8', '#e07ba0', '#a2477a']); g.px([[7, 3], [9, 3], [6, 4], [7, 4], [8, 4], [9, 4], [10, 4], [7, 5], [8, 5], [9, 5], [8, 6]], '#e5535f'); g.outline();
     g.px([[3, 10], [6, 10], [10, 10], [13, 10]], INK); g.px([[4, 12], [5, 12], [11, 12], [12, 12]], INK); ICON.friends = g.canvas();
     ICON.league = safe(() => PS.ui.icon('battle'), null);
+    g = new G(16, 16); g.ell(8, 11, 3.8, 3.2, ['#c48a5c', '#8f563b', '#5a3322']); for (const [x, y] of [[3, 6.5], [6, 3.6], [10, 3.6], [13, 6.5]]) g.ell(x, y, 1.7, 2, ['#c48a5c', '#8f563b', '#5a3322']); g.outline(); g.px([[7, 10], [5, 3], [9, 3]], '#f6d2ad'); ICON.paw = g.canvas();
+    ICON.staron = PX.fromStrings(['...k...', '..kyk..', 'kkkykkk', 'kyyWyyk', '.kyyyk.', '.kykyk.', 'kk...kk'], { k: INK, y: '#fbf236', W: '#ffffff' }).canvas();
+    ICON.staroff = PX.fromStrings(['...k...', '..kgk..', 'kkkgkkk', 'kgggggk', '.kgggk.', '.kgkgk.', 'kk...kk'], { k: '#8c93a8', g: '#e3dccb' }).canvas();
     // particles
     const dot = (c, s) => { const d = new G(s || 2, s || 2); d.rect(0, 0, s || 2, s || 2, c); return d.canvas(); };
     ICON.bubble = PX.fromStrings(['.a.', 'a.a', '.a.'], { a: '#cbeeff' }).canvas();
@@ -866,11 +947,12 @@
     if (ST.formInfo(s).moves.includes(id)) return ST.formInfo(s).short;
     const top = ST.topAnimal(s); return top ? ST.creature(top).name : '';
   }
-  const TABS = [['leagues', 'Leagues', 'league'], ['legends', 'Legends', 'crown'], ['tower', 'Tower', 'tower'], ['friends', 'Friends', 'friends']];
+  const TABS = [['leagues', 'Leagues', 'league'], ['wild', 'Wild', 'paw'], ['legends', 'Legends', 'crown'], ['tower', 'Tower', 'tower'], ['friends', 'Friends', 'friends']];
   function tabBadge(id) {
     const X = extra();
     if (id === 'legends') return BOSSES.some(B => bossUnlocked(B) && !X.seen['boss:' + B.id]);
     if (id === 'tower') return towerUnlocked() && !X.seen.tower;
+    if (id === 'wild') return WILD.areas.some(W => wildOpen(W) && !X.seen['wild:' + W.id]);
     return false;
   }
   function renderHub() {
@@ -884,10 +966,11 @@
     const X = extra();
     if (hubTab === 'legends') { let ch = false; for (const B of BOSSES) if (bossUnlocked(B) && !X.seen['boss:' + B.id]) { X.seen['boss:' + B.id] = true; ch = true; } if (ch) PS.save(); }
     if (hubTab === 'tower' && towerUnlocked() && !X.seen.tower) { X.seen.tower = true; PS.save(); }
+    if (hubTab === 'wild') { let ch = false; for (const W of WILD.areas) if (wildOpen(W) && !X.seen['wild:' + W.id]) { X.seen['wild:' + W.id] = true; ch = true; } if (ch) PS.save(); }
     let h = `<div class="b-top"><h1>Battle</h1><span class="b-rec">${PS.S.totals.battleWins || 0} wins</span></div>
       <div class="b-tabs" role="tablist">${TABS.map(([id, label, ic]) => `<button class="b-tab" type="button" role="tab" data-tab="${id}" aria-selected="${hubTab === id}"><canvas class="px" data-icon="${ic}"></canvas>${label}${tabBadge(id) ? '<span class="dot">NEW</span>' : ''}</button>`).join('')}</div>`;
     if (hubTab !== 'friends') h += partnerHtml(s);
-    h += hubTab === 'legends' ? legendsHtml() : hubTab === 'tower' ? towerHtml() : hubTab === 'friends' ? friendsHtml() : leaguesHtml();
+    h += hubTab === 'wild' ? wildHtml() : hubTab === 'legends' ? legendsHtml() : hubTab === 'tower' ? towerHtml() : hubTab === 'friends' ? friendsHtml() : leaguesHtml();
     hubEl.innerHTML = h;
     paintIcons(hubEl);
     hubEl.querySelectorAll('.b-tab').forEach(b => b.onclick = () => { if (hubTab === b.dataset.tab) return; sfx('tick'); hubTab = b.dataset.tab; renderHub(); hubEl.scrollTop = 0; });
@@ -896,7 +979,7 @@
       PS.ui.drawSproutTo(hubSprite, s);
       hubEl.querySelector('.b-change').onclick = () => { sfx('pop'); PS.ui.pickSprout({ title: 'Choose a fighter', eyebrow: 'Battle', extra: x => ST.movesOf(x).map(id => D.MOVES[id].name).join(', '), onPick: x => { ST.setActive(x.id); renderHub(); } }); };
     }
-    if (hubTab === 'legends') bindLegends(); else if (hubTab === 'tower') bindTower(); else if (hubTab === 'friends') bindFriends(); else bindLeagues();
+    if (hubTab === 'wild') bindWild(); else if (hubTab === 'legends') bindLegends(); else if (hubTab === 'tower') bindTower(); else if (hubTab === 'friends') bindFriends(); else bindLeagues();
   }
   function partnerHtml(s) {
     const fi = ST.formInfo(s), bs = ST.battleStats(s), mv = ST.movesOf(s), rec = s.record || {};
@@ -909,7 +992,10 @@
       </section>`;
   }
   function leaguesHtml() {
-    let h = '';
+    const done = D.LEAGUES.filter(L => ST.leagueProgress(L.id).cleared).length, last = D.LEAGUES[D.LEAGUES.length - 1];
+    let h = ST.leagueProgress(last.id).cleared
+      ? `<div class="b-champ"><canvas class="px" data-icon="crown"></canvas><div><b>Grand Champion!</b><small>You cleared all ${D.LEAGUES.length} leagues. Rematch anyone to keep training!</small></div></div>`
+      : `<p class="b-intro"><b>${done} of ${D.LEAGUES.length} leagues cleared.</b> Beat the ${esc(last.name)} to become the Grand Champion!</p>`;
     D.LEAGUES.forEach((L, li) => {
       const open = ST.leagueUnlocked(L.id), p = ST.leagueProgress(L.id), n = p.beaten.filter(Boolean).length;
       const nextI = p.beaten.findIndex(x => !x);
@@ -920,7 +1006,7 @@
         <div class="b-opps">${L.opponents.map((o, i) => {
           const can = open && (i === 0 || p.beaten[i - 1] || p.beaten[i]);
           const cls = p.beaten[i] ? 'beaten' : can && i === nextI ? 'next' : '';
-          return `<button class="b-opp ${cls}" type="button" data-i="${i}" ${can ? '' : 'disabled'}><canvas class="px" width="32" height="32"></canvas><b>${esc(o.name)}</b><small>Lv ${ST.battleStats(ST.makeNPC(L.id, i)).level}</small>${p.beaten[i] ? '<canvas class="px b-tick" data-icon="tick"></canvas>' : ''}</button>`;
+          return `<button class="b-opp ${cls}" type="button" data-i="${i}" ${can ? '' : 'disabled'}><canvas class="px" width="32" height="32"></canvas><b>${esc(o.name)}</b><small>Lv ${ST.battleStats(leagueNPC(L.id, i)).level}</small>${p.beaten[i] ? '<canvas class="px b-tick" data-icon="tick"></canvas>' : ''}</button>`;
         }).join('')}</div>
         ${open ? '' : `<div class="b-lockline"><canvas class="px" data-icon="lock"></canvas>Clear the ${lockName} to unlock</div>`}
       </section>`;
@@ -931,7 +1017,7 @@
     hubEl.querySelectorAll('.b-lg').forEach(sec => {
       const L = D.LEAGUES[+sec.dataset.li];
       sec.querySelectorAll('.b-opp').forEach(btn => {
-        const i = +btn.dataset.i, npc = ST.makeNPC(L.id, i);
+        const i = +btn.dataset.i, npc = leagueNPC(L.id, i);
         safe(() => PS.ui.drawSproutTo(btn.querySelector('canvas'), ST.lookOf(npc), { eyes: 'brave' }));
         btn.onclick = () => { sfx('pop'); preview(L, i); };
       });
@@ -948,7 +1034,7 @@
   }
   function preview(L, i) {
     const s = partner(); if (!s) return;
-    const npc = ST.makeNPC(L.id, i), bs = ST.battleStats(npc), p = ST.leagueProgress(L.id);
+    const npc = leagueNPC(L.id, i), bs = ST.battleStats(npc), p = ST.leagueProgress(L.id);
     const mine = ST.battleStats(s).level;
     const gap = bs.level - mine;
     const warn = gap >= 12 ? '<p style="color:#b43a44"><b>This looks very tough.</b> Train more first?</p>' : gap >= 5 ? '<p style="color:#a8653a">A tough fight for your Sprout.</p>' : '';
@@ -995,6 +1081,74 @@
   function snackFor(fruit) {
     if (!fruit || !(PS.S.fruits || {})[fruit] || !D.FRUITS[fruit]) return null;
     return { fruit, name: D.FRUITS[fruit].name, heal: snackHeal(fruit), cleanse: fruit === 'goldfruit', used: false };
+  }
+
+  // ---------------- Wild hub ----------------
+  let wildArea = null;
+  const wildOpen = W => !W.unlock || ST.leagueProgress(W.unlock).cleared;
+  const wildRec = id => { const r = extra().wild.animals[id]; return Array.isArray(r) ? [0, 1, 2].map(i => +r[i] || 0) : [0, 0, 0]; };
+  const wildNext = id => { const r = wildRec(id), i = r.findIndex(n => !n); return i < 0 ? 2 : i; };
+  const areaStars = area => wildList(area).reduce((a, id) => a + wildRec(id).filter(Boolean).length, 0);
+  const starsHtml = id => `<span class="b-stars">${wildRec(id).map(n => `<canvas class="px" data-icon="${n ? 'staron' : 'staroff'}"></canvas>`).join('')}</span>`;
+  function wildHtml() {
+    const X = extra();
+    let W = WILD.areas.find(a => a.id === wildArea);
+    if (!W || !wildOpen(W)) { W = WILD.areas.slice().reverse().find(wildOpen) || WILD.areas[0]; wildArea = W.id; }
+    const tabs = WILD.areas.map(a => { const open = wildOpen(a), list = wildList(a.id), c = list[Math.min(list.length - 1, 4)];
+      return `<button class="b-area ${a.id === W.id ? 'on' : ''} ${open ? '' : 'locked'}" type="button" data-area="${a.id}"><canvas class="px" data-critter="${c}" data-box="24"></canvas>${D.AREAS[a.id].name.replace(' Grove', '').replace(' Isle', '')}<small>${open ? `${areaStars(a.id)}/${list.length * 3}★` : 'Locked'}</small>${X.wild.areas[a.id] ? '<canvas class="px done" data-icon="tick"></canvas>' : ''}</button>`; }).join('');
+    const list = wildList(W.id);
+    const cards = list.map(id => { const A = D.ANIMALS[id], r = wildRec(id), n = wildNext(id), all = r[2] > 0;
+      return `<button class="b-wc ${all ? 'done' : ''}" type="button" data-id="${id}"><canvas class="px" data-critter="${id}" data-box="24"></canvas><b>${esc(A.name)}</b>${starsHtml(id)}<small>${all ? 'Alpha beaten!' : `${WILD.steps[n].name} · Lv ${wildLv(id, n)}`}</small></button>`; }).join('');
+    return `<p class="b-intro"><b>Wild Battles:</b> battle the real animals of each island! Beat the <b>Little</b> one, then the <b>Big</b> one, then the <b>Alpha</b>. The first time you beat an animal, it joins your pouch.</p>
+      <div class="b-areas">${tabs}</div>
+      <section class="panel b-lg"><header><div><div class="px-title b-lname">Wild ${D.AREAS[W.id].name}</div><div class="b-lsub ${X.wild.areas[W.id] ? 'done' : ''}">${X.wild.areas[W.id] ? 'Every Alpha beaten!' : `${areaStars(W.id)} of ${list.length * 3} stars`}</div></div>
+        <div class="b-rw"><span>All Alphas: <canvas class="px egg" data-egg="${W.id}"></canvas></span></div></header>
+        <div class="b-wgrid">${cards}</div></section>`;
+  }
+  function bindWild() {
+    hubEl.querySelectorAll('.b-area').forEach(b => b.onclick = () => {
+      const W = WILD.areas.find(a => a.id === b.dataset.area);
+      if (!wildOpen(W)) { sfx('miss'); PS.ui.toast(`Clear the ${(D.LEAGUES.find(l => l.id === W.unlock) || {}).name} to unlock the Wild ${D.AREAS[W.id].name}.`, 2800); return; }
+      if (wildArea === W.id) return; sfx('tick'); wildArea = W.id; renderHub();
+    });
+    hubEl.querySelectorAll('.b-wc').forEach(b => b.onclick = () => { sfx('pop'); previewWild(b.dataset.id); });
+  }
+  const WHERE_VERB = { land: 'hops out', air: 'swoops down', water: 'splashes up', coast: 'scuttles over' };
+  function wildIntro(id, step) {
+    const A = D.ANIMALS[id], v = WHERE_VERB[A.where] || 'appears';
+    return step === 2 ? `The Alpha ${A.name} ${v}! It looks tough!` : step === 1 ? `A big wild ${A.name} ${v}!` : `A little wild ${A.name} ${v}!`;
+  }
+  function wildPrize(id, step) {
+    const r = wildRec(id), L = wildLv(id, step), bits = [`<b>${WILD.coins(L)} coins</b>`];
+    if (!r.some(Boolean)) bits.push(ST.canCatch() ? `the <b>${D.ANIMALS[id].name}</b> joins your pouch` : `bonus coins (your pouch is full, so it can't join)`);
+    if (step === 2 && !r[2]) bits.push(`an <b>Alpha bonus</b> of ${WILD.coins(L) * 2} coins`);
+    return 'Win: ' + bits.join(' + ') + '.';
+  }
+  function previewWild(id) {
+    const s = partner(); if (!s) return;
+    const A = D.ANIMALS[id], r = wildRec(id); let step = wildNext(id);
+    const html = () => {
+      const f = makeWild(id, step), mine = ST.battleStats(s).level, gap = f.lv - mine;
+      const good = ST.movesOf(s).map(m => D.MOVES[m]).filter(m => m.pow > 0 && typeMult(m.el, f.els) > 1).map(m => m.name);
+      const threat = f.moves.map(m => D.MOVES[m]).filter(m => m.pow > 0 && typeMult(m.el, ST.elementsOf(s)) > 1).map(m => m.name);
+      return `<p style="text-align:center;margin-top:-4px">${esc(A.blurb)}</p>
+        <div class="chips-list" style="justify-content:center">${chip(A.el || 'normal')}</div>
+        <div class="b-steps">${WILD.steps.map((S, i) => { const ok = i === 0 || r[i - 1] > 0; return `<button class="b-stp ${i === step ? 'on' : ''}" type="button" data-step="${i}" ${ok ? '' : 'disabled'}>${S.name}<small>${ok ? `Lv ${wildLv(id, i)}${r[i] ? ' · ★' : ''}` : `Beat ${WILD.steps[i - 1].name}`}</small></button>`; }).join('')}</div>
+        <p><b>Moves:</b> ${f.moves.map(m => D.MOVES[m].name).join(', ')}</p>
+        ${good.length ? `<p><b>${good.join(', ')}</b> ${good.length > 1 ? 'are' : 'is'} super effective.</p>` : ''}${threat.length ? `<p>Watch out for <b>${threat.join(', ')}</b>.</p>` : ''}
+        ${gap >= 12 ? '<p style="color:#b43a44"><b>This looks very tough.</b> Train more first?</p>' : gap >= 5 ? '<p style="color:#a8653a">A tough fight for your Sprout.</p>' : ''}
+        <p>${wildPrize(id, step)}</p>`;
+    };
+    PS.ui.modal({
+      eyebrow: `Wild ${D.AREAS[A.area].name}`, title: `${A.name}`, sprite: critterBox(id, 32),
+      html: `<div class="b-wprev">${html()}</div>${snackRow()}`,
+      buttons: [{ label: `Battle!`, kind: 'go', onClick: () => { const st = step; setTimeout(() => startWild(id, st), 0); } }, { label: 'Not yet' }],
+      mount(card) {
+        const box = card.querySelector('.b-wprev');
+        const bind = () => { paintIcons(box); box.querySelectorAll('.b-stp').forEach(b => b.onclick = () => { step = +b.dataset.step; sfx('tick'); box.innerHTML = html(); bind(); }); };
+        paintIcons(card); bind(); bindSnacks(card);
+      },
+    });
   }
 
   // ---------------- Legends hub ----------------
@@ -1208,7 +1362,7 @@
   function startBattle(leagueId, index) {
     const s = partner(); if (!s) return;
     const li = D.LEAGUES.findIndex(l => l.id === leagueId), L = D.LEAGUES[li];
-    const npc = ST.makeNPC(leagueId, index);
+    const npc = leagueNPC(leagueId, index);
     const b = newBattle(s, npc, { npcMult: TUNE.npcMult[li], smart: TUNE.aiSmart[li] });
     b.p.snack = snackFor(currentSnack());
     launch({ mode: 'league', b, L, li, index, s, npc, area: LEAGUE_AREA[leagueId] || npc.area || 'meadow',
@@ -1221,6 +1375,13 @@
     const X = extra(); X.bosses[id] = Object.assign(bossRec(id), { tries: bossRec(id).tries + 1 }); PS.save();
     launch({ mode: 'boss', b, s, boss: B, area: B.area,
       intro: [{ kind: 'bossin', text: `A wild legend appears: ${B.name}, ${B.title}!`, dur: 2.2 }, { kind: 'go', text: `Be brave, ${s.name}!`, dur: 0.9 }] });
+  }
+  function startWild(id, step) {
+    const s = partner(), A = D.ANIMALS[id]; if (!s || !A) return;
+    const b = newBattle(s, null, { wild: { id, step } });
+    b.p.snack = snackFor(currentSnack());
+    launch({ mode: 'wild', b, s, wild: { id, step }, area: D.AREAS[A.area] ? A.area : 'meadow',
+      intro: [{ kind: 'wildin', text: wildIntro(id, step), dur: 1.6 }, { kind: 'go', text: `Go, ${s.name}!`, dur: 0.8 }] });
   }
   function startTowerFloor() {
     const run = towerRun(); if (!run) return;
@@ -1262,7 +1423,8 @@
     if (side === 'o' && V && V.boss) return { x: Math.round(WW * 0.66), y: Math.round(clamp(WH * 0.62, HY() + 34, WH - 58)) };
     return side === 'o' ? { x: Math.round(WW * 0.71), y: Math.round(clamp(WH * 0.53, HY() + 16, WH - 50)) } : { x: Math.round(WW * 0.29), y: Math.round(WH - Math.max(10, WH * 0.1)) };
   }
-  const fighterH = side => (side === 'o' && V && V.boss ? Math.round(22 * bossScale()) : 24);
+  const critScale = () => (V && V.boss ? bossScale() : V && V.wild ? WILD.steps[V.wild.step].scale : 1);
+  const fighterH = side => (side === 'o' && V && V.boss ? Math.round(22 * bossScale()) : side === 'o' && V && V.wild ? Math.round(15 * critScale()) : 24);
   const topOf = side => { const s = spot(side); return { x: s.x, y: s.y - Math.round(fighterH(side) * 0.62) }; };
 
   // ---------------- plates & moves ----------------
@@ -1431,6 +1593,7 @@
   function begin(st) {
     if (st.kind === 'intro') { sfx('whoosh'); if (V.mode === 'friend') banner('FIGHT!', `${V.fr.names.p} vs ${V.fr.names.o}`, '#fbf236'); return; }
     if (st.kind === 'bossin') { sfx('thud'); V.a.o.enter = 1; V.a.o.drop = 1; banner(V.boss.name.toUpperCase(), V.boss.title, '#fbf236', 2.2); return; }
+    if (st.kind === 'wildin') { sfx('whoosh'); banner(V.b.o.name.toUpperCase(), 'Wild ' + D.AREAS[D.ANIMALS[V.wild.id].area].name, V.wild.step === 2 ? '#ff9a3a' : '#fff27a'); V.a.o.hop = 1; return; }
     if (st.kind === 'floor') { sfx('whoosh'); banner(`FLOOR ${V.floor}`, V.floor % 5 === 0 ? 'Star challenger!' : '', '#fff27a'); return; }
     if (st.kind === 'go') { V.a.p.pose = { arms: 'up', mouth: 'open', eyes: 'happy' }; V.a.p.poseT = 0.8; V.a.p.hop = 1; if (V.mode === 'friend') { V.a.o.pose = { arms: 'up', mouth: 'open', eyes: 'brave' }; V.a.o.poseT = 0.8; V.a.o.hop = 1; } return; }
     if (st.kind === 'victory' || st.kind === 'defeat') return;
@@ -1519,6 +1682,7 @@
     let text = won ? `${V.b.p.name} won the battle!` : `${V.b.p.name} lost the battle...`;
     if (V.mode === 'friend') text = `${V.fr.names[V.b.winner]}'s ${V.b[V.b.winner].name} wins!`;
     else if (V.mode === 'boss' && won) text = `${V.b.p.name} beat the ${V.boss.name}!`;
+    else if (V.mode === 'wild' && won) text = `${V.b.p.name} beat the ${V.b.o.name}!`;
     if (won || V.mode === 'friend') banner(V.mode === 'friend' ? 'WINNER!' : 'VICTORY!', '', '#fbf236', 1.8);
     queue([{ kind: won ? 'victory' : 'defeat', text, dur: 1.8 }]);
     sfx(won || V.mode === 'friend' ? 'level' : 'miss');
@@ -1526,7 +1690,7 @@
 
   function showResults() {
     if (V.done) return; V.done = true; V.phase = 'results';
-    if (V.mode === 'boss') resultsBoss(); else if (V.mode === 'tower') resultsTower(); else if (V.mode === 'friend') resultsFriend(); else resultsLeague();
+    if (V.mode === 'wild') resultsWild(); else if (V.mode === 'boss') resultsBoss(); else if (V.mode === 'tower') resultsTower(); else if (V.mode === 'friend') resultsFriend(); else resultsLeague();
     paintIcons(resEl);
     resEl.hidden = false;
     PS.ui.chrome(true); PS.ui.hold(false);
@@ -1599,6 +1763,49 @@
     if (won) PS.ui.drawSproutTo(hero, s, { arms: 'up', eyes: 'happy', mouth: 'open' }); else { const c = critterBox(B.id, 32); hero.width = 32; hero.height = 32; PS.ui.paint(hero, c); }
     const id = B.id;
     bindRes({ retry: () => { V = null; resEl.hidden = true; previewBossAgain(id); } });
+  }
+  function resultsWild() {
+    const { s, won } = V, { id, step } = V.wild, A = D.ANIMALS[id], L = V.b.o.lv, X = extra();
+    const rec = wildRec(id), firstAny = won && !rec.some(Boolean), firstStep = won && !rec[step];
+    if (won) rec[step]++;
+    X.wild.animals[id] = rec;
+    const coins = ST.addCoins(won ? WILD.coins(L) : WILD.coins(L) * D.BATTLE.loseCoinsShare, 'wild');
+    const g = WILD.xp(L) * (won ? 1 : 0.35), res = ST.gain(s, { power: g * 1.2, stamina: g, run: g * 0.6, fly: g * 0.4, swim: g * 0.4 });
+    s.record.battles = (s.record.battles || 0) + 1; PS.S.totals.battles = (PS.S.totals.battles || 0) + 1;
+    if (won) { s.record.battleWins = (s.record.battleWins || 0) + 1; PS.S.totals.battleWins = (PS.S.totals.battleWins || 0) + 1; }
+    let rows = '';
+    if (firstAny) {
+      if (ST.addToPouch(id)) rows += `<div class="b-rrow gold"><canvas class="px" data-critter="${id}" data-box="24" style="width:48px;height:48px"></canvas><span>The ${esc(A.name)} joined you! It's in your pouch. Give it to a Sprout in the Garden.</span></div>`;
+      else { const c = ST.addCoins(20 + L * 2, 'wild'); rows += `<div class="b-rrow gold"><canvas class="px" data-coin="big"></canvas><span>Your pouch is full, so the ${esc(A.name)} left you coins instead.</span><b>+${c}</b></div>`; }
+    }
+    if (firstStep && step === 2) { const c = ST.addCoins(WILD.coins(L) * 2, 'wild'); rows += `<div class="b-rrow gold"><canvas class="px" data-icon="staron"></canvas>Alpha bonus!<b>+${c}</b></div>`; }
+    const area = A.area;
+    if (won && !X.wild.areas[area] && wildList(area).every(k => wildRec(k)[2] > 0)) {
+      X.wild.areas[area] = true;
+      const egg = ST.addEgg(area, `Wild ${D.AREAS[area].name}`);
+      rows += `<div class="b-rrow gold"><canvas class="px egg" data-egg="${area}"></canvas><span>You beat every Alpha in the ${D.AREAS[area].name}! A ${D.EGGS[area] ? D.EGGS[area].name : 'new egg'} is waiting in the ${D.AREAS[egg.area] ? D.AREAS[egg.area].name : 'Garden'}.</span></div>`;
+    }
+    rows += `<div class="b-rrow"><canvas class="px" data-coin="1"></canvas>Coins<b>+${coins}</b></div><div class="b-rrow"><canvas class="px" data-icon="plus"></canvas>Training XP<b>+${Math.round(g * 3.6)}</b></div>`;
+    PS.save();
+    const list = wildList(area), nextId = list[(list.indexOf(id) + 1) % list.length];
+    const ups = upsHtml(res);
+    resEl.innerHTML = `<div class="card"><div class="eyebrow">Wild ${D.AREAS[area].name} · ${esc(V.b.o.name)}</div><canvas class="px hero" width="32" height="32"></canvas>
+      <h1>${won ? (step === 2 && firstStep ? 'Alpha beaten!' : 'Victory!') : 'So close!'}</h1>
+      <p class="sub">${won ? `${esc(s.name)} beat the ${esc(V.b.o.name)} in ${V.b.turn} turn${V.b.turn > 1 ? 's' : ''}.` : `The ${esc(V.b.o.name)} won this time. Train a little and try again!`}</p>
+      ${won ? starsHtml(id).replace('b-stars', 'b-stars" style="justify-content:center') : ''}
+      <div class="b-rrows">${rows}</div>${ups ? `<div class="b-ups">${ups}</div>` : ''}
+      <div class="modal-btns">
+        ${won && step < 2 ? `<button class="btn wide go" data-a="up">Next: ${WILD.steps[step + 1].name} ${esc(A.name)} (Lv ${wildLv(id, step + 1)})</button>` : ''}
+        ${!won ? '<button class="btn wide primary" data-a="retry">Try again</button>' : ''}
+        ${won && nextId !== id ? `<button class="btn wide" data-a="nextA">Next animal: ${esc(D.ANIMALS[nextId].name)}</button>` : ''}
+        <button class="btn wide" data-a="hub">Back to Wild</button></div></div>`;
+    const hero = resEl.querySelector('canvas.hero');
+    if (won) PS.ui.drawSproutTo(hero, s, { arms: 'up', eyes: 'happy', mouth: 'open' }); else { const c = critterBox(id, 32); hero.width = 32; hero.height = 32; PS.ui.paint(hero, c); }
+    bindRes({
+      up: () => { V = null; resEl.hidden = true; startWild(id, step + 1); },
+      retry: () => { V = null; resEl.hidden = true; startWild(id, step); },
+      nextA: () => { hubTab = 'wild'; backToHub(() => previewWild(nextId)); },
+    });
   }
   function previewBossAgain(id) { fightEl.hidden = true; hubEl.hidden = false; hubTab = 'legends'; renderHub(); previewBoss(BOSS[id]); }
   function resultsTower() {
@@ -1748,7 +1955,7 @@
     if (V.boss && V.a.o.enter <= 0 && !V.a.o.landed) { V.a.o.landed = true; quake(0.6, 3); sfx('thud'); burst({ x: spot('o').x, y: spot('o').y - 2 }, 'stone', 18, 40); }
     // ambient status fx
     for (const side of ['p', 'o']) {
-      const d = V.disp[side], sp = spot(side), w = side === 'o' && V.boss ? 40 : 16;
+      const d = V.disp[side], sp = spot(side), w = side === 'o' && V.boss ? 40 : side === 'o' && V.wild ? 24 : 16;
       if (V.a[side].fainting) continue;
       if (d.status === 'poison' && Math.random() < dt * 3) V.parts.push({ x: sp.x + (Math.random() - 0.5) * w, y: sp.y - 8 - Math.random() * 10, vx: 0, vy: -12, g: 0, life: 0.7, spr: icons().bubble });
       if (d.status === 'burn' && Math.random() < dt * 4) V.parts.push({ x: sp.x + (Math.random() - 0.5) * w, y: sp.y - 4 - Math.random() * 12, vx: 0, vy: -16, g: 0, life: 0.5, spr: fxs('spark', Math.random() < 0.5 ? '#ff9a3a' : '#fbf236') });
@@ -1798,7 +2005,7 @@
   }
   // element-flavoured projectiles
   function shoot(from, el, giant) {
-    const a = from === 'o' && V.boss ? topOf('o') : { x: spot(from).x + (from === 'p' ? 10 : -10), y: spot(from).y - 16 };
+    const a = from === 'o' && (V.boss || V.wild) ? topOf('o') : { x: spot(from).x + (from === 'p' ? 10 : -10), y: spot(from).y - 16 };
     const b = topOf(from === 'p' ? 'o' : 'p');
     const ax = a.x, ay = a.y, bx = b.x, by = b.y, P = elParticles(el), I = icons();
     const n = giant ? 26 : 9, life = giant ? 0.3 : 0.22;
@@ -1977,7 +2184,7 @@
     }
     // arena pads
     for (const side of ['o', 'p']) {
-      const s = spot(side), big = side === 'o' && V.boss, rx = big ? 32 : side === 'o' ? 18 : 22, ry = big ? 6 : side === 'o' ? 4 : 5;
+      const s = spot(side), big = side === 'o' && V.boss, wild = side === 'o' && V.wild, rx = big ? 32 : wild ? (V.wild.step === 2 ? 26 : 20) : side === 'o' ? 18 : 22, ry = big ? 6 : wild && V.wild.step === 2 ? 5 : side === 'o' ? 4 : 5;
       ellipse(g, s.x, s.y - 1, rx, ry, G(T.pad[1]), G(T.pad[0]), G(T.pad[2]));
       if (T.ground === 'tiles') { for (let a = 0; a < 6.28; a += 0.8) px(g, Math.round(s.x + Math.cos(a) * rx * 0.6), Math.round(s.y - 1 + Math.sin(a) * ry * 0.5), 1, 1, T.pad[2]); }
     }
@@ -2050,13 +2257,14 @@
     return {};
   }
   function drawFighter(side) {
-    const f = V.b[side], A = V.a[side], sp = spot(side), dir = side === 'p' ? 1 : -1, boss = side === 'o' && V.boss;
+    const f = V.b[side], A = V.a[side], sp = spot(side), dir = side === 'p' ? 1 : -1, boss = side === 'o' && V.boss, crit = side === 'o' && !!f.critter;
     let spr, ax, ay, flip;
-    if (boss) { spr = safe(() => bigCritter(f.critter, bossScale()), null); if (!spr) return; ax = Math.floor(spr.width / 2); ay = spr.height; flip = true; }
+    if (crit) { spr = safe(() => bigCritter(f.critter, critScale()), null); if (!spr) return; ax = Math.floor(spr.width / 2); ay = spr.height; flip = true; }
     else { if (!f.look) return; spr = safe(() => PX.sprig(f.look, poseFor(side)), null); if (!spr) return; ax = PX.SPRIG_AX || 16; ay = spr.height - 1; flip = side === 'p'; }
     let x = sp.x, y = sp.y;
     const bob = V.phase !== 'end' && !A.fainting && Math.floor(V.t * (boss ? 1.3 : 2) + (side === 'o' ? 1 : 0)) % 2 ? -1 : 0;
     y += bob;
+    if (crit && !boss && D.ANIMALS[f.critter] && (D.ANIMALS[f.critter].where === 'water' || D.ANIMALS[f.critter].where === 'air') && !A.fainting) y -= 3 + Math.round(Math.sin(V.t * 3) * 2); // swimmers and fliers hover
     if (A.enter > 0) { if (boss) y -= Math.round(ease(A.enter) * WH); else x -= dir * Math.round(ease(A.enter) * (WW * 0.6)); }
     const reach = boss ? 20 : 12;
     if (A.lunge > 0) { const k = 1 - A.lunge, l = k < 0.35 ? k / 0.35 : 1 - (k - 0.35) / 0.65; x += dir * Math.round(reach * l); y -= Math.round((boss ? 8 : 4) * Math.sin(Math.PI * clamp(k / 0.5, 0, 1))); }
@@ -2069,7 +2277,7 @@
     if (A.fainting) { alpha = 1 - ease(A.fainting); y += Math.round(ease(A.fainting) * (boss ? 14 : 7)); }
     if (alpha <= 0.02) return;
     // shadow
-    const sw = boss ? spr.width * 0.36 : 9;
+    const sw = crit ? spr.width * 0.36 : 9;
     const sh = A.fainting ? 0 : clamp(Math.round((sp.y - y) / (boss ? 6 : 1)), 0, 8);
     lx.fillStyle = 'rgba(34,32,52,.25)'; lx.fillRect(Math.round(x - sw + sh), sp.y - 1, Math.round(sw * 2 + 1 - sh * 2), 2);
     lx.globalAlpha = alpha;
@@ -2082,7 +2290,7 @@
     if (A.flash > 0 && Math.floor(A.flash * 30) % 2 === 0) PX.blit(lx, whiteOf(spr), x, y, flip, ax, ay);
     lx.globalAlpha = 1;
     const em = A.emote || (V.disp[side].status === 'sleep' ? 'zz' : V.disp[side].stun ? 'swirl' : null);
-    if (em && !A.fainting) { const e = safe(() => PX.emote(em), null); if (e) PX.blit(lx, e, x + (boss ? -Math.round(spr.width * 0.3) : 7), y - (boss ? spr.height - 4 : 26) - (Math.floor(V.t * 3) % 2), false, 0, e.height); }
+    if (em && !A.fainting) { const e = safe(() => PX.emote(em), null); if (e) PX.blit(lx, e, x + (crit ? -Math.round(spr.width * 0.3) : 7), y - (crit ? spr.height - 4 : 26) - (Math.floor(V.t * 3) % 2), false, 0, e.height); }
   }
   function drawCrowd() {
     for (const c of V.crowd) {
@@ -2120,7 +2328,7 @@
   function render() {
     if (!cssW) return;
     const night = safe(() => PS.clock.night(), 0), T = THEMES[V.area] || THEMES.meadow;
-    const key = [V.area, WW, WH, T.fixed ? 0 : Math.round(night * 30), V.boss ? 1 : 0].join('|');
+    const key = [V.area, WW, WH, T.fixed ? 0 : Math.round(night * 30), V.boss ? 1 : 0, V.wild ? V.wild.step : -1].join('|');
     if (key !== bgKey) { bgKey = key; drawBg(night); }
     lx.clearRect(0, 0, WW, WH);
     lx.drawImage(bgC, 0, 0);
@@ -2199,7 +2407,7 @@
   }
 
   PS.scenes.battle = { mount, show, hide, frame };
-  Object.assign(window.__battle, { start: startBattle, startBoss, startTowerFloor, towerBegin, towerEnd, startFriend, renderHub, forfeit, extra, choose,
+  Object.assign(window.__battle, { start: startBattle, startWild, startBoss, startTowerFloor, towerBegin, towerEnd, startFriend, renderHub, forfeit, extra, choose,
     tab: t => { hubTab = t; renderHub(); } });
   Object.defineProperty(window.__battle, 'V', { get: () => V });
 })();

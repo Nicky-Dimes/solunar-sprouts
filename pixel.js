@@ -2137,6 +2137,81 @@
         g.px([[16, 2], [17, 2], [16, 3]], '#ffffff');
         break;
       }
+      // ---- pet storage houses (one per area; ~44x42, anchor bottom-centre; door/window spots in PX.HOMES) ----
+      case 'shroomhouse': {
+        g = new Grid(44, 42);
+        const CR3 = ['#fffbf0', '#f4e6c8', '#c8b08a'], CAP = ['#ff8a90', '#e8404a', '#a02c3a'];
+        piece(g, t => { t.poly([[10, 41.6], [11.4, 21], [32.6, 21], [34, 41.6]], CR3[1]); for (let y = 0; y < 42; y++) for (let x = 0; x < 44; x++) if (t.get(x, y)) t.set(x, y, x < 15 ? CR3[0] : x > 29 ? CR3[2] : CR3[1]); });
+        piece(g, t => t.ell(22, 21, 21.4, 14.4, CAP, 0, (x, y) => y <= 22));
+        g.rect(4, 22, 36, 1, '#c86a5a'); g.rect(9, 23, 26, 1, '#b8a07a');
+        for (const [x, y, r] of [[13, 12, 2.6], [24, 9, 3.2], [33, 15, 2.2], [7, 18, 1.6], [19, 17, 1.8], [36, 20, 1.3], [29, 5, 1.6]]) g.ell(x, y, r, r * 0.8, ['#ffffff', '#fbf0f0', '#e8d0d0'], 0, (x2, y2) => CAP.includes(g.get(x2, y2)));
+        piece(g, t => { t.ell(22, 33, 4, 4, '#8f563b', 0, (x, y) => y <= 33); t.rect(18, 33, 8, 9, '#8f563b'); });
+        for (let y = 29; y < 42; y++) { if (g.get(20, y) === '#8f563b') g.set(20, y, '#663931'); if (g.get(23, y) === '#8f563b') g.set(23, y, '#663931'); if (g.get(19, y) === '#8f563b') g.set(19, y, '#a8703a'); }
+        g.px([[24, 36], [24, 37]], '#fbf236');
+        piece(g, t => { t.ell(30.5, 29.5, 2.8, 2.8, '#9fd8ff'); });
+        g.px([[30, 28], [30, 29], [30, 30], [30, 31], [28, 29], [29, 29], [31, 29], [32, 29]].filter(([x, y]) => g.get(x, y) === '#9fd8ff'), '#8f563b'); g.set(29, 28, '#ffffff');
+        g.rect(27, 33, 8, 2, '#8f563b'); g.px([[28, 32], [30, 32], [32, 32], [34, 32]], '#f7b6c8'); g.px([[29, 32], [33, 32]], '#6abe30'); g.set(31, 32, '#fbf236');
+        g.px([[12, 38], [13, 36], [14, 39], [31, 39], [32, 37]].filter(([x, y]) => g.filled(x, y)), '#6abe30');
+        g.px([[9, 41], [8, 41], [35, 41], [36, 41], [7, 40]].filter(([x, y]) => !g.get(x, y)), '#6abe30');
+        g.px([[8, 14], [9, 12], [11, 10]].filter(([x, y]) => CAP.includes(g.get(x, y))), '#ffb0b4');
+        break;
+      }
+      case 'beachhut': {
+        g = new Grid(42, 42);
+        const PL = ['#d8f4ff', '#9fd8ff', '#5f98d0'], ST3 = ['#fff0b0', '#f0d284', '#c8a050'];
+        piece(g, t => { t.rect(7, 20, 28, 22, PL[1]); });
+        for (let y = 20; y < 42; y++) for (let x = 7; x < 35; x++) if (g.get(x, y) === PL[1]) { if ((x - 7) % 4 === 3) g.set(x, y, PL[2]); else if ((x - 7) % 8 < 3) g.set(x, y, '#ffffff'); if (x > 31) g.set(x, y, PL[2]); }
+        piece(g, t => { t.poly([[1.4, 23.6], [21, 3.4], [40.6, 23.6]], ST3[1]); shade(t, 17, 12, 16, 13, ST3); });
+        for (let y = 4; y < 24; y++) for (let x = 0; x < 42; x++) if (ST3.includes(g.get(x, y)) && (x + y * 2) % 5 === 0) g.set(x, y, ST3[2]);
+        for (let x = 2; x < 41; x += 3) if (g.get(x, 23) && g.get(x, 23) !== INK) g.set(x, 24, ST3[2]);
+        piece(g, t => { t.rect(17, 28, 8, 14, '#f07a84'); });
+        for (let y = 28; y < 42; y++) { if (g.get(18, y) === '#f07a84') g.set(18, y, '#ff9aa8'); if (g.get(24, y) === '#f07a84') g.set(24, y, '#c8485a'); }
+        g.px([[23, 35]], '#fbf236');
+        piece(g, t => t.rect(9, 27, 5, 5, '#9fd8ff')); piece(g, t => t.rect(28, 27, 5, 5, '#9fd8ff'));
+        g.px([[9, 27], [28, 27], [10, 27]], '#ffffff'); g.px([[11, 27], [11, 28], [11, 29], [11, 30], [11, 31], [30, 27], [30, 28], [30, 29], [30, 30], [30, 31]], '#5f98d0');
+        g.ell(12, 36.5, 2.4, 2.4, '#ffffff'); g.set(12, 36, '#5f98d0'); g.set(12, 37, '#5f98d0'); g.px([[10, 36], [14, 37], [12, 34], [12, 39]], '#e8404a');
+        g.px([[30, 35], [29, 36], [30, 36], [31, 36], [30, 37], [29, 38], [31, 38]], '#f08a6a');
+        g.px([[21, 2], [20, 1]], '#d24552'); g.set(21, 1, '#d24552'); g.set(20, 2, INK);
+        break;
+      }
+      case 'crystalcave': {
+        g = new Grid(46, 42);
+        const RK = ['#9a9ec0', '#6a6e96', '#44466a'], CXa = ['#f0e0ff', '#c09af0', '#7a50c0'], CXb = ['#e0ffff', '#7ff0ff', '#2a98b8'];
+        const spire = (pts, C) => piece(g, t => { t.poly(pts, C[1]); for (let y = 0; y < 42; y++) for (let x = 0; x < 46; x++) if (t.get(x, y)) { const xs = pts.map(p => p[0]), mid = (Math.min(...xs) + Math.max(...xs)) / 2; t.set(x, y, x < mid - 0.5 ? C[0] : x > mid + 0.5 ? C[2] : C[1]); } });
+        spire([[12, 22], [13, 9], [15.5, 5], [17.5, 10], [18, 22]], CXa);
+        spire([[26, 22], [27, 12], [29, 8.5], [31, 12], [32, 22]], CXb);
+        spire([[19, 20], [20.5, 3], [23, 0.4], [25, 3], [26, 20]], CXa);
+        piece(g, t => t.ell(23, 30, 22, 13, RK, 0, (x, y) => y <= 41));
+        for (let y = 0; y < 42; y++) for (let x = 0; x < 46; x++) if (RK.includes(g.get(x, y)) && (x * 5 + y * 3) % 11 === 0) g.set(x, y, RK[2]);
+        piece(g, t => { t.ell(23, 34, 6, 6, '#241a36', 0, (x, y) => y <= 34); t.rect(17, 34, 13, 8, '#241a36'); });
+        for (let y = 29; y < 42; y++) for (let x = 17; x < 30; x++) if (g.get(x, y) === '#241a36' && y > 36 && (x + y) & 1) g.set(x, y, '#3a2a58');
+        g.px([[20, 40], [21, 39], [26, 40], [25, 41], [23, 38]], '#7ff0ff'); g.px([[22, 41], [23, 41], [24, 41]], '#c8fff8');
+        piece(g, t => t.ell(35, 30.5, 2.4, 2.4, '#7ff0ff')); g.set(34, 29, '#ffffff');
+        g.px([[6, 27], [7, 26], [9, 25], [38, 26], [40, 28], [11, 38], [36, 37]].filter(([x, y]) => g.filled(x, y)), '#4f8a6a');
+        g.px([[6, 28], [8, 26], [39, 27]].filter(([x, y]) => g.filled(x, y)), '#6ad0a8');
+        g.px([[14, 7], [20, 5], [28, 11]].filter(([x, y]) => g.filled(x, y)), '#ffffff');
+        break;
+      }
+      case 'gingerhouse': {
+        g = new Grid(42, 42);
+        const GB = ['#f0b880', '#c8844a', '#8a5028'];
+        piece(g, t => t.rect(6, 20, 30, 22, GB[1]));
+        for (let y = 20; y < 42; y++) for (let x = 6; x < 36; x++) if (g.get(x, y) === GB[1]) { if (x < 9) g.set(x, y, GB[0]); else if (x > 32) g.set(x, y, GB[2]); }
+        piece(g, t => t.rect(29, 6, 4, 9, '#8a5028'));
+        piece(g, t => { t.poly([[1.4, 23.4], [21, 4], [40.6, 23.4]], '#6a3a2a'); shade(t, 17, 12, 16, 13, ['#8a5040', '#6a3a2a', '#48241c']); });
+        for (let x = 1; x < 41; x++) for (let y = 4; y < 25; y++) { const c = g.get(x, y); if (c && c !== INK && g.get(x, y + 1) === INK) { g.set(x, y, '#ffffff'); if (x % 3 === 0 && y + 1 < 42 && g.get(x, y + 1) === INK) g.set(x, y + 1, '#ffffff'); break; } }
+        for (let y = 4; y < 24; y++) { const r = 21 - (y - 4) * 19.6 / 19.4; for (const x of [Math.round(r), Math.round(42 - r)]) if (g.filled(x, y)) g.set(x, y, '#ffffff'); }
+        g.px([[29, 6], [30, 6], [31, 6], [32, 6]], '#ffffff');
+        for (const [x, y, c] of [[14, 16, '#e8404a'], [21, 11, '#99e550'], [27, 17, '#fff27a'], [18, 19, '#5fcde4'], [24, 20, '#f07aa0'], [10, 21, '#fff27a'], [32, 21, '#99e550']]) if (g.filled(x, y)) { g.set(x, y, c); if (g.filled(x + 1, y)) g.set(x + 1, y, c); }
+        piece(g, t => { t.ell(21, 32, 4, 3.6, '#f7b6c8', 0, (x, y) => y <= 32); t.rect(17, 32, 8, 10, '#f7b6c8'); });
+        for (let y = 28; y < 42; y++) { if (g.get(18, y) === '#f7b6c8') g.set(18, y, '#ffd8e8'); if (g.get(24, y) === '#f7b6c8') g.set(24, y, '#e07ba0'); }
+        g.set(23, 36, '#fff27a');
+        piece(g, t => t.rect(9, 27, 5, 5, '#9fd8ff')); piece(g, t => t.rect(28, 27, 5, 5, '#9fd8ff'));
+        for (const x0 of [8, 27]) { for (let x = x0; x < x0 + 7; x++) { g.set(x, 26, '#ffffff'); g.set(x, 32, '#ffffff'); } g.set(x0 + 3, 29, '#ffffff'); g.set(x0 + 2, 29, '#ffffff'); g.set(x0 + 4, 29, '#ffffff'); }
+        for (let y = 23; y < 42; y += 2) { if (g.filled(6, y)) g.set(6, y, (y >> 1) % 2 ? '#e8404a' : '#ffffff'); if (g.filled(35, y)) g.set(35, y, (y >> 1) % 2 ? '#e8404a' : '#ffffff'); }
+        g.px([[12, 36], [11, 37], [13, 37], [30, 36], [29, 37], [31, 37]], '#ffffff');
+        break;
+      }
       case 'donut': {
         g = new Grid(22, 13);
         const DO = ['#f6c890', '#d8964e', '#a06430'], IC = theme === 'night' ? ['#e4d0ff', '#c09af0', '#8a6ad0'] : ['#ffd8ec', '#ff8ac4', '#d0508c'];
@@ -2229,5 +2304,8 @@
   function buzz(ms) { try { navigator.vibrate && navigator.vibrate(ms || 10); } catch (e) {} }
 
   window.PX = { PAL, RAMPS, INK, BELLY, Grid, fromStrings, inEll, shadeOf, sprig, buildSprig, SPRIG_AX, SPRIG_AY, emote, critter, critterSwim, item, fruit, fx, prop, blit, SPRIG_W, SPRIG_H, FLOWER_IDS: Object.keys(FLO).filter(k => !k.endsWith('D')), stroke, line, starPts, DEFAULT_LOOK, cloneLook, clamp, lerp, Sound, buzz,
-    gumballMachine, gumballColors: GUM.map(r => r[1]), GUMBALL_W: 40, GUMBALL_H: 60, SKIN_IDS, SPOOKY_SKINS, HAT_IDS, EXTRA_IDS, PATTERN_IDS: ['spots', 'stripes', 'twotone', 'mask', 'star', 'freckles', 'heart', 'socks'] };
+    gumballMachine, gumballColors: GUM.map(r => r[1]),
+    // pet houses: door (bottom centre) and window centres, relative to the bottom-centre anchor
+    HOMES: { shroomhouse: { door: [0, 0], win: [[8, -12]], w: 36, h: 40 }, beachhut: { door: [0, 0], win: [[-10, -13], [9, -13]], w: 30, h: 38 },
+      crystalcave: { door: [0, 0], win: [[12, -12]], w: 42, h: 30 }, gingerhouse: { door: [0, 0], win: [[-10, -13], [9, -13]], w: 32, h: 36 } }, GUMBALL_W: 40, GUMBALL_H: 60, SKIN_IDS, SPOOKY_SKINS, HAT_IDS, EXTRA_IDS, PATTERN_IDS: ['spots', 'stripes', 'twotone', 'mask', 'star', 'freckles', 'heart', 'socks'] };
 })();
