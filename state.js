@@ -7,6 +7,7 @@
 //   PS.on(evt, fn) / PS.emit(evt, payload)
 //       events: 'coins' {n, why} · 'sprout:update' {s} · 'levelup' {s, stat, lv} · 'sprout:evolve' {s, from, to, name}
 //               'egg:new' {egg} · 'egg:hatch' {egg, s} · 'pouch' {} · 'area' {area} · 'night' {isNight}
+//               'sprout:sold' {s, price} · 'items' {} (paints / pattern stickers / hats changed)
 //   PS.clock.isNight() · PS.clock.night() -> 0..1 (smooth, fades at the switch) · PS.clock.msToSwitch()
 //   PS.state.*  (see bottom of file)
 (function () {
@@ -39,24 +40,34 @@
   // ---------------- save ----------------
   function fresh() {
     return {
-      v: 1, created: Date.now(), coins: 60, area: 'meadow', activeId: null, clockOffset: 0,
+      v: SAVE_VERSION, created: Date.now(), coins: 60, area: 'meadow', activeId: null, clockOffset: 0,
       sprouts: [], eggs: [{ id: newId('e'), kind: 'meadow', source: 'Your first egg', area: 'meadow', taps: 0 }],
       pouch: [], fruits: { apple: 3 }, progress: { races: {}, leagues: {} },
-      seen: {}, bestTier: 0, totals: { races: 0, raceWins: 0, battles: 0, battleWins: 0, coinsEarned: 0 },
+      seen: {}, bestTier: 0, totals: { races: 0, raceWins: 0, battles: 0, battleWins: 0, coinsEarned: 0, gumballs: 0, sold: 0 },
+      items: { paints: {}, patterns: {}, hats: {} },
     };
   }
   // Save format version. When the save shape changes, bump this and add a step to migrate() so old saves upgrade instead of breaking.
-  const SAVE_VERSION = 1;
+  const SAVE_VERSION = 2;
   function migrate(s) {
     if (!s || typeof s !== 'object' || !Array.isArray(s.sprouts)) return null;
-    // future steps go here, e.g.  if (s.v === 1) { ...; s.v = 2; }
+    // v1 -> v2: Sprouts keep at most D.MAX_PARTS animal parts (the biggest ones stay); gumball items
+    if (!s.v || s.v < 2) {
+      for (const sp of s.sprouts) {
+        const keep = Object.keys(sp.parts || {}).filter(p => p !== 'spots' && sp.parts[p] > 0).sort((a, b) => sp.parts[b] - sp.parts[a]);
+        for (const p of keep.slice(D.MAX_PARTS)) delete sp.parts[p];
+        sp.partOrder = keep.slice(0, D.MAX_PARTS).reverse();
+      }
+    }
     const f = fresh();
     for (const k of Object.keys(f)) if (s[k] === undefined || s[k] === null) s[k] = k === 'eggs' ? [] : f[k];
     s.progress.races = s.progress.races || {}; s.progress.leagues = s.progress.leagues || {};
     s.totals = Object.assign({}, f.totals, s.totals);
+    s.items = Object.assign({ paints: {}, patterns: {}, hats: {} }, s.items);
     for (const sp of s.sprouts) {
       sp.stats = sp.stats || {}; for (const st of D.STATS) sp.stats[st] = sp.stats[st] || { lv: 0, xp: 0 };
       sp.parts = sp.parts || {}; sp.absorbed = sp.absorbed || {}; sp.look = sp.look || {};
+      if (!Array.isArray(sp.partOrder)) sp.partOrder = Object.keys(sp.parts).filter(p => p !== 'spots' && sp.parts[p] > 0);
       sp.record = Object.assign({ races: 0, raceWins: 0, battles: 0, battleWins: 0 }, sp.record);
       if (sp.nature == null) sp.nature = 0; if (sp.stage == null) sp.stage = 0; if (!sp.form) sp.form = 'seedling';
       if (sp.happy == null) sp.happy = 70; if (sp.energy == null) sp.energy = 100; if (!D.AREAS[sp.area]) sp.area = 'meadow';
@@ -108,6 +119,11 @@
     // a brand-new install: one unnamed player who hasn't hatched anything yet
     isFreshInstall() { return players.list.length === 1 && !players.named && playersApi.summary(players.list[0].id).sprouts === 0; },
     markNamed() { players.named = true; writePlayers(players); },
+    // read-only copies of another player's Sprouts on this device (e.g. for friend battles). Never write these back.
+    sproutsOf(id) {
+      const sv = id === players.current && !SLOT ? PS.S : (() => { try { return parseSave(localStorage.getItem(keyFor(id))); } catch (e) { return null; } })();
+      return sv ? JSON.parse(JSON.stringify(sv.sprouts)) : [];
+    },
   };
 
   // ---------------- backups (copyable codes) ----------------
@@ -186,10 +202,12 @@
     const s = {
       id: newId('s'), name: opts.name || uniqueName(), area: opts.area || 'meadow', born: Date.now(), kind: opts.kind || 'meadow',
       look: { body: opts.body || pick(egg.bodies), eyes: egg.sparkle ? 'sparkle' : pick(['round', 'round', 'sparkle', 'dot', 'sleepy']),
-        pattern: Math.random() < 0.3 ? pick(['spots', 'stripes', 'twotone']) : 'plain', patternColor: '#fbf3dc', hat: 'none' },
-      stats: blankStats(), parts: {}, absorbed: {}, nature: 0, stage: 0, form: 'seedling', flower: null,
+        pattern: Math.random() < 0.4 ? pick(['spots', 'stripes', 'twotone', 'freckles', 'heart', 'socks']) : 'plain', patternColor: pick(D.PATTERN_COLORS), hat: 'none' },
+      stats: blankStats(), parts: {}, partOrder: [], absorbed: {}, nature: 0, stage: 0, form: 'seedling', flower: null,
       happy: 70, energy: 100, record: { races: 0, raceWins: 0, battles: 0, battleWins: 0 },
     };
+    if (egg.skin) s.look.skin = egg.skin;
+    if (egg.hat && D.HATS[egg.hat]) { s.look[D.HATS[egg.hat].slot] = egg.hat; if (!s.npc && PS.S) items().hats[egg.hat] = true; }
     if (egg.bonus) D.STATS.forEach(st => addXp(s, st, egg.bonus, true));
     return s;
   }
@@ -317,11 +335,21 @@
     const grew = [];
     if (c.rare) { for (const [p, v] of Object.entries(c.parts)) if ((s.parts[p] || 0) < v) { s.parts[p] = v; grew.push(p); } }
     else if (c.part) { const b = s.parts[c.part] || 0; s.parts[c.part] = Math.min(1, b + D.GROWTH.partPerAbsorb); if (s.parts[c.part] > b) grew.push(c.part); }
+    const lost = trackParts(s, c.rare ? Object.keys(c.parts) : c.part ? [c.part] : []);
     s.nature = clamp(s.nature + (c.nature || 0) * (c.rare ? 1 : 3), -100, 100);
     s.happy = clamp(s.happy + 6, 0, 100);
     const res = gain(s, c.gives);
     const unlocked = afterTier > beforeTier ? c.moves.slice(beforeTier, afterTier) : [];
-    return { id, name: c.name, gives: c.gives, ups: res.ups, grew, unlocked, evolved: res.evolved };
+    return { id, name: c.name, gives: c.gives, ups: res.ups, grew: grew.filter(p => !lost.includes(p)), lost, unlocked, evolved: res.evolved };
+  }
+  // The newest parts go to the end of s.partOrder (touching a part again makes it new). Past D.MAX_PARTS, the oldest drops off.
+  function trackParts(s, touched) {
+    const order = Array.isArray(s.partOrder) ? s.partOrder : (s.partOrder = Object.keys(s.parts).filter(p => p !== 'spots' && s.parts[p] > 0));
+    for (const p of touched) { if (p === 'spots') continue; const i = order.indexOf(p); if (i >= 0) order.splice(i, 1); order.push(p); }
+    for (let i = order.length - 1; i >= 0; i--) if (!(s.parts[order[i]] > 0)) order.splice(i, 1);
+    const lost = [];
+    while (order.length > D.MAX_PARTS) { const p = order.shift(); delete s.parts[p]; lost.push(p); }
+    return lost;
   }
   function feed(s, fruitId) {
     const f = D.FRUITS[fruitId]; if (!f) return null;
@@ -359,6 +387,92 @@
     const d = tbl[key], mult = 1 + (PS.S.bestTier || 0) * 0.5;
     if (key === 'xp') return { type: 'xp', amount: irand(d.min, d.max), stat: pick(D.STATS) };
     return { type: 'coin', big: key === 'bigcoin', amount: Math.round(irand(d.min, d.max) * mult) };
+  }
+
+  // ---------------- selling Sprouts ----------------
+  function sellPrice(s) {
+    const S = D.SELL; let p = S.base + totalLevels(s) * S.perLevel + (S.stage[s.stage] || 0);
+    for (const id of Object.keys(s.absorbed || {})) if (D.RARES[id]) p += D.RARES[id].price * S.rareShare;
+    if (s.look && s.look.skin) p += S.skin;
+    return Math.round(p);
+  }
+  const canSell = s => !!s && PS.S.sprouts.includes(s) && PS.S.sprouts.length > 1;
+  // removes the Sprout for good and pays for it. Returns the coins paid (0 = not sold: you must keep at least one Sprout)
+  function sellSprout(id) {
+    const s = get(id); if (!canSell(s)) return 0;
+    const price = sellPrice(s);
+    PS.S.sprouts.splice(PS.S.sprouts.indexOf(s), 1);
+    if (PS.S.activeId === id) PS.S.activeId = PS.S.sprouts[0].id;
+    PS.S.totals.sold = (PS.S.totals.sold || 0) + 1;
+    addCoins(price, 'sell');
+    emit('sprout:sold', { s, price }); emit('sprout:update', { s: active() }); save();
+    return price;
+  }
+
+  // ---------------- gumball machine + closet (paints, pattern stickers, hats) ----------------
+  function weighted(list) { const tot = list.reduce((a, x) => a + x[1], 0); let r = Math.random() * tot; for (const x of list) { r -= x[1]; if (r <= 0) return x[0]; } return list[list.length - 1][0]; }
+  const items = () => PS.S.items || (PS.S.items = { paints: {}, patterns: {}, hats: {} });
+  const bump = (bag, id, n) => { bag[id] = (bag[id] || 0) + (n || 1); };
+  // Spends the price and gives one prize. Returns null (unknown tier), {ok:false, reason:'coins'} or
+  // {ok:true, tier, color (0..7 gumball colour), type, id?, n?, title, text}
+  function gumball(tier) {
+    const G = D.GUMBALL[tier]; if (!G) return null;
+    if (!spend(G.price)) return { ok: false, reason: 'coins' };
+    const mega = tier === 'mega', it = items();
+    let type = weighted(G.prizes), out = null;
+    const coins = n => { const got = addCoins(n, 'gumball'); return { type: 'coins', n: got, title: `${got} coins`, text: 'Coins spill out of the gumball!' }; };
+    if (type === 'hat') {
+      const pool = Object.keys(D.HATS).filter(h => D.HATS[h].tier <= (mega ? 3 : 2) && !it.hats[h]);
+      if (pool.length) { const h = pick(pool); it.hats[h] = true; out = { type, id: h, title: D.HATS[h].name, text: `A new ${D.HATS[h].slot === 'extra' ? 'accessory' : 'hat'} for your closet. Any Sprout can wear it.` }; }
+      else type = 'coins';
+    }
+    if (type === 'animal') {
+      const id = pick(Object.keys(D.ANIMALS));
+      if (canCatch()) { PS.S.pouch.push(id); PS.S.seen['animal:' + id] = true; emit('pouch'); out = { type, id, title: `A ${D.ANIMALS[id].name}!`, text: `It hopped into your pouch. It lives in ${D.AREAS[D.ANIMALS[id].area].name}.` }; }
+      else type = 'coins';
+    }
+    if (!out) switch (type) {
+      case 'coins': out = coins(irand(G.coins[0], G.coins[1])); break;
+      case 'fruit': {
+        const pool = Object.keys(D.FRUITS).filter(k => k !== 'goldfruit' && k !== 'apple'), got = [pick(pool), pick(pool), pick(['apple', pick(pool)])];
+        got.forEach(k => bump(PS.S.fruits, k)); emit('pouch');
+        out = { type, id: got[0], n: 3, title: '3 fruits', text: got.map(k => D.FRUITS[k].name).join(', ') + '. Find them in the Garden fruit tray.' }; break;
+      }
+      case 'goldfruit': { const n = mega ? 2 : 1; bump(PS.S.fruits, 'goldfruit', n); emit('pouch'); out = { type, id: 'goldfruit', n, title: `${n} Golden Fruit`, text: 'XP to every stat. Find it in the Garden fruit tray.' }; break; }
+      case 'paint': { const id = pick(Object.keys(D.COLORS)); bump(it.paints, id); out = { type, id, title: `${D.COLORS[id]} paint`, text: 'Paint a Sprout this color from its page in Sprouts.' }; break; }
+      case 'pattern': { const id = pick(Object.keys(D.PATTERNS).filter(k => k !== 'plain')); bump(it.patterns, id); out = { type, id, title: `${D.PATTERNS[id]} sticker`, text: 'Give a Sprout this pattern from its page in Sprouts.' }; break; }
+      case 'egg': { const k = pick(D.AREA_ORDER); addEgg(k, 'Gumball machine'); out = { type, id: k, title: D.EGGS[k].name, text: `It's waiting in ${D.AREAS[k].name}. Tap it to hatch.` }; break; }
+      case 'spookyegg': { const k = pick(D.SPOOKY_EGGS); const e = addEgg(k, 'Gumball machine'); out = { type: 'egg', id: k, title: D.EGGS[k].name + '!', text: `A spooky surprise! It's waiting in ${D.AREAS[e.area].name}.` }; break; }
+      case 'goldenegg': case 'rainbowegg': { const k = type === 'goldenegg' ? 'golden' : 'rainbow'; const e = addEgg(k, 'Gumball machine'); out = { type: 'egg', id: k, title: D.EGGS[k].name + '!', text: `A jackpot! It's waiting in ${D.AREAS[e.area].name}.` }; break; }
+      case 'rare': { const id = pick(Object.keys(D.RARES)); PS.S.pouch.push(id); PS.S.seen['rare:' + id] = true; emit('pouch'); out = { type, id, title: `A ${D.RARES[id].name}!`, text: 'The jackpot! It is waiting in your pouch in the Garden.' }; break; }
+      default: out = coins(irand(G.coins[0], G.coins[1]));
+    }
+    PS.S.totals.gumballs = (PS.S.totals.gumballs || 0) + 1;
+    emit('items'); save();
+    return Object.assign({ ok: true, tier, color: irand(0, 7) }, out);
+  }
+  // use one paint tin: new body colour (a special skin is painted over)
+  function usePaint(s, color) {
+    const it = items(); if (!s || !it.paints[color] || !D.COLORS[color]) return false;
+    if (--it.paints[color] <= 0) delete it.paints[color];
+    s.look.body = color; delete s.look.skin;
+    emit('sprout:update', { s }); emit('items'); save(); return true;
+  }
+  // use one pattern sticker ('plain' is free: it removes the pattern)
+  function usePattern(s, pat) {
+    const it = items(); if (!s || !D.PATTERNS[pat]) return false;
+    if (pat !== 'plain') { if (!it.patterns[pat]) return false; if (--it.patterns[pat] <= 0) delete it.patterns[pat]; }
+    s.look.pattern = pat;
+    if (pat !== 'plain') s.look.patternColor = pick(D.PATTERN_COLORS.filter(c => c !== s.look.patternColor));
+    emit('sprout:update', { s }); emit('items'); save(); return true;
+  }
+  // hats are kept forever once won; id 'none' takes off whatever is in that slot ('hat' or 'extra')
+  const ownsHat = id => !!items().hats[id];
+  function wear(s, id, slot) {
+    if (!s) return false;
+    if (id === 'none') { s.look[slot || 'hat'] = 'none'; }
+    else { const H = D.HATS[id]; if (!H || !ownsHat(id)) return false; s.look[H.slot] = s.look[H.slot] === id ? 'none' : id; }
+    emit('sprout:update', { s }); save(); return true;
   }
 
   // ---------------- eggs ----------------
@@ -480,6 +594,7 @@
       addEgg, hatchEgg, moveSprout, renameSprout, get, active, setActive,
       raceProgress, raceUnlocked, raceRivals, finishRace,
       leagueProgress, leagueUnlocked, makeNPC, finishBattle, checkEvolve, evolveTo, flowerFor, PART_RACE, esc,
+      sellPrice, canSell, sellSprout, gumball, items, usePaint, usePattern, ownsHat, wear,
     },
   };
   lastNight = clock.isNight();

@@ -19,9 +19,12 @@
 
   // ---------------- Tuning (garden feel only; growth numbers come from D.GROWTH) ----------------
   const TUNE = {
-    holdDelay: 0.28, rubStep: 10, walkSpeed: 9, walkPerRunLv: 0.2, gravity: 420, flutterFall: 16, flutterAt: 8, holdLift: 16,
+    holdDelay: 0.28, rubStep: 10, walkSpeed: 10, walkPerRunLv: 0.2, gravity: 420, flutterFall: 20, flutterAt: 8, holdLift: 16,
     drainDay: 0.2, drainNight: 0.38, sleepAt: 15, regenDay: 9, regenNight: 6, happyDecay: 0.012,
     maxCritters: 2, maxDrops: 3, dropLife: 40, flutterXpMax: 3, flutterCooldown: 8, xpFlushSec: 3,
+    // camera: the world is sized so it all fits at zoomMin; you start at zoomDef x zoomMin and can pinch between.
+    // (1.5 css px per world px zoomed out; the default 2x = 3 css px per world px, the same close-up size as before.)
+    worldW: 280, zoomMinPx: 1.5, zoomDef: 2, zoomMax: 4, edgePan: 90, smellRange: 85, maxGroundFruit: 12,
   };
   const PART_NAMES = { wings: 'wings', ears: 'long ears', fins: 'fins', horns: 'horns', tail: 'a tail', shell: 'a shell', antennae: 'antennae',
     claws: 'claws', spikes: 'spikes', fluff: 'fluff', tentacles: 'tentacles', spots: 'star spots', batwings: 'bat wings', fairywings: 'fairy wings',
@@ -29,38 +32,55 @@
 
   // ---------------- Area themes ----------------
   // props: [kind, x as share of width, y as share of the walkable span]. Night is an overlay colour (rgb + max alpha).
+  // mount/far/near: distant scenery layers. grass: 4 ground tones (light..dark) for the dithered lawn. deco: which ground details to scatter.
   const TH = {
     meadow: {
       sky: ['#6cc3f2', '#86cff5', '#a4dcf8', '#c4e9fb'], skyN: ['#1a1d48', '#222a5a', '#2c366c', '#3a4580'],
-      far: ['#a6d98b', '#7fbf6a'], near: ['#8fd07a', '#66b35a'], lawn: ['#8fd46a', '#62a855'], low: '#84cb62', tuft: '#5fae4a', tuftStyle: 'grass',
+      mount: ['#d4ece6', '#b4d9d2', '#94c0bc'], snow: '#f8fdff', mountAmp: 22, mountShape: 'peak',
+      far: ['#a6d98b', '#7fbf6a'], farDots: ['#79bd66', '#9ad283', '#62a456'], near: ['#8fd07a', '#66b35a'], nearDots: ['#5ea94f', '#80c56b'],
+      lawn: ['#8fd46a', '#62a855'], grass: ['#a2de76', '#8fd46a', '#83ca61', '#76bd58'], blade: '#5aa846', bladeHi: '#b8ec8c', shade: '#6cb050',
       dots: ['#ffffff', '#fbf236', '#f7b6c8', '#c9a2f0'], dotC: '#df7126', sand: '#efe0b4', wet: '#d9c38e', sandEdge: '#c9b27a',
-      water: ['#9fe6f7', '#5fcde4', '#3f9fd0', '#2f7fb8'], foam: '#ffffff', hl: '#d6f5fd', cloud: ['#ffffff', '#cbdbfc'],
-      path: ['#efe4c8', '#c9b99a'], night: [20, 18, 64, 0.36], dim: 0, tree: 'bigtree', house: true,
-      props: [['bush', 0.44, 0.0], ['rock', 0.07, 0.64], ['flowerbed', 0.36, 0.88], ['bush', 0.05, 0.22]],
+      water: ['#9fe6f7', '#5fcde4', '#3f9fd0', '#2f7fb8'], foam: '#ffffff', hl: '#d6f5fd', cloud: ['#ffffff', '#dfeafc', '#bccdf0'],
+      path: ['#f2e9cf', '#e2d3ae', '#c4ae86'], night: [20, 18, 64, 0.36], dim: 0, tree: 'bigtree', house: true, deco: 'meadow', fish: '32,70,120',
+      props: [['bush', 0.5, 0.0], ['fence', 0.33, 0.01], ['rock', 0.2, 0.7], ['flowerbed', 0.42, 0.9], ['bush', 0.05, 0.22], ['stump', 0.16, 0.44],
+        ['flowerbed', 0.1, 0.96], ['bench', 0.28, 0.62], ['mushrooms', 0.44, 0.78], ['bush', 0.48, 0.99], ['rock', 0.05, 0.39]],
+      fruitTrees: [['tree', 0.5, 0.56], ['tree', 0.06, 0.66], ['tree', 0.26, 0.88]],
     },
     beach: {
       sky: ['#48b8f0', '#6fcaf5', '#98dbf8', '#c8eefc'], skyN: ['#14214a', '#1c2d5e', '#243a70', '#2f4a82'],
-      far: ['#9ccf8a', '#6fa86a'], near: ['#d6e9a0', '#a7c873'], lawn: ['#f6e3a8', '#dec486'], low: '#f0d898', tuft: '#e2c47e', tuftStyle: 'ripple',
+      far: ['#9ccf8a', '#6fa86a'], farDots: ['#5f9a5e', '#88c07a', '#4f8a54'], near: ['#d6e9a0', '#a7c873'], nearDots: ['#b8d488', '#e6f2b8'],
+      lawn: ['#f6e3a8', '#dec486'], grass: ['#faebbd', '#f6e3a8', '#f1db9b', '#ebd290'], blade: '#e2c47e', bladeHi: '#fff6d8', shade: '#e2c47e',
       dots: ['#f7b6c8', '#ffffff', '#f5a86a', '#fbf3dc'], dotC: '#e07ba0', sand: '#f3dc9c', wet: '#e0c283', sandEdge: '#d9bd7c',
-      water: ['#8ee8f0', '#3fc0e0', '#2a8fd0', '#1f6fb0'], foam: '#ffffff', hl: '#d6f5fd', cloud: ['#ffffff', '#cbdbfc'],
-      path: null, night: [20, 18, 64, 0.36], dim: 0, tree: 'palm', surf: true, openSea: true,
-      props: [['umbrella', 0.44, 0.04], ['sandcastle', 0.33, 0.86], ['shells', 0.08, 0.62], ['rockpool', 0.47, 0.95]],
+      water: ['#8ee8f0', '#3fc0e0', '#2a8fd0', '#1f6fb0'], foam: '#ffffff', hl: '#d6f5fd', cloud: ['#ffffff', '#dfeafc', '#bccdf0'],
+      path: null, night: [20, 18, 64, 0.36], dim: 0, tree: 'palm', surf: true, openSea: true, deco: 'beach', fish: '20,60,120',
+      props: [['umbrella', 0.44, 0.04], ['sandcastle', 0.33, 0.86], ['shells', 0.08, 0.62], ['rockpool', 0.47, 0.97], ['shells', 0.34, 0.3],
+        ['umbrella', 0.12, 0.93], ['driftwood', 0.2, 0.7], ['surfboard', 0.47, 0.6], ['bucket', 0.42, 0.88], ['ball', 0.28, 0.08],
+        ['towel', 0.25, 0.5], ['rock', 0.47, 0.36], ['shells', 0.46, 0.76]],
+      fruitTrees: [['palm', 0.06, 0.34], ['palm', 0.05, 0.8], ['palm', 0.32, 0.68]],
     },
     moonlit: {
       sky: ['#3b2f6e', '#553d86', '#7a4f98', '#a868a8'], skyN: ['#110e2e', '#19153e', '#231c50', '#2f2462'],
-      far: ['#3e5a78', '#2c4260'], near: ['#2f6a6a', '#1f4c50'], lawn: ['#3f8a72', '#2a6450'], low: '#377d68', tuft: '#2a6450', tuftStyle: 'grass',
+      mount: ['#6a6aa8', '#4c4c88', '#36366a'], snow: '#c9c4f0', mountAmp: 24, mountShape: 'spire',
+      far: ['#3e5a78', '#2c4260'], farDots: ['#243850', '#34506c', '#1c2c42'], near: ['#2f6a6a', '#1f4c50'], nearDots: ['#1c4448', '#2a5e5e'],
+      lawn: ['#3f8a72', '#2a6450'], grass: ['#4a977d', '#3f8a72', '#377e68', '#2f705d'], blade: '#27604e', bladeHi: '#7fe0c0', shade: '#2c6654',
       dots: ['#9fd8ff', '#c9a2f0', '#a6f2d3', '#fff6c9'], dotC: '#ffffff', sand: '#b9b3cc', wet: '#8f88a8', sandEdge: '#7a7496',
-      water: ['#5a6aa8', '#3a4a88', '#2a3570', '#1c2458'], foam: '#cbdbfc', hl: '#9fb0e8', cloud: ['#8a78b8', '#6a5a98'],
-      path: ['#6a6a8a', '#4a4a6a'], night: [26, 14, 60, 0.32], dim: 0.16, tree: 'glowtree', bigMoon: true,
-      props: [['crystal', 0.44, 0.0], ['glowshroom', 0.07, 0.6], ['lantern', 0.37, 0.86], ['glowshroom', 0.48, 0.5]],
+      water: ['#6a7cb8', '#4a5a98', '#36427e', '#283068'], foam: '#cbdbfc', hl: '#9fb0e8', cloud: ['#9a88c8', '#7e6cb0', '#665498'],
+      path: ['#c0c0d8', '#9a9ab8', '#6a6a8e'], night: [26, 14, 60, 0.32], dim: 0.16, tree: 'glowtree', bigMoon: true, deco: 'moonlit', fish: '10,10,40',
+      props: [['crystal', 0.44, 0.0], ['glowshroom', 0.16, 0.56], ['lantern', 0.37, 0.86], ['glowshroom', 0.48, 0.5], ['crystal', 0.08, 0.95], ['lantern', 0.3, 0.3],
+        ['mushrooms', 0.22, 0.84], ['moonstone', 0.12, 0.4], ['fern', 0.3, 0.72], ['fern', 0.04, 0.2], ['moonstone', 0.49, 0.96]],
+      fruitTrees: [['glowtree', 0.08, 0.76], ['glowtree', 0.46, 0.72]],
     },
     candy: {
       sky: ['#f6a6d0', '#f9bcdc', '#fbd2e6', '#fde6f0'], skyN: ['#2e1a4e', '#3c2260', '#4c2a72', '#5e3484'],
-      far: ['#f7c6e0', '#e89cc4'], farStripe: '#fde6f0', near: ['#bff0dc', '#86d6b8'], lawn: ['#c8f2e0', '#8fd8bc'], low: '#bdeed6', tuft: '#f08cbc', tuftStyle: 'sprinkle',
+      mount: ['#fbe0f0', '#f4c4de', '#e0a4c8'], snow: '#ffffff', mountAmp: 14, mountShape: 'drop',
+      far: ['#f7c6e0', '#e89cc4'], farStripe: '#fde6f0', farDots: ['#c9a2f0', '#fff27a', '#99e5c0'], near: ['#bff0dc', '#86d6b8'], nearDots: ['#f07aa0', '#fff4f8'],
+      lawn: ['#c8f2e0', '#8fd8bc'], grass: ['#d6f7e9', '#c8f2e0', '#bcebd5', '#aee3ca'], blade: '#8fd8bc', bladeHi: '#ffffff', shade: '#a2dcc4',
       dots: ['#f07a84', '#fff27a', '#639bff', '#ffffff'], dotC: '#f08cbc', sand: '#fde6b8', wet: '#f5c890', sandEdge: '#e8b87c',
-      water: ['#b8f5ec', '#8ee0e0', '#f5a6cc', '#e07ba0'], foam: '#ffffff', hl: '#ffffff', cloud: ['#ffffff', '#f7c6e0'],
-      path: ['#ffffff', '#f7b6c8'], night: [40, 16, 70, 0.36], dim: 0, tree: 'lollitree', house: true, fizz: true,
-      props: [['candycane', 0.44, 0.02], ['cupcake', 0.07, 0.62], ['gumdrops', 0.37, 0.88]],
+      water: ['#b8f5ec', '#8ee0e0', '#f5a6cc', '#e07ba0'], foam: '#ffffff', hl: '#ffffff', cloud: ['#ffffff', '#fbe4f2', '#f2c4e0'],
+      path: ['#ffffff', '#fcd8e8', '#e8a2c4'], night: [40, 16, 70, 0.36], dim: 0, tree: 'lollitree', house: true, fizz: true, deco: 'candy', fish: '150,40,100',
+      props: [['candycane', 0.5, 0.03], ['cupcake', 0.07, 0.74], ['gumdrops', 0.2, 0.9], ['gumball', 0.12, 0.46], ['candycane', 0.14, 0.98], ['gumdrops', 0.1, 0.2],
+        ['donut', 0.47, 0.62], ['lollipop', 0.26, 0.72], ['lollipop', 0.47, 0.45], ['icecream', 0.3, 0.98], ['donut', 0.2, 0.6], ['gumdrops', 0.48, 0.97]],
+      fruitTrees: [['lollitree', 0.36, 0.84], ['lollitree', 0.06, 0.92], ['lollitree', 0.45, 0.2]],
     },
   };
   // where fruit hangs on each tree (share of sprite width/height from the base)
@@ -69,17 +89,26 @@
     lollitree: [[-0.28, -0.72], [0.04, -0.9], [0.3, -0.66]],
     default: [[-0.27, -0.45], [0, -0.74], [0.27, -0.47]],
   };
-  const GLOWS = { lantern: [0.5, 0.8, 9, '255,236,150'], glowshroom: [0.5, 0.6, 7, '170,240,255'], crystal: [0.5, 0.55, 7, '180,220,255'] };
+  // spooky (Halloween) skins: sparkle colours, the little thing that floats up at night, and a faint night glow
+  const SPOOKY = {
+    pumpkin: { c: ['#ffb040', '#fff27a'], fx: 'wisp', glow: '255,170,60' }, ghost: { c: ['#ffffff', '#e0d8ff'], fx: 'wisp', glow: '225,215,255' },
+    mummy: { c: ['#fffaf0', '#e8dcc0'], fx: 'wisp', glow: '255,240,205' }, candycorn: { c: ['#ffffff', '#ff9a22', '#ffd23a'], fx: 'wisp', glow: '255,205,110' },
+    vampire: { c: ['#4a3a6c', '#e8506a', '#c9a2f0'], fx: 'bat', glow: '230,90,130' }, witch: { c: ['#8e56c8', '#9ad862', '#fff27a'], fx: 'bat', glow: '190,255,150' },
+  };
+  const GLOWS = { lantern: [0.5, 0.8, 9, '255,236,150'], glowshroom: [0.5, 0.6, 7, '170,240,255'], crystal: [0.5, 0.55, 7, '180,220,255'], moonstone: [0.5, 0.5, 6, '160,230,255'], mushrooms: [0.5, 0.5, 4, '170,240,255'] };
 
   // ---------------- seeded decoration ----------------
   let seed = 7; const srand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const DECO = { tufts: [], flowers: [], stars: [], waves: [], clouds: [], flies: [] };
-  for (let i = 0; i < 50; i++) DECO.tufts.push({ x: srand(), y: srand() });
-  for (let i = 0; i < 30; i++) DECO.flowers.push({ x: srand(), y: srand(), c: i % 4 });
-  for (let i = 0; i < 44; i++) DECO.stars.push({ x: srand(), y: srand(), tw: srand() > 0.78, ph: srand() * 6 });
-  for (let i = 0; i < 18; i++) DECO.waves.push({ x: srand(), y: srand(), ph: srand() * 6.28, w: 2 + Math.floor(srand() * 3) });
-  for (let i = 0; i < 4; i++) DECO.clouds.push({ x: srand(), y: 0.12 + srand() * 0.42, s: srand() > 0.5 ? 1 : 0, v: 0.8 + srand() * 1.4 });
-  for (let i = 0; i < 9; i++) DECO.flies.push({ p: srand() * 10, a: srand(), b: srand() });
+  const DECO = { stars: [], waves: [], clouds: [], flies: [], fish: [], bugs: [], drift: [], floats: [], birds: [] };
+  for (let i = 0; i < 60; i++) DECO.stars.push({ x: srand(), y: srand(), tw: srand() > 0.78, ph: srand() * 6 });
+  for (let i = 0; i < 46; i++) DECO.waves.push({ x: srand(), y: srand(), ph: srand() * 6.28, w: 2 + Math.floor(srand() * 3) });
+  for (let i = 0; i < 7; i++) DECO.clouds.push({ x: srand(), y: 0.1 + srand() * 0.45, s: i % 3, v: 0.8 + srand() * 1.4 });
+  for (let i = 0; i < 11; i++) DECO.flies.push({ p: srand() * 10, a: srand(), b: srand() });
+  for (let i = 0; i < 4; i++) DECO.fish.push({ a: 0.15 + srand() * 0.6, b: srand(), r: 0.08 + srand() * 0.12, v: 0.05 + srand() * 0.06, ph: srand() * 6.28, big: i === 0 });
+  for (let i = 0; i < 3; i++) DECO.bugs.push({ p: srand() * 10, a: srand(), b: srand(), c: i });
+  for (let i = 0; i < 3; i++) DECO.drift.push({ p: srand(), y: srand(), v: 0.03 + srand() * 0.03, ph: srand() * 6.28, c: i });
+  for (let i = 0; i < 4; i++) DECO.floats.push({ a: 0.12 + i * 0.2 + srand() * 0.08, b: 0.1 + srand() * 0.8, ph: srand() * 6.28, v: 0.4 + srand() * 0.4, k: i });
+  for (let i = 0; i < 3; i++) DECO.birds.push({ p: srand(), y: 0.2 + srand() * 0.4, v: 0.012 + srand() * 0.01, ph: srand() * 6 });
 
   // ---------------- sprites (guarded: art is still being drawn, so nothing may crash) ----------------
   const sprCache = new Map();
@@ -94,7 +123,8 @@
   const critterSpr = id => spr('c:' + id, () => PX.critter(id), () => blob(16, 12, PX.RAMPS.peach));
   const swimSpr = id => spr('cs:' + id, () => (PX.critterSwim ? PX.critterSwim(id) : null), () => critterSpr(id));
   const itemSpr = (kind, id) => spr('i:' + kind + ':' + id, () => PX.item(kind, id), () => (kind === 'fruit' ? PX.fruit('round') : blob(11, 11, PX.RAMPS.sun)));
-  const propSpr = (kind, theme) => spr('p:' + kind + ':' + theme, () => PX.prop(kind, theme), () => blob(14, 12));
+  const propSpr = (kind, theme) => spr('p:' + kind + ':' + theme, () => (kind === 'gumball' ? PX.gumballMachine(0) : PX.prop(kind, theme)), () => blob(14, 12));
+  function propAt(p) { for (const q of Lw.props) if (q.kind === 'gumball' && Math.abs(p.x - q.x) < q.c.width / 2 + 2 && p.y <= q.y + 2 && p.y >= q.y - q.c.height) return q.kind; return null; }
   const dropSpr = d => (d.type === 'xp' ? itemSpr('xp', d.stat) : itemSpr(d.big ? 'bigcoin' : 'coin', ''));
   let cocoonC = null, arrowC = null, sunC = null, moonC = null, bigMoonC = null;
   function cocoonSprite() {
@@ -120,7 +150,13 @@
   // ---------------- module state ----------------
   let root, cv, ctx, buf, bx, skyC, skx, bgC, bgx, pillName, pillSub, dotsEl, trayEl, pouchStrip, fruitStrip, pouchCnt, hintEl, cardEl, ghostEl, gctx, labelsEl;
   const card = {};
-  let W = 0, H = 0, DPR = 1, PXS = 4, ww = 0, wh = 0, t = 0, visible = false, mounted = false, area = 'meadow';
+  let W = 0, H = 0, DPR = 1, ww = 0, wh = 0, t = 0, visible = false, mounted = false, area = 'meadow';
+  // camera (Z = CSS px per world px; cam = world px at the top-left of the screen)
+  let Z = 3, ZMIN = 2, ZMAX = 6, camX = 0, camY = 0, zoomAnim = null, pinch = null, camV = { x: 0, y: 0 }, lastTapBg = null, zoomSnapT = 0;
+  const touches = new Map();          // pointerId -> {x, y} (client coords) for fingers that went down on the garden
+  const lastClient = { x: -1, y: -1, on: false };
+  const ZKEY = 'solunar:gardenZoom2'; // (v2: the world got bigger, so old zoom levels no longer mean the same)
+  let zoomPref = (() => { try { return parseFloat(localStorage.getItem(ZKEY)) || 0; } catch (e) { return 0; } })(); // as a multiple of ZMIN
   const Lw = { shore: [], props: [] };
   const RT = new Map();              // sprout id -> runtime (position, state, timers)
   const arrivals = new Set();        // sprouts that just swam here: they enter from the water
@@ -146,7 +182,7 @@
     const trayH = trayEl.offsetHeight || 110;
     Lw.hz = Math.round(wh * 0.2);
     Lw.minY = Lw.hz + 18;
-    Lw.maxY = Math.max(Lw.minY + 30, Math.floor((H - trayH - 16) / PXS));
+    Lw.maxY = Math.max(Lw.minY + 30, Math.floor((H - trayH - 16) / ZMIN));
     Lw.span = Lw.maxY - Lw.minY;
     Lw.waterTop = Lw.hz + 2;
     Lw.shore.length = 0;
@@ -168,14 +204,21 @@
       const x = Math.round(Math.min(ww * fx, shoreAt(y) - c.width / 2 - 3));
       return { kind, x: Math.max(Math.round(c.width / 2) + 1, x), y, c };
     });
-    const tc = treeSpr(), sl = TREE_SLOTS[th.tree] || TREE_SLOTS.default;
-    Lw.slots = sl.map(([fx, fy]) => ({ x: Math.round(Lw.tree.x + fx * tc.width), y: Math.round(Lw.tree.y + fy * tc.height) }));
+    // fruit trees: the area's main tree first (its 3 fruit slots are the ones old saves already have), then the others
+    Lw.trees = [{ kind: th.tree, x: Lw.tree.x, y: Lw.tree.y }].concat((th.fruitTrees || []).map(([kind, fx, fy]) => {
+      const c = propSpr(kind, theme), y = Math.round(Lw.minY + Lw.span * fy);
+      return { kind, y, x: Math.max(Math.round(c.width / 2) + 1, Math.round(Math.min(ww * fx, shoreAt(y) - c.width / 2 - 3))) };
+    }));
+    Lw.slots = [];
+    Lw.trees.forEach((T, ti) => {
+      T.c = propSpr(T.kind, theme);
+      for (const [fx, fy] of TREE_SLOTS[T.kind] || TREE_SLOTS.default) Lw.slots.push({ x: Math.round(T.x + fx * T.c.width), y: Math.round(T.y + fy * T.c.height), tree: ti });
+    });
   }
-  const treeSpr = () => propSpr(TH[area].tree, themeOf(area));
   function lawnPoint() {
     for (let i = 0; i < 40; i++) {
       const y = rand(Lw.minY + 2, Lw.maxY), x = rand(8, shoreAt(y) - 8);
-      if (Math.abs(x - Lw.tree.x) < 7 && Math.abs(y - Lw.tree.y) < 5) continue;
+      if ((Lw.trees || []).some(T => Math.abs(x - T.x) < 8 && Math.abs(y - T.y) < 6)) continue;
       if (Lw.props.some(p => Math.abs(x - p.x) < p.c.width / 2 && Math.abs(y - p.y) < 4)) continue;
       return { x, y };
     }
@@ -187,93 +230,303 @@
 
   // ---------------- colours ----------------
   const rgb = h => { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
-  const mixHex = (a, b, k) => { const A = rgb(a), B = rgb(b); return 'rgb(' + A.map((v, i) => Math.round(v + (B[i] - v) * k)).join(',') + ')'; };
+  const hex2 = v => v.toString(16).padStart(2, '0');
+  const mixH = (a, b, k) => { const A = rgb(a), B = rgb(b); return '#' + A.map((v, i) => hex2(Math.round(v + (B[i] - v) * k))).join(''); };
+  const U32 = new Map();
+  const u32 = c => { let v = U32.get(c); if (v === undefined) { const [r, g, b] = rgb(c); v = ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0; U32.set(c, v); } return v; };
+  // hashing, ordered dither and value noise for the cached ground (only used when a background layer is repainted)
+  const hash2 = (x, y, s) => { let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul((s | 0) + 1, 1442695041); h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  const bayer = (x, y) => (BAYER[((y & 3) << 2) | (x & 3)] + 0.5) / 16;
+  function vnoise(x, y, s) {
+    const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const a = hash2(xi, yi, s), b = hash2(xi + 1, yi, s), c = hash2(xi, yi + 1, s), d = hash2(xi + 1, yi + 1, s);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  }
+  const fbm = (x, y, s) => vnoise(x, y, s) * 0.62 + vnoise(x * 2.1 + 5.3, y * 2.1 + 1.7, s + 1) * 0.38;
+  // one of n tones from v (0..1), with a narrow checker dither where two tones meet
+  function toneOf(v, n, x, y, w) {
+    w = w || 0.13; const s = clamp(v, 0, 0.9999) * n, b = Math.floor(s), f = s - b, odd = (x + y) & 1;
+    if (f < w && b > 0) return odd ? b - 1 : b;
+    if (f > 1 - w && b < n - 1) return odd ? b + 1 : b;
+    return b;
+  }
+  const sandW = y => Math.round(lerp(3, 9, clamp((y - Lw.waterTop) / Math.max(1, Lw.maxY - Lw.waterTop), 0, 1)));
 
   // ---------------- background (cached per area / size / night level) ----------------
   function paintSky(n) {
     const th = TH[area], x = skx, hz = Lw.hz; x.clearRect(0, 0, ww, wh);
-    const bands = th.sky.map((c, i) => mixHex(c, th.skyN[i], n));
-    const bh = Math.ceil((hz + 12) / bands.length);
+    const base = th.sky.map((c, i) => mixH(c, th.skyN[i], n));
+    // 7 smooth bands from the 4 theme colours, dithered where they meet
+    const bands = []; for (let i = 0; i < 7; i++) { const k = i / 6 * 3, a = Math.floor(k); bands.push(mixH(base[a], base[Math.min(3, a + 1)], k - a)); }
+    const bh = (hz + 12) / bands.length;
     bands.forEach((c, i) => {
-      x.fillStyle = c; x.fillRect(0, i * bh, ww, i === bands.length - 1 ? wh : bh);
-      if (i) { x.fillStyle = bands[i - 1]; for (let j = i % 2; j < ww; j += 2) x.fillRect(j, i * bh, 1, 1); }
+      const y0 = Math.round(i * bh);
+      x.fillStyle = c; x.fillRect(0, y0, ww, wh - y0);
+      if (i) { x.fillStyle = bands[i - 1]; for (let j = i % 2; j < ww; j += 2) x.fillRect(j, y0, 1, 1); for (let j = (i % 2) * 2; j < ww; j += 4) x.fillRect(j, y0 + 1, 1, 1); }
     });
+    // soft haze just above the horizon
+    const haze = mixH(base[3], n > 0.5 ? th.skyN[3] : '#ffffff', 0.35);
+    x.fillStyle = haze;
+    for (let y = hz - 12; y < hz + 12; y++) { const d = clamp((y - (hz - 12)) / 14, 0, 1) * 0.6; for (let j = 0; j < ww; j++) if (bayer(j, y) < d) x.fillRect(j, y, 1, 1); }
+    // stars (the twinkly ones are drawn live, above the night tint)
     const sa = th.bigMoon ? Math.max(0.5, n) : n;
     if (sa > 0.04) {
       x.globalAlpha = sa;
+      // a faint band of far-off stars across the sky
+      x.fillStyle = mixH(base[1], '#cbdbfc', 0.35);
+      for (let j = 0; j < ww; j++) for (let y = 0; y < hz - 10; y++) { const d = Math.abs(y - (hz * 0.15 + j * 0.22)); if (d < 9 && hash2(j, y, 77) < 0.16 * (1 - d / 9)) x.fillRect(j, y, 1, 1); }
       for (const s of DECO.stars) { if (s.tw) continue; x.fillStyle = s.y > 0.5 ? '#cbdbfc' : '#ffffff'; x.fillRect(Math.round(s.x * ww), Math.round(s.y * (hz - 8)), 1, 1); }
       x.globalAlpha = 1;
     }
   }
   function paintLand() {
-    const th = TH[area], x = bgx, hz = Lw.hz; x.clearRect(0, 0, ww, wh);
-    const seaX = th.openSea ? shoreAt(Lw.waterTop) - 3 : ww;
-    const hill = (base, amp, f, ph, fill, edge, maxX, stripe) => {
+    const th = TH[area], X = bgx, hz = Lw.hz, wt = Lw.waterTop; X.clearRect(0, 0, ww, wh);
+    const img = X.createImageData(ww, wh), P = new Uint32Array(img.data.buffer);
+    const put = (i, y, c) => { if (i >= 0 && i < ww && y >= 0 && y < wh) P[y * ww + i] = u32(c); };
+    const lawnTop = hz + 9, seaX = th.openSea ? shoreAt(wt) - 3 : ww, AS = AREA_IDS.indexOf(area) * 101 + 3;
+    const lawnTopAt = i => Math.round(lawnTop - Math.sin(i * 0.09 + 2) * 1.2);
+    // ---- distant mountains: lit left faces, shaded right faces, snow / icing on the tops ----
+    const fTop = [], nTop = [];
+    if (th.mount) {
+      const M = th.mount, amp = th.mountAmp, base = hz - 2, sh = th.mountShape;
+      const tri = v => 1 - 2 * Math.abs(v - Math.floor(v) - 0.5);
+      const h = i => sh === 'spire' ? 0.62 * Math.pow(tri(i / 44 + 0.3), 1.7) + 0.38 * Math.pow(tri(i / 17 + 0.1), 2.2)
+        : sh === 'drop' ? 0.7 * Math.pow(Math.abs(Math.sin(i * 0.052 + 0.4)), 0.6) + 0.3 * Math.abs(Math.sin(i * 0.12 + 1.3))
+          : 0.66 * Math.pow(tri(i / 74 + 0.15), 1.3) + 0.34 * Math.pow(tri(i / 31 + 0.55), 1.5);
+      const top = i => base - amp * h(i);
+      const hazeC = mixH(M[1], th.sky[3], 0.45);
+      for (let i = 0; i < Math.min(ww, seaX); i++) {
+        const tp = Math.round(top(i)), sl = top(i + 1) - top(i - 1), snowTo = base - amp * 0.6 + hash2(i >> 2, 1, AS) * 2 + (sh === 'drop' && i % 6 < 2 ? 2 : 0);
+        for (let y = Math.max(0, tp); y < lawnTop + 2; y++) {
+          let c = sl < -0.15 ? M[0] : sl > 0.15 ? M[2] : ((i + y) & 1 ? M[0] : M[1]);
+          if (y - tp > 3 && c === M[0] && ((i + y) & 1)) c = M[1];
+          if (y < snowTo && y - tp < 6) c = sl > 0.15 ? mixH(th.snow, M[2], 0.3) : th.snow;
+          if (y > base - 6 && bayer(i, y) < (y - (base - 6)) / 8) c = hazeC;
+          put(i, y, c);
+        }
+      }
+    }
+    // ---- rolling hills: an ink-soft rim, a lit band under it, optional candy stripes ----
+    const hillLayer = (arr, b, amp, f, ph, fill, edge, maxX, stripe) => {
+      const lit = mixH(fill, '#ffffff', 0.14), fillU = u32(fill), litU = u32(lit), edgeU = u32(edge), stU = stripe ? u32(stripe) : 0;
+      for (let i = 0; i < ww; i++) arr[i] = Math.round(b - Math.sin(i * f + ph) * amp - Math.sin(i * f * 2.3 + ph * 2) * amp * 0.4);
       for (let i = 0; i < Math.min(ww, maxX); i++) {
-        const top = Math.round(base - Math.sin(i * f + ph) * amp - Math.sin(i * f * 2.3 + ph * 2) * amp * 0.4);
-        x.fillStyle = edge; x.fillRect(i, top, 1, 1); x.fillStyle = fill; x.fillRect(i, top + 1, 1, wh - top);
-        if (stripe) { x.fillStyle = stripe; for (let y = top + 2; y < hz + 8; y++) if (((i + y) >> 1) % 3 === 0) x.fillRect(i, y, 1, 1); }
+        const tp = arr[i]; if (tp >= 0 && tp < wh) P[tp * ww + i] = edgeU;
+        for (let y = Math.max(0, tp + 1); y < lawnTop + 2; y++) {
+          let c = fillU; const d = y - tp;
+          if (d === 1 || (d === 2 && ((i + y) & 1))) c = litU;
+          else if (stU && y < hz + 8 && ((i + y) >> 1) % 3 === 0) c = stU;
+          P[y * ww + i] = c;
+        }
       }
     };
-    hill(hz - 2, 6, 0.045, 1, th.far[0], th.far[1], th.openSea ? seaX - 6 : ww, th.farStripe);
-    hill(hz + 4, 3.5, 0.07, 3, th.near[0], th.near[1], th.openSea ? seaX : ww);
-    const lawnTop = hz + 9;
-    for (let i = 0; i < ww; i++) { const top = Math.round(lawnTop - Math.sin(i * 0.09 + 2) * 1.2); x.fillStyle = th.lawn[1]; x.fillRect(i, top, 1, 1); x.fillStyle = th.lawn[0]; x.fillRect(i, top + 1, 1, wh - top); }
-    const lowBand = Math.round(lawnTop + (wh - lawnTop) * 0.55);
-    x.fillStyle = th.low; x.fillRect(0, lowBand, ww, wh - lowBand);
-    x.fillStyle = th.lawn[0]; for (let j = 0; j < ww; j += 2) x.fillRect(j, lowBand, 1, 1);
-    // house far on the hill
-    if (th.house) { const hc = propSpr('house', themeOf(area)); Lw.house = { x: Math.round(ww * 0.42), y: hz + 8, c: hc }; PX.blit(x, hc, Lw.house.x, Lw.house.y); } else Lw.house = null;
-    // path from the tree to the dock
-    if (th.path) {
-      for (let i = 0; i < 6; i++) {
-        const k = i / 5, px = Math.round(lerp(Lw.tree.x + 10, Lw.dockX0 - 4, k)), py = Math.round(lerp(Lw.tree.y + 6, Lw.dockY + 2, k) + Math.sin(k * 5) * 2);
-        x.fillStyle = th.path[1]; x.fillRect(px - 2, py, 5, 2); x.fillStyle = th.path[0]; x.fillRect(px - 2, py - 1, 5, 2); x.fillRect(px - 1, py - 2, 3, 1);
+    hillLayer(fTop, hz - 2, 6, 0.045, 1, th.far[0], th.far[1], th.openSea ? seaX - 6 : ww, th.farStripe);
+    hillLayer(nTop, hz + 4, 3.5, 0.07, 3, th.near[0], th.near[1], th.openSea ? seaX : ww);
+    // ---- the lawn: soft dithered patches of 4 tones, lighter toward the back ----
+    const G = th.grass.map(u32), edgeU = u32(th.lawn[1]);
+    for (let i = 0; i < ww; i++) {
+      const tp = lawnTopAt(i); P[tp * ww + i] = edgeU;
+      for (let y = tp + 1; y < wh; y++) {
+        const g = (y - lawnTop) / Math.max(1, wh - lawnTop);
+        const v = (fbm(i * 0.05, y * 0.085, AS) - 0.5) * 1.8 + 0.5 + (1 - g) * 0.2 - 0.08;
+        P[y * ww + i] = y === tp + 1 ? G[0] : G[3 - toneOf(v, 4, i, y)];
       }
     }
-    // tufts & little flowers (or ripples / sprinkles)
-    const top = lawnTop + 4, span = wh - top;
-    for (const f of DECO.tufts) {
-      const X = Math.round(f.x * ww), Y = Math.round(top + f.y * span); if (X > shoreAt(Y) - 8) continue;
-      x.fillStyle = th.tuft;
-      if (th.tuftStyle === 'ripple') { x.fillRect(X - 1, Y, 3, 1); x.fillRect(X + 2, Y - 1, 1, 1); }
-      else if (th.tuftStyle === 'sprinkle') { x.fillStyle = th.dots[(X + Y) % 4]; x.fillRect(X, Y, 2, 1); }
-      else { x.fillRect(X - 1, Y - 1, 1, 1); x.fillRect(X, Y, 1, 1); x.fillRect(X + 1, Y - 1, 1, 1); x.fillRect(X, Y - 2, 1, 1); }
-    }
-    for (const f of DECO.flowers) {
-      const X = Math.round(f.x * ww), Y = Math.round(top + f.y * span); if (X > shoreAt(Y) - 9) continue;
-      x.fillStyle = th.dots[f.c]; x.fillRect(X - 1, Y, 1, 1); x.fillRect(X + 1, Y, 1, 1); x.fillRect(X, Y - 1, 1, 1); x.fillRect(X, Y + 1, 1, 1);
-      x.fillStyle = th.dotC; x.fillRect(X, Y, 1, 1);
-    }
-    // sandy shore + water
-    const W0 = th.water;
-    for (let y = Lw.waterTop; y < wh; y++) {
-      const s = shoreAt(y), k = clamp((y - Lw.waterTop) / 30, 0, 1), sw = Math.round(lerp(2, 6, k));
-      x.fillStyle = th.sandEdge; if (y % 2 === 0 || k > 0.5) x.fillRect(s - sw - 1, y, 1, 1);
-      x.fillStyle = th.sand; x.fillRect(s - sw, y, sw, 1);
-      x.fillStyle = th.wet; x.fillRect(s - 1, y, 2, 1);
+    // ---- sandy shore (dry -> damp -> wet) and water in depth bands ----
+    const W0 = th.water, WU = W0.map(u32);
+    const shalU = u32(mixH(W0[0], th.wet, 0.42)), sandU = u32(th.sand), wetU = u32(th.wet), dampU = u32(mixH(th.sand, th.wet, 0.5)), sEdgeU = u32(th.sandEdge);
+    const reflU = u32(mixH(th.openSea ? th.sky[3] : th.near[1], W0[2], th.openSea ? 0.3 : 0.5)), hlU = u32(th.hl);
+    const TH3 = [0.14, 0.45, 0.78];
+    for (let y = wt; y < wh; y++) {
+      const s = shoreAt(y), sw = sandW(y);
+      for (let i = Math.max(0, s - sw - 1); i <= s && i < ww; i++) {
+        const u = (i - (s - sw)) / Math.max(1, sw);
+        let c;
+        if (i === s - sw - 1) { if (!((i + y) & 1)) continue; c = sEdgeU; }
+        else if (u < 0.45) c = sandU; else if (u < 0.6) c = (i + y) & 1 ? dampU : sandU; else if (u < 0.8) c = dampU; else if (u < 0.9) c = (i + y) & 1 ? wetU : dampU; else c = wetU;
+        P[y * ww + i] = c;
+      }
+      const fk = y - wt;
       for (let i = s + 1; i < ww; i++) {
-        const d = (i - s) / Math.max(1, ww - s), far = y < Lw.waterTop + 3;
-        let c = d < 0.16 ? 0 : d < 0.45 ? 1 : 2;
-        if (far) c = y === Lw.waterTop ? 0 : 3;
-        else if (Math.abs(d - 0.16) < 0.03 && (i + y) % 2) c = 1;
-        else if (Math.abs(d - 0.45) < 0.03 && (i + y) % 2) c = 2;
-        else if (d > 0.8 && (i + y) % 2 && y < Lw.waterTop + 8) c = 3;
-        x.fillStyle = W0[c]; x.fillRect(i, y, 1, 1);
+        const d = (i - s) / Math.max(1, ww - s) + (vnoise(i * 0.13, y * 0.3, AS + 5) - 0.5) * 0.05;
+        let tn = 0; for (const q of TH3) if (d > q) tn++;
+        for (let q = 0; q < 3; q++) if (Math.abs(d - TH3[q]) < 0.022 && ((i + y) & 1)) tn = d > TH3[q] ? q : q + 1;
+        let c = WU[tn];
+        if (d < 0.035) c = (i + y) & 1 && d > 0.02 ? WU[0] : shalU;
+        if (fk === 0) c = hlU;
+        else if (fk < 7) {
+          if (fk < 3 || (fk < 5 && ((i + y) & 1)) || (fk < 7 && bayer(i, y) < 0.25)) c = WU[Math.max(tn, 2)];
+          if (fk >= 1 && fk <= 4 && ((i + fk) % 3 === 0 || fk === 1) && (i & 1)) c = reflU;
+        }
+        P[y * ww + i] = c;
       }
     }
-    // dock: planks on posts, a lamp at the end
+    X.putImageData(img, 0, 0);
+
+    // ---- details on top (fillRect) ----
+    let rs = AS * 7919 + 1; const rr = () => ((rs = (rs * 16807) % 2147483647) / 2147483647);
+    const R = (x0, y0, w, h, c) => { X.fillStyle = c; X.fillRect(Math.round(x0), Math.round(y0), w, h); };
+    const blob = (cx, cy, r, dark, mid, lit) => { // tiny round shrub / tree crown, lit from the top-left
+      for (let dy = -r; dy <= r; dy++) { const w = Math.round(Math.sqrt(Math.max(0, r * r - dy * dy + r * 0.6))); R(cx - w, cy + dy, w * 2 + 1, 1, mid); }
+      R(cx - r + 1, cy + r - 1, r * 2 - 1, 1, dark); R(cx + r - 1, cy - 1, 1, r, dark); R(cx - r + 1, cy - r + 1, Math.max(1, r - 1), 1, lit); R(cx - r, cy - r + 2, 1, 1, lit);
+    };
+    // scenery on the ridges
+    if (area === 'meadow') {
+      for (let i = 4; i < ww; i += 5 + Math.floor(hash2(i, 2, AS) * 9)) if (hash2(i, 3, AS) > 0.3) { const r = hash2(i, 4, AS) > 0.6 ? 3 : 2; blob(i, fTop[i] + 1, r, th.farDots[2], th.farDots[0], th.farDots[1]); if (r === 3 && hash2(i, 5, AS) > 0.5) blob(i + 4, fTop[Math.min(ww - 1, i + 4)] + 2, 2, th.farDots[2], th.farDots[0], th.farDots[1]); }
+      for (let i = 8; i < ww; i += 12 + Math.floor(hash2(i, 6, AS) * 18)) { if (Math.abs(i - ww * 0.42) < 16) continue; blob(i, nTop[i] + 1, 2, th.nearDots[0], th.nearDots[0], th.nearDots[1]); R(i + 3, nTop[Math.min(ww - 1, i + 3)], 1, 2, th.nearDots[0]); }
+    } else if (area === 'beach') {
+      for (let i = 6; i < seaX - 8; i += 16 + Math.floor(hash2(i, 2, AS) * 14)) { // little palms on the headland
+        const b = fTop[i] + 1, lean = hash2(i, 3, AS) > 0.5 ? 1 : -1, c = th.farDots[2];
+        for (let k = 0; k < 6; k++) R(i + (k > 3 ? lean : 0), b - k, 1, 1, '#8a7a50');
+        const tx = i + lean, ty = b - 6; R(tx - 3, ty, 7, 1, c); R(tx - 4, ty + 1, 2, 1, c); R(tx + 3, ty + 1, 2, 1, c); R(tx - 1, ty - 1, 3, 1, th.farDots[1]); R(tx - 2, ty + 1, 1, 1, c); R(tx + 2, ty + 1, 1, 1, c);
+      }
+      for (let i = 3; i < seaX; i += 5 + Math.floor(hash2(i, 7, AS) * 6)) { R(i, nTop[i] - 1, 1, 2, th.nearDots[0]); if (hash2(i, 8, AS) > 0.5) R(i + 1, nTop[i] - 2, 1, 2, th.nearDots[0]); R(i - 1, nTop[i], 1, 1, th.nearDots[1]); }
+    } else if (area === 'moonlit') {
+      for (let i = 5; i < ww; i += 4 + Math.floor(hash2(i, 2, AS) * 7)) { // pines
+        if (hash2(i, 3, AS) < 0.25) continue;
+        const b = fTop[i] + 2, hgt = 5 + Math.floor(hash2(i, 4, AS) * 5), c = th.farDots[0];
+        for (let k = 0; k < hgt; k++) { const w = Math.floor((hgt - k) / 2.2); R(i - w, b - k, w * 2 + 1, 1, k % 3 === 2 ? th.farDots[1] : c); }
+        R(i, b - hgt, 1, 1, th.farDots[1]);
+      }
+      for (let i = 10; i < ww; i += 28 + Math.floor(hash2(i, 9, AS) * 30)) { // crystal spires on the far peaks, faintly glowing
+        const y0 = Math.round(hz - 6 - hash2(i, 10, AS) * 6), h = 6 + Math.floor(hash2(i, 11, AS) * 5);
+        R(i - 1, y0 - h + 2, 3, h - 2, '#8a9ae0'); R(i, y0 - h, 1, h, '#c9d4ff'); R(i + 1, y0 - h + 3, 1, h - 3, '#5a64b0'); R(i, y0 - h - 1, 1, 1, '#ffffff');
+      }
+      for (let i = 6; i < ww; i += 14 + Math.floor(hash2(i, 12, AS) * 16)) { blob(i, nTop[i] + 1, 2, th.nearDots[0], th.nearDots[0], th.nearDots[1]); }
+    } else if (area === 'candy') {
+      for (let i = 5; i < ww; i += 9 + Math.floor(hash2(i, 2, AS) * 12)) { // gumdrops on the far hills
+        const c = th.farDots[Math.floor(hash2(i, 3, AS) * 3)], b = fTop[i];
+        R(i - 1, b - 2, 3, 1, c); R(i - 2, b - 1, 5, 2, c); R(i - 1, b - 2, 1, 1, '#ffffff');
+      }
+      for (let i = 12; i < ww; i += 26 + Math.floor(hash2(i, 4, AS) * 26)) { // lollipops on the near hills
+        if (Math.abs(i - ww * 0.42) < 18) continue;
+        const b = nTop[i], hgt = 6 + Math.floor(hash2(i, 5, AS) * 4), c = th.nearDots[Math.floor(hash2(i, 6, AS) * 2)];
+        R(i, b - hgt, 1, hgt, '#fff4f8'); R(i - 2, b - hgt - 3, 5, 3, c); R(i - 1, b - hgt - 4, 3, 1, c); R(i - 1, b - hgt - 1, 3, 1, c); R(i, b - hgt - 2, 1, 1, '#ffffff'); R(i - 1, b - hgt - 3, 1, 1, '#ffffff');
+      }
+    }
+    // house far on the hill
+    if (th.house) { const hc = propSpr('house', themeOf(area)); Lw.house = { x: Math.round(ww * 0.42), y: hz + 8, c: hc }; PX.blit(X, hc, Lw.house.x, Lw.house.y); } else Lw.house = null;
+    // ---- path from the tree to the dock ----
+    const pathPts = [];
+    if (th.path) {
+      const p0 = { x: Lw.tree.x + 9, y: Lw.tree.y + 4 }, p2 = { x: Lw.dockX0 - 3, y: Lw.dockY + 1 }, p1 = { x: (p0.x + p2.x) / 2 - 8, y: Math.max(p0.y, p2.y) + 12 };
+      for (let k = 0; k <= 60; k++) { const u = k / 60, a = (1 - u) * (1 - u), b = 2 * u * (1 - u), c = u * u; pathPts.push({ x: a * p0.x + b * p1.x + c * p2.x, y: a * p0.y + b * p1.y + c * p2.y }); }
+      const [pl, pm, pe] = th.path;
+      if (area === 'meadow') {
+        for (const q of pathPts) R(q.x - 3, q.y - 1, 7, 4, pe);
+        for (const q of pathPts) R(q.x - 2, q.y - 1, 5, 3, pm);
+        for (const q of pathPts) R(q.x - 1, q.y - 1, 3, 1, pl);
+        for (let k = 3; k < pathPts.length - 2; k += 4) { const q = pathPts[k], o = hash2(k, 1, AS) > 0.5 ? 1 : -2; R(q.x + o, q.y + 1, 1, 1, pe); if (k % 8 === 3) R(q.x - o, q.y, 1, 1, '#fffaf0'); }
+      } else {
+        let acc = 0;
+        for (let k = 1; k < pathPts.length; k++) {
+          acc += Math.hypot(pathPts[k].x - pathPts[k - 1].x, pathPts[k].y - pathPts[k - 1].y);
+          if (acc < 7) continue; acc = 0;
+          const q = pathPts[k], w = 5 + (k % 3 === 0 ? 1 : 0);
+          R(q.x - w / 2 + 1, q.y + 1, w, 1, th.shade);
+          R(q.x - w / 2, q.y - 2, w, 3, pe); R(q.x - w / 2 + 1, q.y - 3, w - 2, 1, pe);
+          R(q.x - w / 2 + 1, q.y - 2, w - 2, 2, pm); R(q.x - w / 2 + 1, q.y - 2, w - 3, 1, pl);
+          if (area === 'candy') R(q.x - w / 2 + 2, q.y - 1, 1, 1, '#f7b6c8');
+        }
+      }
+    }
+    // ---- ground details, scattered by area (counts scale with the size of the land) ----
+    let land = 0; for (let y = lawnTop + 4; y < wh; y++) land += Math.max(0, shoreAt(y) - sandW(y) - 6);
+    const onPath = (x0, y0) => pathPts.some(q => Math.abs(q.x - x0) < 5 && Math.abs(q.y - y0) < 4);
+    const spot = pad => { for (let k = 0; k < 8; k++) { const y0 = Math.round(lawnTop + 4 + rr() * (wh - lawnTop - 5)), x0 = Math.round(2 + rr() * (shoreAt(y0) - sandW(y0) - 6 - (pad || 0))); if (x0 > 1 && !onPath(x0, y0)) return [x0, y0]; } return null; };
+    const scatter = (per, fn) => { const n = Math.round(land / per); for (let k = 0; k < n; k++) { const q = spot(); if (q) fn(q[0], q[1], k); } };
+    const G2 = th.grass, sh = th.shade, bl = th.blade, bh = th.bladeHi;
+    const tuft = (x0, y0, k) => { const n = 2 + (k % 3 === 0 ? 1 : 0); for (let b = 0; b < n; b++) { const bx0 = x0 + b * 2 - 1, h = 1 + Math.floor(hash2(x0 + b, y0, AS) * 2.6); R(bx0, y0 - h + 1, 1, h, bl); R(bx0 + (b === 0 ? -1 : b === n - 1 ? 1 : 0), y0 - h, 1, 1, bh); } };
+    const flower = (x0, y0, k) => { const c = th.dots[k % 4]; R(x0, y0 + 1, 1, 1, bl); R(x0 - 1, y0, 1, 1, c); R(x0 + 1, y0, 1, 1, c); R(x0, y0 - 1, 1, 1, c); R(x0, y0 + 1, 1, 1, c); R(x0, y0, 1, 1, th.dotC); R(x0 + 1, y0 + 1, 1, 1, sh); };
+    const pebble = (x0, y0, k) => { const w = k % 2 ? 2 : 3; R(x0, y0 + 1, w, 1, sh); R(x0, y0, w, 1, '#9badb7'); R(x0, y0, 1, 1, '#dfe8fb'); if (w === 3) R(x0 + 1, y0 - 1, 1, 1, '#b7c2cc'); };
+    if (th.deco === 'meadow') {
+      scatter(70, tuft); scatter(230, flower);
+      scatter(900, (x0, y0) => { for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0]]) { R(x0 + dx * 2 - 1, y0 + dy * 2, 2, 2, '#4f9a3e'); R(x0 + dx * 2 - 1, y0 + dy * 2, 1, 1, '#9fdc70'); } R(x0, y0 + 2, 1, 1, bl); });
+      scatter(1100, pebble);
+      scatter(1600, (x0, y0) => { R(x0, y0 - 1, 1, 2, '#fbf3dc'); R(x0 - 1, y0 - 2, 3, 1, '#d95763'); R(x0, y0 - 3, 1, 1, '#d95763'); R(x0 - 1, y0 - 2, 1, 1, '#ffffff'); R(x0 + 1, y0, 1, 1, sh); });
+      scatter(1300, (x0, y0) => { R(x0, y0 - 2, 1, 3, bl); R(x0 - 1, y0 - 4, 3, 2, '#ffffff'); R(x0, y0 - 5, 1, 1, '#ffffff'); R(x0 + 1, y0 - 3, 1, 1, '#dfe8fb'); });
+    } else if (th.deco === 'beach') {
+      scatter(95, (x0, y0) => { R(x0 - 2, y0, 4, 1, G2[3]); R(x0 + 2, y0 - 1, 2, 1, G2[3]); R(x0 - 2, y0 - 1, 3, 1, G2[0]); });
+      scatter(380, (x0, y0) => R(x0, y0, 1, 1, '#fffbea'));
+      scatter(700, (x0, y0, k) => { const c = th.dots[k % 4]; R(x0, y0, 2, 1, c); R(x0, y0 - 1, 1, 1, c); R(x0 + 1, y0 - 1, 1, 1, '#ffffff'); R(x0, y0 + 1, 2, 1, G2[3]); });
+      scatter(2600, (x0, y0) => { R(x0, y0 - 2, 1, 5, '#f08a6a'); R(x0 - 2, y0, 5, 1, '#f08a6a'); R(x0 - 1, y0 + 1, 1, 1, '#f08a6a'); R(x0 + 1, y0 + 1, 1, 1, '#f08a6a'); R(x0, y0, 1, 1, '#ffd0b8'); });
+      scatter(900, pebble);
+      scatter(1500, (x0, y0) => { R(x0, y0, 1, 1, '#4b692f'); R(x0 + 1, y0 - 1, 1, 1, '#6a8a3a'); R(x0 + 2, y0, 1, 1, '#4b692f'); R(x0 + 3, y0 - 1, 1, 1, '#6a8a3a'); });
+      // a trail of little footprints wandering down toward the sea
+      for (let k = 0; k < 16; k++) { const y0 = Math.round(lawnTop + 30 + k * 9), x0 = Math.round(ww * 0.28 + Math.sin(k * 0.55) * 14 + k * 1.2); if (x0 > shoreAt(y0) - sandW(y0) - 4 || y0 > wh - 4) break; R(x0 + (k % 2) * 3, y0, 2, 1, G2[3]); R(x0 + (k % 2) * 3, y0 + 1, 1, 1, G2[3]); }
+    } else if (th.deco === 'moonlit') {
+      scatter(75, tuft);
+      scatter(620, (x0, y0, k) => { R(x0, y0, 1, 1, k % 2 ? '#7fe0f0' : '#c9a2f0'); if (k % 3 === 0) R(x0 + 1, y0 + 1, 1, 1, '#4fb8a8'); });
+      scatter(1200, (x0, y0) => { R(x0, y0 - 1, 1, 2, '#e0e8ff'); R(x0 - 1, y0 - 2, 3, 1, '#5fe8e0'); R(x0, y0 - 3, 1, 1, '#c8fff8'); R(x0 + 1, y0, 1, 1, sh); });
+      scatter(1500, (x0, y0) => { R(x0, y0 - 2, 1, 3, '#c09af0'); R(x0 + 1, y0 - 1, 1, 2, '#7a50c0'); R(x0, y0 - 3, 1, 1, '#ffffff'); R(x0 - 1, y0, 1, 1, '#8a6ad0'); });
+      scatter(1000, pebble); scatter(950, flower);
+    } else if (th.deco === 'candy') {
+      scatter(100, (x0, y0, k) => { const c = th.dots[k % 4]; if (k % 2) R(x0, y0, 2, 1, c); else R(x0, y0, 1, 2, c); });
+      scatter(650, (x0, y0, k) => { const c = ['#f07a84', '#99e550', '#fff27a', '#c9a2f0'][k % 4]; R(x0, y0, 3, 2, c); R(x0, y0, 1, 1, '#ffffff'); R(x0 + 1, y0 + 2, 2, 1, sh); });
+      scatter(750, (x0, y0) => { R(x0, y0, 1, 1, '#ffffff'); R(x0 - 1, y0, 1, 1, '#e8fff6'); R(x0 + 1, y0, 1, 1, '#e8fff6'); });
+      scatter(1700, (x0, y0) => { R(x0 - 2, y0, 1, 2, '#f07a84'); R(x0 + 2, y0, 1, 2, '#f07a84'); R(x0 - 1, y0, 3, 2, '#ffffff'); R(x0, y0, 1, 1, '#f07a84'); R(x0 - 1, y0 + 2, 3, 1, sh); });
+      scatter(260, tuft);
+    }
+    // ---- shore: pebbles and shells in the sand ----
+    for (let y = wt + 4; y < wh; y += 5 + Math.floor(hash2(y, 1, AS) * 6)) { const s = shoreAt(y), x0 = s - sandW(y) + 1 + Math.floor(hash2(y, 2, AS) * Math.max(1, sandW(y) - 3)); R(x0, y, 1, 1, hash2(y, 3, AS) > 0.5 ? th.sandEdge : '#fffaf0'); }
+    // ---- water: glints, then plants / reefs / an island ----
+    const waterSpot = (lo, hi, avoidDock) => { for (let k = 0; k < 10; k++) { const y0 = Math.round(Lw.minY + 4 + rr() * (Lw.maxY - Lw.minY - 6)), s = shoreAt(y0), x0 = Math.round(s + 3 + (lo + rr() * (hi - lo)) * (ww - s - 6)); if (!avoidDock || Math.abs(y0 - Lw.dockY) > 7 || x0 > Lw.dockX1 + 6) return [x0, y0]; } return null; };
+    for (let k = 0; k < Math.round((ww - shoreAt(Lw.minY)) * (wh - wt) / 260); k++) { const y0 = Math.round(wt + 6 + rr() * (wh - wt - 6)), s = shoreAt(y0), x0 = Math.round(s + 4 + rr() * (ww - s - 8)); R(x0, y0, 2 + Math.floor(rr() * 3), 1, mixH(W0[depthK(x0, y0) > 0.45 ? 2 : 1], th.hl, 0.45)); }
+    Lw.glowPts = [];
+    const reeds = (x0, y0, n, stem, tip, glow) => {
+      for (let k = 0; k < n; k++) { const x1 = x0 + k * 2 - n + (k % 2), h = 4 + Math.floor(hash2(x0 + k, y0, AS) * 5); R(x1, y0 - h, 1, h, stem); if (k % 2 === 0) { R(x1, y0 - h - 2, 1, 2, tip); if (glow) Lw.glowPts.push({ x: x1, y: y0 - h - 1 }); } else R(x1 + 1, y0 - h + 1, 1, 1, stem); }
+      R(x0 - n, y0 + 1, n * 2 + 1, 1, mixH(th.water[0], stem, 0.3));
+    };
+    if (area === 'meadow') {
+      for (let k = 0; k < 4; k++) { const y0 = Math.round(Lw.minY + 12 + (k + rr() * 0.6) * (Lw.span / 4.2)); if (Math.abs(y0 - Lw.dockY) < 8) continue; reeds(shoreAt(y0) + 2, y0, 3 + (k % 2), '#4b8a3a', '#8f563b'); }
+      for (let k = 0; k < 7; k++) {
+        const q = waterSpot(0.1, 0.5, true); if (!q) continue; const [x0, y0] = q, big = k % 3 === 0;
+        R(x0 - (big ? 3 : 2), y0, big ? 7 : 5, 1, '#3f8a3a'); R(x0 - (big ? 2 : 1), y0 - 1, big ? 5 : 3, 1, '#6abe30'); R(x0 - (big ? 2 : 1), y0 + 1, big ? 5 : 3, 1, '#2f6a3a'); R(x0 + 1, y0, 1, 1, '#2f6a3a');
+        R(x0 - (big ? 2 : 1), y0 - 1, 1, 1, '#99e550');
+        if (k % 2 === 0) { R(x0 - 1, y0 - 2, 2, 1, '#f7b6c8'); R(x0 - 1, y0 - 3, 1, 1, '#ffffff'); R(x0, y0 - 2, 1, 1, '#e07ba0'); }
+      }
+    } else if (area === 'beach') {
+      for (let k = 0; k < 7; k++) { // reef shadows, with a little coral in the shallower ones
+        const q = waterSpot(0.25, 0.85, true); if (!q) continue; const [x0, y0] = q, c = mixH(th.water[2], '#123a6a', 0.35);
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -5; dx <= 5; dx++) if (dx * dx / 25 + dy * dy / 4 <= 1 && ((x0 + dx + y0 + dy) & 1 || Math.abs(dx) < 3)) R(x0 + dx, y0 + dy, 1, 1, c);
+        if (depthK(x0, y0) < 0.5) { R(x0 - 2, y0 - 1, 1, 2, '#f07a84'); R(x0 + 1, y0 - 2, 1, 2, '#f5a86a'); R(x0 + 3, y0 - 1, 1, 1, '#f7b6c8'); }
+      }
+      // a far island with a palm and a tiny lighthouse
+      const ix = Math.round(ww * 0.82), iy = wt;
+      R(ix - 12, iy - 1, 24, 2, th.sand); R(ix - 10, iy - 3, 20, 2, '#8cc47a'); R(ix - 7, iy - 5, 13, 2, '#9ccf8a'); R(ix - 4, iy - 6, 6, 1, '#9ccf8a'); R(ix - 12, iy + 1, 24, 1, '#ffffff');
+      R(ix + 3, iy - 13, 3, 8, '#ffffff'); R(ix + 3, iy - 11, 3, 2, '#e8404a'); R(ix + 3, iy - 7, 3, 2, '#e8404a'); R(ix + 3, iy - 15, 3, 2, '#595a70'); R(ix + 2, iy - 13, 5, 1, '#595a70');
+      Lw.beacon = { x: ix + 4, y: iy - 14 };
+      for (let k = 0; k < 7; k++) R(ix - 5 + (k > 4 ? 1 : 0), iy - 6 - k, 1, 1, '#8a7a50');
+      R(ix - 8, iy - 13, 7, 1, '#4f8a54'); R(ix - 9, iy - 12, 2, 1, '#4f8a54'); R(ix - 3, iy - 12, 2, 1, '#4f8a54'); R(ix - 6, iy - 14, 3, 1, '#6fa86a');
+    } else Lw.beacon = null;
+    if (area === 'moonlit') {
+      for (let k = 0; k < 5; k++) { const y0 = Math.round(Lw.minY + 10 + (k + rr() * 0.6) * (Lw.span / 5.2)); if (Math.abs(y0 - Lw.dockY) < 8) continue; reeds(shoreAt(y0) + 2, y0, 3, '#2a4a60', '#9ff8ff', true); }
+      for (let k = 0; k < 5; k++) {
+        const q = waterSpot(0.1, 0.55, true); if (!q) continue; const [x0, y0] = q;
+        R(x0 - 2, y0, 5, 1, '#2a5a5a'); R(x0 - 1, y0 - 1, 3, 1, '#3f7a70'); R(x0 - 1, y0 + 1, 3, 1, '#1f4040');
+        if (k % 2 === 0) { R(x0 - 1, y0 - 2, 3, 1, '#e0d0ff'); R(x0, y0 - 3, 1, 1, '#ffffff'); R(x0 - 1, y0 - 1, 1, 1, '#c09af0'); R(x0 + 1, y0 - 1, 1, 1, '#c09af0'); Lw.glowPts.push({ x: x0, y: y0 - 2 }); }
+      }
+    }
+    if (area === 'candy') {
+      for (let k = 0; k < 16; k++) { const q = waterSpot(0.05, 0.95, false); if (!q) continue; const [x0, y0] = q; if (k % 3) R(x0, y0, 1, 1, '#ffffff'); else { R(x0 - 1, y0, 1, 1, '#ffffff'); R(x0 + 1, y0, 1, 1, '#ffffff'); R(x0, y0 - 1, 1, 1, '#ffffff'); R(x0, y0 + 1, 1, 1, '#ffffff'); } }
+      for (let k = 0; k < 3; k++) { // rock-candy crystals poking out of the soda
+        const q = waterSpot(0.3, 0.8, true); if (!q) continue; const [x0, y0] = q, c = ['#f7b6c8', '#c9a2f0', '#9fd8ff'][k];
+        R(x0 - 2, y0 - 3, 2, 4, c); R(x0, y0 - 5, 2, 6, c); R(x0 + 2, y0 - 2, 2, 3, c); R(x0, y0 - 5, 1, 4, '#ffffff'); R(x0 - 3, y0 + 1, 8, 1, '#ffffff');
+      }
+    }
+    // ---- dock: planks on posts, a lamp at the end ----
     const dy = Lw.dockY, x0 = Lw.dockX0, x1 = Lw.dockX1;
-    x.fillStyle = 'rgba(34,32,52,.22)'; x.fillRect(x0 + 2, dy + 1, x1 - x0, 2);
-    for (const px of [x0 + 5, Math.round((x0 + x1) / 2) + 2, x1 - 1]) { x.fillStyle = '#663931'; x.fillRect(px, dy - 1, 1, 4); x.fillStyle = W0[0]; x.fillRect(px - 1, dy + 3, 3, 1); }
-    x.fillStyle = INK; x.fillRect(x0 - 1, dy - 4, x1 - x0 + 3, 1); x.fillRect(x0 - 1, dy - 3, 1, 3); x.fillRect(x1 + 1, dy - 3, 1, 3); x.fillRect(x0 - 1, dy, x1 - x0 + 3, 1);
-    x.fillStyle = '#d9a066'; x.fillRect(x0, dy - 3, x1 - x0 + 1, 1);
-    x.fillStyle = '#b8743a'; x.fillRect(x0, dy - 2, x1 - x0 + 1, 2);
-    x.fillStyle = '#8f563b'; for (let i = x0 + 2; i < x1; i += 3) x.fillRect(i, dy - 3, 1, 3);
+    X.fillStyle = 'rgba(34,32,52,.22)'; X.fillRect(x0 + 2, dy + 1, x1 - x0, 2);
+    for (const px of [x0 + 5, Math.round((x0 + x1) / 2) + 2, x1 - 1]) { R(px, dy - 1, 1, 4, '#663931'); R(px - 1, dy + 3, 3, 1, W0[0]); R(px - 2, dy + 4, 1, 1, W0[0]); R(px + 2, dy + 4, 1, 1, W0[0]); }
+    R(x0 - 1, dy - 4, x1 - x0 + 3, 1, INK); R(x0 - 1, dy - 3, 1, 3, INK); R(x1 + 1, dy - 3, 1, 3, INK); R(x0 - 1, dy, x1 - x0 + 3, 1, INK);
+    R(x0, dy - 3, x1 - x0 + 1, 1, '#e4b27a'); R(x0, dy - 2, x1 - x0 + 1, 2, '#b8743a'); R(x0, dy - 1, x1 - x0 + 1, 1, '#9a5f32');
+    for (let i = x0 + 2; i < x1; i += 3) R(i, dy - 3, 1, 3, '#8f563b');
+    for (let i = x0 + 4; i < x1; i += 6) R(i, dy - 2, 1, 1, '#595652');
     Lw.lamp = { x: x1 - 1, y: dy - 12 };
-    x.fillStyle = INK; x.fillRect(x1 - 2, dy - 14, 5, 5); x.fillRect(x1 - 1, dy - 15, 3, 1); x.fillRect(x1 - 1, dy - 9, 3, 6);
-    x.fillStyle = '#595a70'; x.fillRect(x1, dy - 9, 1, 5); x.fillRect(x1 - 1, dy - 14, 3, 1);
-    x.fillStyle = '#f6c83a'; x.fillRect(x1 - 1, dy - 13, 3, 3); x.fillStyle = '#fff27a'; x.fillRect(x1 - 1, dy - 13, 1, 2);
+    R(x1 - 2, dy - 14, 5, 5, INK); R(x1 - 1, dy - 15, 3, 1, INK); R(x1 - 1, dy - 9, 3, 6, INK);
+    R(x1, dy - 9, 1, 5, '#595a70'); R(x1 - 1, dy - 14, 3, 1, '#595a70');
+    R(x1 - 1, dy - 13, 3, 3, '#f6c83a'); R(x1 - 1, dy - 13, 1, 2, '#fff27a');
   }
   function ensureBg(n) {
     const nq = Math.round(n * 20) / 20;
@@ -287,14 +540,85 @@
     const r = root.getBoundingClientRect();
     if (r.width < 10 || r.height < 10) return false;
     DPR = Math.min(2, window.devicePixelRatio || 1);
+    const oldW = ww, oldMin = Lw.minY, oldSpan = Lw.span, k0 = ZMIN ? Z / ZMIN : 0;
     W = r.width; H = r.height;
-    PXS = clamp(Math.round(W / 100), 3, 5);
-    ww = Math.ceil(W / PXS); wh = Math.ceil(H / PXS);
+    // the whole world fits the screen at ZMIN (about TUNE.worldW world pixels across)
+    // (rounded to whole device pixels, so the zoomed-out view is crisp too; wide screens get a slightly wider world)
+    ZMIN = Math.max(TUNE.zoomMinPx, Math.floor(W / TUNE.worldW * DPR) / DPR);
+    ZMIN = Math.ceil(ZMIN * DPR - 0.001) / DPR; ZMAX = ZMIN * TUNE.zoomMax;
+    ww = Math.ceil(W / ZMIN); wh = Math.ceil(H / ZMIN);
     for (const c of [buf, skyC, bgC]) { c.width = ww; c.height = wh; }
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     layout();
-    for (const r2 of RT.values()) { r2.x = clamp(r2.x, 6, ww + 20); r2.y = clamp(r2.y, Lw.minY, Lw.maxY); }
+    // keep everything where it was relative to the (possibly resized) world
+    const fx = oldW ? ww / oldW : 1;
+    for (const r2 of RT.values()) { r2.x = clamp(r2.x * fx, 6, ww + 20); r2.y = clamp(oldSpan ? Lw.minY + (r2.y - oldMin) / oldSpan * Lw.span : r2.y, Lw.minY, Lw.maxY); }
+    for (const a in ground) for (const f of ground[a]) { f.x = clamp(f.x * fx, 5, ww - 5); f.y = clamp(oldSpan ? Lw.minY + (f.y - oldMin) / oldSpan * Lw.span : f.y, Lw.minY, Lw.maxY); }
+    Z = snapZ(ZMIN * (k0 || zoomPref || TUNE.zoomDef));
+    if (!k0) focusCamera(); else clampCam();
     return true;
+  }
+
+  // ---------------- camera ----------------
+  const viewW = () => W / Z, viewH = () => H / Z;
+  // crisp pixels: at rest the zoom is a whole number of device pixels per world pixel
+  function snapZ(z) {
+    z = clamp(z, ZMIN, ZMAX);
+    let s = Math.round(z * DPR) / DPR;
+    if (s < ZMIN - 0.001) s = Math.ceil(ZMIN * DPR) / DPR;
+    if (s > ZMAX + 0.001) s = Math.floor(ZMAX * DPR) / DPR;
+    return s;
+  }
+  function camLimits() {
+    const trayH = trayEl ? trayEl.offsetHeight || 110 : 110;
+    const maxX = Math.max(0, ww - viewW());
+    // don't scroll further down than the bottom of the lawn sitting just above the tray
+    const maxY = Math.max(0, Math.min(wh - viewH(), Lw.maxY + 12 - (H - trayH - 8) / Z));
+    return { maxX, maxY };
+  }
+  function clampCam() { const L = camLimits(); camX = clamp(camX, 0, L.maxX); camY = clamp(camY, 0, L.maxY); }
+  // start the view on your partner (or an egg) in this area
+  function focusCamera() {
+    let fx = ww * 0.42, fy = Lw.minY + Lw.span * 0.5;
+    const mine = PS.S.sprouts.filter(x => x.area === area), act = ST.active();
+    const s0 = mine.includes(act) ? act : mine[0], r = s0 && RT.get(s0.id);
+    if (r) { fx = r.x; fy = r.y - 10; } else { const e = PS.S.eggs.find(x => x.area === area); if (e) fy = Lw.minY + Lw.span * 0.46; }
+    camX = fx - viewW() * 0.45; camY = fy - viewH() * 0.52; camV.x = camV.y = 0; zoomAnim = null;
+    clampCam();
+  }
+  const clientToWorld = (cx, cy) => { const r = cv.getBoundingClientRect(); return { x: (cx - r.left) / Z + camX, y: (cy - r.top) / Z + camY }; };
+  const worldToScreen = (x, y) => ({ x: (x - camX) * Z, y: (y - camY) * Z }); // CSS px inside the garden
+  // zoom to z keeping the world point under screen point (sx, sy) in place
+  function zoomAt(z, sx, sy) {
+    const wx = sx / Z + camX, wy = sy / Z + camY;
+    Z = clamp(z, ZMIN * 0.85, ZMAX * 1.15);
+    camX = wx - sx / Z; camY = wy - sy / Z; clampCam();
+  }
+  function animateZoom(to, sx, sy) { zoomAnim = { from: Z, to: snapZ(to), sx: sx == null ? W / 2 : sx, sy: sy == null ? H / 2 : sy, k: 0 }; }
+  function saveZoomPref() { zoomPref = Z / ZMIN; try { localStorage.setItem(ZKEY, zoomPref.toFixed(3)); } catch (e) { /* blocked */ } }
+  function updateCamera(dt) {
+    if (zoomAnim) {
+      zoomAnim.k = Math.min(1, zoomAnim.k + dt / 0.22);
+      const e = 1 - Math.pow(1 - zoomAnim.k, 3);
+      zoomAt(lerp(zoomAnim.from, zoomAnim.to, e), zoomAnim.sx, zoomAnim.sy);
+      if (zoomAnim.k >= 1) { Z = zoomAnim.to; clampCam(); zoomAnim = null; saveZoomPref(); }
+    }
+    if (zoomSnapT > 0) { zoomSnapT -= dt; if (zoomSnapT <= 0 && !pinch && !zoomAnim) animateZoom(Z, lastClient.sx, lastClient.sy); }
+    // fling
+    if (!pinch && !(press && press.kind === 'bg') && (Math.abs(camV.x) > 0.5 || Math.abs(camV.y) > 0.5)) {
+      camX += camV.x * dt; camY += camV.y * dt; const k = Math.pow(0.02, dt); camV.x *= k; camV.y *= k;
+      const bx0 = camX, by0 = camY; clampCam(); if (camX !== bx0) camV.x = 0; if (camY !== by0) camV.y = 0;
+    }
+    // carrying a Sprout or an item to the edge of the screen scrolls the garden
+    const carrying = drag || here.some(r => r.state === 'held');
+    if (carrying && lastClient.on && !pinch) {
+      const r = cv.getBoundingClientRect(), x = lastClient.x - r.left, y = lastClient.y - r.top, m = 40, sp = TUNE.edgePan / Z * ZMIN * dt;
+      let dx = x < m ? -1 : x > W - m ? 1 : 0, dy = y < m + 50 ? -1 : y > H - m - (drag ? 0 : 60) ? 1 : 0;
+      if (dx || dy) {
+        const ox = camX, oy = camY; camX += dx * sp; camY += dy * sp; clampCam();
+        if (camX !== ox || camY !== oy) { const p = clientToWorld(lastClient.x, lastClient.y); ptr.x = p.x; ptr.y = p.y; }
+      }
+    }
   }
   let lastTrayH = 0;
   function checkSize() {
@@ -310,7 +634,10 @@
     const G = PS.S.garden || (PS.S.garden = {});
     if (!G.trees) G.trees = {};
     let a = G.trees[area];
-    if (!Array.isArray(a) || a.length !== 3) a = G.trees[area] = [0, 1, 2].map(() => ({ kind: pick(D.TREE_FRUITS), readyAt: 0 }));
+    if (!Array.isArray(a)) a = G.trees[area] = [];
+    // old saves hold 3 slots (the main tree); slots for the other trees are appended, existing ones are never wiped
+    const need = Math.max(3, (Lw.slots || []).length);
+    for (let i = 0; i < need; i++) if (!a[i] || !D.FRUITS[a[i].kind]) a[i] = { kind: pick(D.TREE_FRUITS), readyAt: (a[i] && +a[i].readyAt) || 0 };
     return a;
   }
   function growK(sl) { const now = Date.now(); if (sl.readyAt <= now) return 1; return clamp(1 - (sl.readyAt - now) / (D.GROWTH.fruitRegrowSec * 1000), 0, 1); }
@@ -319,6 +646,32 @@
     sl.kind = pick(D.TREE_FRUITS); sl.readyAt = Date.now() + D.GROWTH.fruitRegrowSec * 1000; PS.save();
     burst(p.x, p.y, 'leaf', 6); snd('pop');
     return kind;
+  }
+
+  // ---------------- fruit on the ground (saved per area, so snacks wait for your Sprouts) ----------------
+  function groundList(a) {
+    if (!ground[a]) {
+      const G = PS.S.garden && PS.S.garden.ground && PS.S.garden.ground[a];
+      ground[a] = (Array.isArray(G) ? G : []).filter(g => D.FRUITS[g.kind]).map(g => ({ kind: g.kind, x: clamp(g.fx * ww, 5, ww - 5), y: clamp(Lw.minY + g.fy * Lw.span, Lw.minY, Lw.maxY), z: 0, vz: 0 }));
+    }
+    return ground[a];
+  }
+  function saveGround() {
+    if (!ww || !Lw.span) return;
+    const G = PS.S.garden || (PS.S.garden = {}); G.ground = G.ground || {};
+    for (const a in ground) G.ground[a] = ground[a].map(f => ({ kind: f.kind, fx: +(f.x / ww).toFixed(3), fy: +((f.y - Lw.minY) / Lw.span).toFixed(3) }));
+    PS.save();
+  }
+  function takeGround(f) { const gl = groundList(area), i = gl.indexOf(f); if (i < 0) return false; gl.splice(i, 1); saveGround(); return true; }
+  function dropFruit(kind, x, y, z) {
+    const f = { kind, x, y, z: z || 0, vz: 0 };
+    groundList(area).push(f); saveGround(); snd('pop'); markSeen('drop-fruit');
+    // Sprouts that are close by notice it right away
+    for (const r of here) {
+      if ((r.state !== 'idle' && r.state !== 'walk') || r.target || dist(r, f) > TUNE.smellRange) continue;
+      r.state = 'idle'; r.timer = Math.min(r.timer, 0.3);
+    }
+    return f;
   }
 
   // ---------------- particles & floaters ----------------
@@ -366,12 +719,15 @@
   function think(r) {
     const s = r.s, night = PS.clock.isNight();
     r.mood = null;
-    const gl = ground[area] || [];
+    const gl = groundList(area);
     const free = gl.filter(f => !f.claim || f.claim.until < t || f.claim.id === r.id);
     if (free.length) {
       let best = null, bd = 1e9; for (const f of free) { const d = dist(r, f); if (d < bd) { bd = d; best = f; } }
-      best.claim = { id: r.id, until: t + 12 };
-      goTo(r, best.x - 5 * (best.x > r.x ? 1 : -1), best.y, { type: 'fruit', f: best }); emote(r, '!', 0.8); return;
+      // close snacks are sniffed out straight away; far ones get found sooner or later while wandering
+      if (bd < TUNE.smellRange || Math.random() < 0.3) {
+        best.claim = { id: r.id, until: t + 16 };
+        goTo(r, best.x - 5 * (best.x > r.x ? 1 : -1), best.y, { type: 'fruit', f: best }); emote(r, bd < TUNE.smellRange ? '!' : '?', 1); return;
+      }
     }
     if (s.happy < 25 && Math.random() < 0.25) { r.state = 'idle'; r.timer = rand(1.5, 3); r.mood = 'sad'; emote(r, '?', 1.5); return; }
     const pals = here.filter(o => o !== r && !busy(o) && o.state !== 'sleep');
@@ -396,6 +752,13 @@
     if (r.emoteT > 0) { r.emoteT -= dt; if (r.emoteT <= 0) r.emote = null; }
     if (r.cheerT > 0) r.cheerT -= dt;
     if (r.hopT > 0) r.hopT -= dt;
+    const skin = s.look && s.look.skin, spook = SPOOKY[skin], dark = night || TH[area].bigMoon;
+    if (skin && r.state !== 'travel' && Math.random() < dt * (spook ? (dark ? 1.2 : 0.5) : 1.6)) {
+      const col = spook ? pick(spook.c) : skin === 'rainbow' ? pick(['#f07a84', '#f6a83a', '#fbf236', '#99e550', '#5fcde4', '#c9a2f0']) : skin === 'gold' ? pick(['#fff27a', '#ffffff']) : skin === 'crystal' ? pick(['#ffffff', '#c8ecfa', '#d8ccf8']) : pick(['#f6a83a', '#fff27a']);
+      parts.push({ x: r.x + rand(-9, 9), y: r.y - rand(6, 20) - (r.state === 'fall' ? r.z : 0), vx: 0, vy: -4, life: 0.7, type: 'spark', color: col });
+    }
+    // now and then at night a tiny bat or ghost wisp floats up from a spooky Sprout
+    if (spook && dark && r.state !== 'travel' && Math.random() < dt * 0.18) parts.push({ x: r.x + rand(-6, 6), y: r.y - 22 - (r.state === 'fall' ? r.z : 0), vx: rand(-4, 4), vy: -7, life: 2.2, type: spook.fx, color: spook.c[0] });
     const speed = TUNE.walkSpeed + s.stats.run.lv * TUNE.walkPerRunLv;
     const wet = inWater(r.x, r.y);
     if (wet && (r.state === 'swim' || r.state === 'walk' || r.state === 'wait' || r.state === 'arrive')) addXp(r, 'swim', D.GROWTH.swimXpPerSec * dt);
@@ -411,8 +774,7 @@
         if (moveTo(sp)) {
           const tg = r.target; r.target = null;
           if (tg && tg.type === 'fruit') {
-            const gl = ground[area] || [], i = gl.indexOf(tg.f);
-            if (i >= 0) { gl.splice(i, 1); r.facing = tg.f.x > r.x ? 1 : -1; feedSprout(r, tg.f.kind); } else { r.state = 'idle'; r.timer = 0.6; }
+            if (takeGround(tg.f)) { r.facing = tg.f.x > r.x ? 1 : -1; feedSprout(r, tg.f.kind); } else { r.state = 'idle'; r.timer = 0.6; }
           } else if (tg && tg.type === 'greet' && !busy(tg.o)) {
             const o = tg.o; r.facing = o.x > r.x ? 1 : -1; r.state = 'idle'; r.timer = 1.6; emote(r, 'heart', 1.4); hop(r);
             if (o.state === 'idle' || o.state === 'walk') { o.state = 'idle'; o.timer = 1.6; o.facing = -r.facing; emote(o, pick(['heart', 'note']), 1.4); }
@@ -531,6 +893,7 @@
     burst(r.x, r.y - 12, 'spark', 18, main ? D.STAT_META[main[0]].color : '#fbf236');
     for (const [st, v] of Object.entries(res.gives)) floaterFor(r, `${v > 0 ? '+' : ''}${v} ${D.STAT_META[st].label}`, v > 0 ? D.STAT_META[st].color : '#8c93a8');
     for (const p of res.grew) floaterFor(r, `Grew ${PART_NAMES[p] || p}!`, '#5b4630');
+    for (const p of res.lost || []) { floaterFor(r, `Shed ${PART_NAMES[p] || p}`, '#8c93a8'); burst(r.x, r.y - 16, 'leaf', 5); }
     for (const m of res.unlocked) floaterFor(r, `Learned ${(D.MOVES[m] || { name: m }).name}!`, '#c0612a');
     snd('chime'); markSeen('give'); buzz(12);
   }
@@ -597,7 +960,7 @@
     if (first) {
       setTimeout(() => PS.ui.modal({
         eyebrow: 'It hatched!', title: `Say hi to ${s.name}`, sprite: s,
-        html: '<ol><li>Rub it to pet it. Tap it to see its stats.</li><li>Drag fruit from the tree onto it.</li><li>Tap animals that wander in to catch them, then drag them from your pouch onto it. They change its stats, body and moves.</li><li>Press and hold to pick it up. Drop it in the shallows to swim, or in the deep water to travel.</li></ol>',
+        html: '<ol><li>Rub it to pet it. Tap it to see its stats.</li><li>Drag fruit from the tree onto it, or onto the grass as a snack to find.</li><li>Tap animals that wander in to catch them, then drag them from your pouch onto it. They change its stats, body and moves.</li><li>Press and hold to pick it up. Drop it in the shallows to swim, or in the deep water to travel.</li><li>Pinch to zoom in and out, and drag the grass to look around.</li></ol>',
         buttons: [{ label: 'Let\'s play', kind: 'primary' }],
       }), 900);
     }
@@ -738,13 +1101,18 @@
     if (r.state === 'eat' && r.eat) bx.drawImage(itemSpr('fruit', r.eat), Math.round(r.x - 5), Math.round(r.y - 11 - hopY), 9, 9);
     emQ.push([r, r.x, r.y - hopY - head]);
   }
-  function drawTree() {
-    const T = Lw.tree, c = treeSpr();
+  function hintTree() {
+    if (seen('feed') || !PS.S.sprouts.some(s => s.area === area)) return -1;
+    const sl = treeSlots(); for (let i = 0; i < Lw.slots.length; i++) if (sl[i] && growK(sl[i]) >= 1) return Lw.slots[i].tree;
+    return -1;
+  }
+  function drawTree(ti, hintT) {
+    const T = Lw.trees[ti], c = T.c;
     shadow(T.x, T.y, Math.round(c.width * 0.6));
     PX.blit(bx, c, T.x, T.y);
-    const sl = treeSlots(), hint = PS.S.sprouts.some(s => s.area === area) && !seen('feed');
+    const sl = treeSlots(), hint = hintT === ti;
     sl.forEach((s, i) => {
-      const p = Lw.slots[i]; if (!p) return;
+      const p = Lw.slots[i]; if (!p || p.tree !== ti) return;
       const k = growK(s); if (k < 0.35) return;
       const f = itemSpr('fruit', s.kind);
       if (k < 1) { const sz = Math.max(3, Math.round(f.width * (0.3 + 0.6 * k))); bx.drawImage(f, Math.round(p.x - sz / 2), Math.round(p.y - sz / 2), sz, sz); return; }
@@ -794,29 +1162,64 @@
     if (Math.floor(t * 4 + d.x) % 5 === 0) { bx.fillStyle = '#ffffff'; bx.fillRect(Math.round(d.x + s.width / 2), Math.round(d.y - s.height - 2), 1, 1); }
   }
   function drawGroundFruit(f) { const s = itemSpr('fruit', f.kind); shadow(f.x, f.y, 7); PX.blit(bx, s, f.x, f.y + 1 - f.z); }
+  // puffy clouds, built once per colour set (3 sizes), lit on top with a soft shaded underside
+  const cloudCache = new Map();
+  function cloudSpr(size) {
+    const C = TH[area].cloud, key = C.join() + size;
+    let c = cloudCache.get(key); if (c) return c;
+    const w = [18, 26, 34][size], h = [7, 9, 11][size], g = new PX.Grid(w, h); g.dither = false;
+    const puffs = size === 0 ? [[5, 4.6, 3.6], [10, 3.6, 4], [14, 4.8, 3]] : size === 1 ? [[5, 5.8, 3.8], [11, 4, 4.6], [17, 4.6, 4], [21.5, 6, 3]] : [[5, 7, 4], [11, 4.8, 5], [18, 3.8, 5.4], [25, 5.4, 4.6], [30, 7.4, 3]];
+    for (const [x, y, r] of puffs) g.ell(x, y, r, r * 0.8, C[0]);
+    g.rect(2, h - 3, w - 4, 2, C[0]);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { if (!g.get(x, y)) continue; if (!g.get(x, y + 1) || y >= h - 2) g.set(x, y, C[2]); else if (!g.get(x, y + 2) && (x + y) & 1) g.set(x, y, C[1]); else if (y >= h - 4 && (x + y) & 1) g.set(x, y, C[1]); }
+    c = g.canvas(); cloudCache.set(key, c); return c;
+  }
   function drawClouds(n) {
     const th = TH[area], a = th.bigMoon ? 0.5 : 1 - n * 0.75;
     if (a <= 0.05) return;
     bx.globalAlpha = a;
     for (const c of DECO.clouds) {
-      const x = Math.round(((c.x * (ww + 30) + t * c.v) % (ww + 30)) - 15), y = Math.round(c.y * Lw.hz), s = c.s;
-      bx.fillStyle = th.cloud[1]; bx.fillRect(x - 6 - s * 2, y + 1, 13 + s * 4, 2);
-      bx.fillStyle = th.cloud[0]; bx.fillRect(x - 6 - s * 2, y - 1, 13 + s * 4, 2); bx.fillRect(x - 3 - s, y - 3, 7 + s * 2, 2); bx.fillRect(x - 1, y - 4, 3 + s * 2, 1);
+      const s = cloudSpr(c.s), span = ww + s.width + 10;
+      const x = Math.round(((c.x * span + t * c.v) % span) - s.width / 2 - 5), y = Math.round(c.y * Lw.hz);
+      PX.blit(bx, s, x, y);
     }
     bx.globalAlpha = 1;
   }
   function moonPos() { return { x: Math.round(ww * 0.74), y: Math.round(Lw.hz * 0.36) }; }
   function drawSunMoon(n) {
     const th = TH[area], m = moonPos();
-    if (!th.bigMoon && n < 0.98) { const s = sunSprite(); PX.blit(bx, s, m.x, Math.round(m.y + 8 + n * Lw.hz * 0.9)); }
+    if (!th.bigMoon && n < 0.98) { const s = sunSprite(), sy = Math.round(m.y + 8 + n * Lw.hz * 0.9); if (n < 0.5) glow(m.x, sy - 8, 14, '255,250,210', 0.16 * (1 - n * 2)); PX.blit(bx, s, m.x, sy); }
     const mv = th.bigMoon ? 1 : n;
     if (mv > 0.02) { const s = moonSprite(th.bigMoon); PX.blit(bx, s, m.x, Math.round(m.y + s.height / 2 + (1 - mv) * Lw.hz * 0.9)); }
   }
+  // tiny sprites for things bobbing on the water (built once)
+  let floatC = null;
+  function floatSprites() {
+    if (floatC) return floatC;
+    const mk = (w, h, f) => { const g = new PX.Grid(w, h); f(g); g.outline(); return g.canvas(); };
+    floatC = {
+      lantern: mk(7, 8, g => { g.rect(2, 1, 3, 1, '#595a70'); g.ell(3.5, 4, 2.4, 2.4, ['#fffbd0', '#fbd23a', '#df7126']); g.rect(1, 6, 5, 1, '#8f563b'); }),
+      donut: mk(9, 6, g => { g.ell(4.5, 3, 3.8, 2.2, ['#ffd8ec', '#ff8ac4', '#d0508c']); g.set(4, 3, null); g.set(5, 3, null); g.set(3, 2, '#ffffff'); g.set(6, 3, '#fff27a'); g.set(2, 3, '#5fcde4'); }),
+      candy: mk(10, 5, g => { g.ell(5, 2.5, 2.4, 1.6, ['#fffab0', '#fcd82c', '#c49c14']); g.poly([[1, 1], [3, 2.5], [1, 4]], '#fcd82c'); g.poly([[9, 1], [7, 2.5], [9, 4]], '#fcd82c'); g.set(4, 2, '#ffffff'); }),
+      ring: mk(8, 6, g => { g.ell(4, 3, 3.2, 2, ['#c8fff0', '#5fdcc8', '#2f8f98']); g.set(4, 3, null); g.set(3, 3, null); g.set(2, 2, '#ffffff'); }),
+      boat: mk(9, 9, g => { g.poly([[4.5, 0.5], [4.5, 6], [8, 6]], '#ffffff'); g.poly([[4, 1.5], [4, 6], [1.4, 6]], '#fbf3dc'); g.rect(1, 6, 8, 2, '#d24552'); g.set(1, 7, null); }),
+    };
+    return floatC;
+  }
   function drawWater(dt, n) {
     const th = TH[area], wt = Lw.waterTop;
+    // fish shadows gliding under the surface
+    bx.fillStyle = `rgba(${th.fish},0.26)`;
+    for (const f of DECO.fish) {
+      const y = Math.round(Lw.minY + 8 + f.b * (Lw.span - 14) + Math.sin(t * f.v * 2.3 + f.ph) * 5), s = shoreAt(y), span = ww - s - 12;
+      if (span < 16 || (Math.abs(y - Lw.dockY) < 4 && s + 10 < Lw.dockX1 + 4)) continue;
+      const ph = t * f.v + f.ph, X = Math.round(s + 8 + clamp(f.a + Math.sin(ph) * f.r, 0.04, 0.96) * span), d = Math.cos(ph) >= 0 ? 1 : -1, L = f.big ? 4 : 3, wag = Math.floor(t * 4 + f.ph) % 2;
+      bx.fillRect(X - L, y, L * 2 + 1, 2); bx.fillRect(X - L + 1, y - 1, L * 2 - 1, 1);
+      bx.fillRect(X - d * (L + 1), y - wag, 1, 2); bx.fillRect(X - d * (L + 2), y - 1 + wag, 1, 2);
+    }
     // shoreline foam
     bx.fillStyle = th.foam;
-    for (let y = wt + 1; y < wh; y++) { const s = shoreAt(y), w = Math.sin(t * 2.2 + y * 0.45); if (w > -0.2) bx.fillRect(s + 1, y, w > 0.6 ? 2 : 1, 1); }
+    for (let y = wt + 1; y < wh; y++) { const s = shoreAt(y), w = Math.sin(t * 2.2 + y * 0.45); if (w > -0.2) bx.fillRect(s + 1, y, w > 0.6 ? 2 : 1, 1); if (w > 0.85 && (y & 3) === 0) bx.fillRect(s + 3, y, 1, 1); }
     // little wave marks
     for (const w of DECO.waves) {
       const y = Math.round(wt + 4 + w.y * (Lw.maxY - wt)), s = shoreAt(y), x = Math.round(s + 4 + w.x * (ww - s - 6) + Math.sin(t * 0.5 + w.ph) * 2);
@@ -830,18 +1233,31 @@
         const p = (t * 0.16 + i * 0.5) % 1; if (p > 0.92) continue;
         for (let y = wt + 3; y < wh; y++) { if ((y + i) % 2 && p < 0.7) continue; const s = shoreAt(y), X = Math.round(ww - p * (ww - s - 2) + Math.sin(y * 0.5 + i * 3) * 1.5); bx.fillRect(X, y, p > 0.6 ? 2 : 1, 1); }
       }
+      // a sailboat on the horizon
+      const b = floatSprites().boat, sx = shoreAt(wt) + 10, span = ww - sx + 20, bxp = Math.round(sx + ((t * 1.1) % span) - 10);
+      if (bxp > sx - 4) PX.blit(bx, b, bxp, wt + 2 + (Math.floor(t * 1.5) % 2 ? 0 : 1));
     }
     // sparkles
-    if (Math.floor(t * 2) % 2) { bx.fillStyle = '#ffffff'; for (let i = 0; i < 3; i++) { const y = Math.round(wt + 8 + ((i * 37 + Math.floor(t * 0.5) * 13) % Math.max(1, Lw.maxY - wt - 8))), s = shoreAt(y); bx.fillRect(Math.round(s + (ww - s) * (0.3 + i * 0.22)), y, 2, 1); } }
+    if (Math.floor(t * 2) % 2) { bx.fillStyle = '#ffffff'; for (let i = 0; i < 4; i++) { const y = Math.round(wt + 8 + ((i * 37 + Math.floor(t * 0.5) * 13) % Math.max(1, Lw.maxY - wt - 8))), s = shoreAt(y); bx.fillRect(Math.round(s + (ww - s) * (0.25 + i * 0.18)), y, 2, 1); } }
     // moon reflection
     const moonA = th.bigMoon ? 0.55 + 0.35 * n : n * 0.8;
     if (moonA > 0.1) {
       const m = moonPos(); bx.fillStyle = `rgba(255,246,201,${moonA})`;
-      for (let y = wt + 1, i = 0; y < wt + 34 && y < wh; y += 2, i++) { if (m.x < shoreAt(y) + 2) continue; const w = 1 + ((i * 7 + Math.floor(t * 3)) % 3) + Math.max(0, 3 - i / 3); bx.fillRect(Math.round(m.x - w / 2 + Math.sin(t * 2 + i) * 1), y, Math.round(w), 1); }
+      for (let y = wt + 1, i = 0; y < wt + 40 && y < wh; y += 2, i++) { if (m.x < shoreAt(y) + 2) continue; const w = 1 + ((i * 7 + Math.floor(t * 3)) % 3) + Math.max(0, 3 - i / 3); bx.fillRect(Math.round(m.x - w / 2 + Math.sin(t * 2 + i) * 1), y, Math.round(w), 1); }
+    }
+    // things bobbing on the water: paper lanterns (moonlit), sweets (candy)
+    if (area === 'moonlit' || area === 'candy') {
+      const F = floatSprites(), kinds = area === 'moonlit' ? ['lantern', 'lantern', 'lantern'] : ['donut', 'candy', 'ring', 'donut'];
+      for (let i = 0; i < kinds.length; i++) {
+        const f = DECO.floats[i], p = floatPos(f), s = F[kinds[i]];
+        if (!p) continue;
+        PX.blit(bx, s, p.x, p.y + (Math.floor(t * f.v * 2 + f.ph) % 2));
+        bx.fillStyle = th.hl; bx.fillRect(p.x - Math.floor(s.width / 2) - 1, p.y + 1, 2, 1); bx.fillRect(p.x + Math.ceil(s.width / 2) - 1, p.y + 1, 2, 1);
+      }
     }
     // soda fizz
     if (th.fizz) {
-      if (Math.random() < dt * 9) { const q = waterPoint(0.05, 0.95); fizz.push({ x: q.x, y: q.y, life: rand(0.8, 1.6) }); }
+      if (Math.random() < dt * 9 && fizz.length < 30) { const q = waterPoint(0.05, 0.95); fizz.push({ x: q.x, y: q.y, life: rand(0.8, 1.6) }); }
       for (const f of fizz) {
         f.life -= dt; f.y -= 5 * dt; f.x += Math.sin(t * 6 + f.y) * 0.1;
         const X = Math.round(f.x), Y = Math.round(f.y);
@@ -850,6 +1266,43 @@
         if (f.life > 0.4) { bx.fillRect(X, Y - 1, 1, 1); bx.fillRect(X - 1, Y, 1, 1); bx.fillRect(X + 1, Y, 1, 1); bx.fillRect(X, Y + 1, 1, 1); } else bx.fillRect(X, Y, 1, 1);
       }
       fizz = fizz.filter(f => f.life > 0);
+    }
+  }
+  // drifting slowly across the open water, never over the dock
+  function floatPos(f) {
+    const y = Math.round(Lw.minY + 6 + f.b * (Lw.span - 10)); if (Math.abs(y - Lw.dockY) < 6) return null;
+    const s = shoreAt(y), x = Math.round(s + 10 + clamp(f.a + Math.sin(t * 0.05 * f.v + f.ph) * 0.1, 0.05, 0.95) * (ww - s - 18));
+    return { x, y };
+  }
+  // life in the air: butterflies by day, drifting petals / leaves / motes, birds far off
+  const BUGS = { meadow: ['#fbf236', '#f7b6c8', '#ffffff'], candy: ['#f7b6c8', '#9fd8ff', '#fff27a'], beach: ['#ffffff', '#fbf236', '#f5a86a'] };
+  const DRIFT = { meadow: ['#f7b6c8', '#99e550', '#ffffff'], moonlit: ['#c9a2f0', '#9fd8ff', '#a6f2d3'], candy: ['#f07a84', '#fff27a', '#639bff'], beach: null };
+  function drawAmbient(n) {
+    const day = 1 - n, bc = BUGS[area];
+    if (bc && day > 0.5 && area !== 'beach') {
+      for (const b of DECO.bugs) {
+        const p = t * 0.22 + b.p, x = Math.round(10 + (Math.sin(p * 1.1 + b.a * 6) * 0.5 + 0.5) * (shoreAt(Lw.minY + 30) - 24)), y = Math.round(Lw.minY + 4 + (Math.sin(p * 1.7 + b.b * 6) * 0.5 + 0.5) * Lw.span * 0.75 + Math.sin(t * 5 + b.p) * 2);
+        const open = Math.floor(t * 9 + b.p * 3) % 2, c = bc[b.c % bc.length];
+        bx.fillStyle = c;
+        if (open) { bx.fillRect(x - 2, y - 1, 2, 2); bx.fillRect(x + 1, y - 1, 2, 2); } else { bx.fillRect(x - 1, y - 2, 1, 2); bx.fillRect(x + 1, y - 2, 1, 2); }
+        bx.fillStyle = INK; bx.fillRect(x, y - 1, 1, 2);
+      }
+    }
+    const dc = DRIFT[area];
+    if (dc) {
+      for (const d of DECO.drift) {
+        const u = (d.p + t * d.v * 0.25) % 1.2 - 0.1, x = Math.round(u * ww), y = Math.round(Lw.minY - 20 + d.y * Lw.span * 0.9 + Math.sin(t * 1.3 + d.ph) * 5 + u * 20);
+        const c = dc[d.c % dc.length], f = Math.floor(t * 3 + d.ph) % 3;
+        if (area === 'moonlit') { glow(x, y, 2, '200,230,255', 0.25); bx.fillStyle = c; bx.fillRect(x, y, 1, 1); continue; }
+        bx.fillStyle = c; if (f === 0) bx.fillRect(x, y, 2, 1); else if (f === 1) bx.fillRect(x, y, 1, 2); else { bx.fillRect(x, y, 1, 1); bx.fillRect(x + 1, y + 1, 1, 1); }
+      }
+    }
+    if ((area === 'beach' || area === 'meadow') && day > 0.4) {
+      bx.fillStyle = area === 'beach' ? '#ffffff' : '#4a4a6a';
+      for (const b of DECO.birds) {
+        const u = (b.p + t * b.v) % 1.3 - 0.15, x = Math.round(u * ww), y = Math.round(b.y * Lw.hz + Math.sin(t * 0.8 + b.ph) * 2), up = Math.floor(t * 4 + b.ph) % 2;
+        bx.fillRect(x - 2, y - up, 2, 1); bx.fillRect(x + 1, y - up, 2, 1); bx.fillRect(x, y, 1, 1);
+      }
     }
   }
   function drawLights(n) {
@@ -863,8 +1316,14 @@
     if (Lw.lamp) { glow(Lw.lamp.x, Lw.lamp.y, 7, '255,236,150', 0.35 * lit); bx.fillStyle = '#fff27a'; bx.fillRect(Lw.lamp.x - 1, Lw.lamp.y - 1, 3, 3); }
     if (Lw.house) { const hc = Lw.house.c, X = Lw.house.x - Math.floor(hc.width / 2) + Math.round(hc.width * 0.64), Y = Lw.house.y - hc.height + Math.round(hc.height * 0.62); glow(X, Y, 5, '255,236,150', 0.4 * lit); bx.fillStyle = '#fff27a'; bx.fillRect(X - 1, Y - 1, 2, 2); }
     for (const p of Lw.props) { const g = GLOWS[p.kind]; if (!g) continue; const pulse = 0.8 + Math.sin(t * 2 + p.x) * 0.2; glow(p.x, p.y - p.c.height * g[1], g[2], g[3], 0.3 * lit * pulse); }
+    // spooky Sprouts glow softly at night
+    if (lit > 0.3) for (const r of here) { const sp = SPOOKY[r.s.look && r.s.look.skin]; if (sp && r.state !== 'travel') glow(r.x, (r.state === 'held' ? r.feetY : r.y - (r.state === 'fall' ? r.z : 0)) - 12, 10, sp.glow, 0.13 * lit); }
+    // glowing reed tips and lotus buds, the lighthouse beam, floating lanterns
+    for (const q of Lw.glowPts || []) { const pulse = 0.7 + Math.sin(t * 1.7 + q.x * 0.3) * 0.3; glow(q.x, q.y, 3, '160,250,255', 0.3 * lit * pulse); bx.fillStyle = '#c8fff8'; bx.fillRect(q.x, q.y, 1, 1); }
+    if (Lw.beacon && Math.floor(t * 1.2) % 3 !== 2) { glow(Lw.beacon.x, Lw.beacon.y, 5, '255,242,170', 0.5 * lit); bx.fillStyle = '#fff27a'; bx.fillRect(Lw.beacon.x - 1, Lw.beacon.y, 3, 1); }
+    if (area === 'moonlit') for (let i = 0; i < 3; i++) { const p = floatPos(DECO.floats[i]); if (!p) continue; glow(p.x, p.y - 4, 6, '255,220,140', 0.28 * lit); bx.fillStyle = '#fff27a'; bx.fillRect(p.x - 1, p.y - 5 + (Math.floor(t * DECO.floats[i].v * 2 + DECO.floats[i].ph) % 2), 2, 2); }
     // fireflies
-    const count = Math.round((th.bigMoon ? 4 : 0) + 5 * n);
+    const count = Math.round((th.bigMoon ? 5 : 0) + 6 * n);
     for (let i = 0; i < Math.min(count, DECO.flies.length); i++) {
       const f = DECO.flies[i], p = t * 0.25 + f.p;
       const x = Math.round(8 + (Math.sin(p * 1.3 + f.a * 6) * 0.5 + 0.5) * (shoreAt(Lw.minY + 20) - 12)), y = Math.round(Lw.minY - 6 + (Math.sin(p * 1.9 + f.b * 6) * 0.5 + 0.5) * Lw.span * 0.8);
@@ -887,6 +1346,8 @@
         case 'drop': bx.drawImage(PX.fx('drop', p.color), X, Y); break;
         case 'feather': bx.drawImage(PX.fx('feather'), X, Y); break;
         case 'dust': bx.fillStyle = p.color; bx.fillRect(X, Y, 1, 1); break;
+        case 'bat': { const up = Math.floor(t * 8 + p.x) % 2; bx.fillStyle = p.color; bx.fillRect(X - 2, Y - up, 2, 1); bx.fillRect(X + 1, Y - up, 2, 1); bx.fillRect(X, Y, 1, 1); break; }
+        case 'wisp': { p.vx = Math.sin(t * 3 + p.y * 0.3) * 4; bx.fillStyle = p.color; bx.fillRect(X, Y, 1, 2); bx.fillRect(X + (Math.floor(t * 4) % 2 ? 1 : -1), Y + 2, 1, 1); break; }
         case 'ripple': { const w = Math.round(3 + (0.8 - p.life) * 10); bx.fillStyle = p.color; bx.fillRect(X - w, Y, 2, 1); bx.fillRect(X + w - 1, Y, 2, 1); break; }
       }
     }
@@ -905,7 +1366,7 @@
     for (const d of dl) { d.life -= dt; if (d.z > 0 || d.vz) { d.vz += TUNE.gravity * 0.6 * dt; d.z -= d.vz * dt; if (d.z <= 0) { d.z = 0; if (!d.bounced && d.vz > 30) { d.vz = -d.vz * 0.35; d.bounced = true; d.z = 0.01; } else d.vz = 0; } } }
     if (dl.some(d => d.life <= 0)) drops[area] = dl.filter(d => d.life > 0);
     // ground fruit falls to the grass
-    for (const f of ground[area] || []) if (f.z > 0) { f.vz += TUNE.gravity * dt; f.z = Math.max(0, f.z - f.vz * dt); }
+    for (const f of groundList(area)) if (f.z > 0) { f.vz += TUNE.gravity * dt; f.z = Math.max(0, f.z - f.vz * dt); }
     for (const [id, v] of egw) { if (v > 0) egw.set(id, v - dt); }
     // periodic XP flush + save
     flushT -= dt; if (flushT <= 0) { flushT = TUNE.xpFlushSec; flushAll(); }
@@ -921,22 +1382,24 @@
     drawClouds(n);
     bx.drawImage(bgC, 0, 0);
     drawWater(dt, n);
-    const list = [{ y: Lw.tree.y, fn: drawTree }];
+    const hintT = hintTree(), list = Lw.trees.map((T, ti) => ({ y: T.y, fn: () => drawTree(ti, hintT) }));
     for (const p of Lw.props) list.push({ y: p.y, fn: () => PX.blit(bx, p.c, p.x, p.y) });
     for (const o of eggsHere()) list.push({ y: o.y, fn: () => drawEgg(o) });
     const emQ = [], top = [];
     for (const r of here) { if (r.state === 'held' || r.state === 'fall') top.push(r); else list.push({ y: r.y, fn: () => drawSprout(r, emQ) }); }
     for (const c of critters) if (c.where !== 'air') list.push({ y: c.y, fn: () => drawCritter(c) });
-    for (const f of ground[area] || []) list.push({ y: f.y, fn: () => drawGroundFruit(f) });
+    for (const f of groundList(area)) list.push({ y: f.y, fn: () => drawGroundFruit(f) });
     list.sort((a, b) => a.y - b.y).forEach(o => o.fn());
+    drawAmbient(n);
     for (const c of critters) if (c.where === 'air') drawCritter(c);
     for (const r of top) drawSprout(r, emQ);
     // night overlay over the land (the sky already has its own night colours)
     const na = th.dim + (th.night[3] - th.dim * 0.5) * n;
     if (na > 0.01) {
-      const [cr, cg, cb] = th.night, y0 = Lw.hz - 14;
-      for (let i = 0; i < 4; i++) { bx.fillStyle = `rgba(${cr},${cg},${cb},${na * (i + 1) / 5})`; bx.fillRect(0, y0 + i * 3, ww, 3); }
-      bx.fillStyle = `rgba(${cr},${cg},${cb},${na})`; bx.fillRect(0, y0 + 12, ww, wh);
+      // fade in from above the tallest far peaks so snowy tops don't glow at night
+      const [cr, cg, cb] = th.night, bh = th.mount ? 5 : 3, y0 = Lw.hz - (th.mount ? 10 + th.mountAmp : 14);
+      for (let i = 0; i < 4; i++) { bx.fillStyle = `rgba(${cr},${cg},${cb},${na * (i + 1) / 5})`; bx.fillRect(0, y0 + i * bh, ww, bh); }
+      bx.fillStyle = `rgba(${cr},${cg},${cb},${na})`; bx.fillRect(0, y0 + 4 * bh, ww, wh);
     }
     drawLights(n);
     // drops sit above the night tint so they always sparkle
@@ -948,9 +1411,11 @@
     drawParticles(dt);
 
     // present, then crisp text at display resolution
+    const sc = Z * DPR;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(buf, 0, 0, ww * PXS * DPR, wh * PXS * DPR);
+    ctx.fillStyle = TH[area].water[3]; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(buf, Math.round(-camX * sc), Math.round(-camY * sc), ww * sc, wh * sc);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.textAlign = 'center'; ctx.lineJoin = 'round';
     if (here.some(r => r.state === 'held')) drawZoneLabels();
@@ -959,15 +1424,15 @@
       if (f.delay > 0) { f.delay -= dt; continue; }
       f.life -= dt; f.y -= 10 * dt;
       if (f.life < 0.3 && Math.floor(t * 20) % 2) continue;
-      const X = Math.round(clamp(f.x * PXS, 80, W - 80)), Y = Math.round(Math.max(28, f.y * PXS));
+      const sp = worldToScreen(f.x, f.y), X = Math.round(clamp(sp.x, 80, W - 80)), Y = Math.round(clamp(sp.y, 28, H - 20));
       ctx.lineWidth = 5; ctx.strokeStyle = '#fff8e6'; ctx.strokeText(f.text, X, Y); ctx.fillStyle = f.color; ctx.fillText(f.text, X, Y);
     }
     floaters = floaters.filter(f => f.life > 0);
   }
   function drawZoneLabels() {
-    const y = Math.round((Lw.minY + Lw.span * 0.62) * PXS), s = shoreAt(Lw.minY + Lw.span * 0.62);
+    const wy = Lw.minY + Lw.span * 0.62, s = shoreAt(wy), y = Math.round(clamp(worldToScreen(0, wy).y, 90, H - 150));
     const lab = (text, wx, deep) => {
-      const X = Math.round(wx * PXS); ctx.font = '700 13px "Pixelify Sans", monospace';
+      const X = Math.round(clamp(worldToScreen(wx, 0).x, 40, W - 40)); ctx.font = '700 13px "Pixelify Sans", monospace';
       const w = ctx.measureText(text).width + 14;
       ctx.fillStyle = deep ? 'rgba(34,32,52,.55)' : 'rgba(255,248,230,.75)'; roundRect(X - w / 2, y - 12, w, 20, 8); ctx.fill();
       ctx.fillStyle = deep ? '#fff8e6' : '#2f6f8f'; ctx.fillText(text, X, y + 3);
@@ -978,7 +1443,7 @@
   function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 
   // ---------------- input: world ----------------
-  function local(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / PXS, y: (e.clientY - r.top) / PXS }; }
+  function local(e) { return clientToWorld(e.clientX, e.clientY); }
   function sproutAt(p, k) {
     let best = null, bd = 1e9;
     for (const r of here) {
@@ -989,7 +1454,16 @@
     return best;
   }
   function onDown(e) {
-    if (!visible || press || drag || (e.button != null && e.button > 0)) return;
+    if (!visible || (e.button != null && e.button > 0)) return;
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    lastClient.x = e.clientX; lastClient.y = e.clientY; lastClient.on = true;
+    camV.x = camV.y = 0;
+    // a second finger: pinch to zoom (unless the first one is carrying something)
+    if (touches.size >= 2) {
+      if (drag || (press && press.kind === 'sprout' && press.mode === 'hold')) return;
+      press = null; beginPinch(); return;
+    }
+    if (press || drag || pinch) return;
     PX.Sound.unlock();
     const p = local(e); ptr.x = ptr.px = p.x; ptr.y = ptr.py = p.y; ptr.vx = 0;
     const base = { pid: e.pointerId, sx: e.clientX, sy: e.clientY, ms: performance.now() };
@@ -997,15 +1471,32 @@
     for (const d of (drops[area] || []).slice().reverse()) if (Math.hypot(p.x - d.x, p.y - (d.y - 5 - d.z)) < 9) { collectDrop(d); return; }
     const sl = treeSlots();
     for (let i = 0; i < sl.length; i++) { const q = Lw.slots[i]; if (q && growK(sl[i]) >= 1 && Math.hypot(p.x - q.x, p.y - q.y) < 7.5) { press = Object.assign({ kind: 'tree', i, x0: p.x, y0: p.y }, base); return; } }
-    const gl = ground[area] || [];
+    const gl = groundList(area);
     for (let i = gl.length - 1; i >= 0; i--) { const f = gl[i]; if (Math.hypot(p.x - f.x, p.y - (f.y - 5)) < 7.5) { press = Object.assign({ kind: 'gfruit', f, x0: p.x, y0: p.y }, base); return; } }
     for (const c of critters) if (critterHit(c, p)) { catchCritter(c); return; }
     const r = sproutAt(p);
     if (r) { press = Object.assign({ kind: 'sprout', r, t0: t, x0: p.x, y0: p.y, mode: 'pending', rub: 0 }, base); return; }
-    press = Object.assign({ kind: 'bg' }, base);
+    if (propAt(p) === 'gumball') { press = Object.assign({ kind: 'gumball' }, base); return; }
+    press = Object.assign({ kind: 'bg', lx: e.clientX, ly: e.clientY, cam0: camX, cam0y: camY, vx: 0, vy: 0, lt: performance.now() }, base);
+  }
+  function beginPinch() {
+    const [a, b] = [...touches.values()], r = cv.getBoundingClientRect();
+    const mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top;
+    pinch = { d0: Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)), z0: Z, wx: mx / Z + camX, wy: my / Z + camY };
+    zoomAnim = null; closeCard(); markSeen('zoom');
+  }
+  function movePinch() {
+    const [a, b] = [...touches.values()], r = cv.getBoundingClientRect();
+    const mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top, d = Math.hypot(a.x - b.x, a.y - b.y);
+    Z = clamp(pinch.z0 * d / pinch.d0, ZMIN * 0.85, ZMAX * 1.15);
+    camX = pinch.wx - mx / Z; camY = pinch.wy - my / Z; clampCam();
+    pinch.mx = mx; pinch.my = my;
   }
   function onMove(e) {
     if (!visible) return;
+    if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.has(e.pointerId) || (drag && drag.pid === e.pointerId) || (trayPress && trayPress.pid === e.pointerId)) { lastClient.x = e.clientX; lastClient.y = e.clientY; lastClient.on = true; }
+    if (pinch) { if (touches.size >= 2) movePinch(); return; }
     if (trayPress && trayPress.pid === e.pointerId && !drag) trayPressMove(e);
     if (drag && drag.pid === e.pointerId) { moveGhost(e); updateHover(e); }
     if (!press || press.pid !== e.pointerId) return;
@@ -1015,10 +1506,17 @@
       if (Math.hypot(p.x - press.x0, p.y - press.y0) > 3) {
         let kind;
         if (press.kind === 'tree') kind = takeTreeFruit(press.i);
-        else { const gl = ground[area] || [], i = gl.indexOf(press.f); if (i < 0) { press = null; return; } gl.splice(i, 1); kind = press.f.kind; }
+        else { if (!takeGround(press.f)) { press = null; return; } kind = press.f.kind; }
         const src = press.kind; press = null;
         startDrag(src, kind, e, -1);
       }
+    } else if (press.kind === 'bg') {
+      // drag the empty garden to look around
+      const now = performance.now(), dtm = Math.max(1, now - press.lt), dx = e.clientX - press.lx, dy = e.clientY - press.ly;
+      camX -= dx / Z; camY -= dy / Z; clampCam();
+      press.vx = lerp(press.vx, -dx / Z / dtm * 1000, 0.4); press.vy = lerp(press.vy, -dy / Z / dtm * 1000, 0.4);
+      press.lx = e.clientX; press.ly = e.clientY; press.lt = now;
+      if (Math.hypot(e.clientX - press.sx, e.clientY - press.sy) > 10) press.panned = true;
     } else if (press.kind === 'sprout') {
       if (press.mode === 'pending' && Math.hypot(p.x - press.x0, p.y - press.y0) > 2.5) press.mode = 'rub';
       if (press.mode === 'rub') {
@@ -1030,23 +1528,45 @@
     ptr.px = p.x; ptr.py = p.y;
   }
   function onUp(e, cancelled) {
+    const wasTouch = touches.delete(e.pointerId);
+    if (!touches.size) lastClient.on = false;
     if (!visible) return;
+    if (pinch) {
+      if (touches.size < 2) {
+        const mx = pinch.mx == null ? W / 2 : pinch.mx, my = pinch.my == null ? H / 2 : pinch.my;
+        pinch = null; animateZoom(Z, mx, my);
+        // the finger still down keeps panning
+        const rest = [...touches.entries()][0];
+        if (rest) press = { kind: 'bg', pid: rest[0], sx: rest[1].x, sy: rest[1].y, lx: rest[1].x, ly: rest[1].y, ms: performance.now(), cam0: camX, cam0y: camY, vx: 0, vy: 0, lt: performance.now(), panned: true };
+      }
+      return;
+    }
+    void wasTouch;
     if (trayPress && trayPress.pid === e.pointerId) trayPressUp(e, cancelled);
     if (drag && drag.pid === e.pointerId) endDrag(e, cancelled);
     if (!press || press.pid !== e.pointerId) return;
     const pr = press; press = null;
     if (cancelled) { if (pr.kind === 'sprout' && pr.mode === 'hold' && pr.r.state === 'held') release(pr.r); return; }
     if (pr.kind === 'tree') { const kind = takeTreeFruit(pr.i); ST.addFruit(kind, 1); floater(`+1 ${D.FRUITS[kind].name}`, '#5b4630', Lw.slots[pr.i].x, Lw.slots[pr.i].y - 6); markSeen('pick'); return; }
-    if (pr.kind === 'gfruit') { const gl = ground[area] || [], i = gl.indexOf(pr.f); if (i >= 0) { gl.splice(i, 1); ST.addFruit(pr.f.kind, 1); floater(`+1 ${D.FRUITS[pr.f.kind].name}`, '#5b4630', pr.f.x, pr.f.y - 12); snd('pop'); } return; }
+    if (pr.kind === 'gfruit') { if (takeGround(pr.f)) { ST.addFruit(pr.f.kind, 1); floater(`+1 ${D.FRUITS[pr.f.kind].name}`, '#5b4630', pr.f.x, pr.f.y - 12); snd('pop'); } return; }
     if (pr.kind === 'sprout') {
       if (pr.mode === 'pending') tapSprout(pr.r);
       else if (pr.mode === 'hold' && pr.r.state === 'held') release(pr.r);
       return;
     }
+    if (pr.kind === 'gumball') { if (Math.hypot(e.clientX - pr.sx, e.clientY - pr.sy) < 12) { snd('pop'); PS.ui.go('shop', { tab: 'gumball' }); } return; }
     if (pr.kind === 'bg') {
       const dx = e.clientX - pr.sx, dy = e.clientY - pr.sy, ms = performance.now() - pr.ms;
-      if (Math.abs(dx) > 60 && Math.abs(dy) < 50 && ms < 700) { switchArea(dx < 0 ? 1 : -1); return; }
-      if (Math.hypot(dx, dy) < 10) closeCard();
+      // a quick sideways swipe changes area, but only when the view can't scroll that way any more
+      if (Math.abs(dx) > 60 && Math.abs(dy) < 50 && ms < 700 && Math.abs(camX - pr.cam0) < 1) { switchArea(dx < 0 ? 1 : -1); return; }
+      if (pr.panned) { if (performance.now() - pr.lt < 90) { camV.x = clamp(pr.vx, -600, 600); camV.y = clamp(pr.vy, -600, 600); } return; }
+      closeCard();
+      // double-tap: zoom all the way out, or back in
+      const now = performance.now();
+      if (lastTapBg && now - lastTapBg.t < 330 && Math.hypot(e.clientX - lastTapBg.x, e.clientY - lastTapBg.y) < 30) {
+        const r = cv.getBoundingClientRect();
+        animateZoom(Z > ZMIN * 1.05 ? ZMIN : ZMIN * TUNE.zoomDef, e.clientX - r.left, e.clientY - r.top); lastTapBg = null; markSeen('zoom');
+      } else lastTapBg = { t: now, x: e.clientX, y: e.clientY };
     }
   }
   function tapSprout(r) {
@@ -1070,9 +1590,9 @@
   }
   function ghostPoint(e) { const r = root.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top - 44 }; }
   function moveGhost(e) { const g = ghostPoint(e); ghostEl.style.transform = `translate(${Math.round(g.x - drag.gw / 2)}px, ${Math.round(g.y - drag.gh / 2)}px)`; }
+  function ghostWorld(e) { const g = ghostPoint(e), cr = root.getBoundingClientRect(); return clientToWorld(g.x + cr.left, g.y + cr.top); }
   function dropTarget(e) {
-    const r = cv.getBoundingClientRect(), g = ghostPoint(e), cr = root.getBoundingClientRect();
-    const pg = { x: (g.x + cr.left - r.left) / PXS, y: (g.y + cr.top - r.top) / PXS + 4 };
+    const pg = ghostWorld(e); pg.y += 4 * ZMIN / Z * 1.5;
     return sproutAt(pg, 1.5) || sproutAt(local(e), 1.3);
   }
   function updateHover(e) { drag.hover = dropTarget(e); }
@@ -1082,14 +1602,18 @@
     if (d.el) d.el.classList.remove('g-lift');
     const target = cancelled ? null : dropTarget(e);
     if (d.src === 'pouch') { if (target) giveAnimal(target, d.idx, d.id); }
-    else if (d.src === 'fruitinv') { if (target && ST.useFruit(d.id)) feedSprout(target, d.id); }
-    else if (target) feedSprout(target, d.id);
-    else {
-      // fruit picked in the world: drop it on the grass (Sprouts walk over to eat it) or it sinks
-      const g = ghostPoint(e), cr = root.getBoundingClientRect(), r = cv.getBoundingClientRect();
-      const wx = clamp((g.x + cr.left - r.left) / PXS, 5, ww - 5), wy = (g.y + cr.top - r.top) / PXS + 6, gy = clamp(wy, Lw.minY, Lw.maxY);
-      if (inWater(wx, gy)) { burst(wx, gy - 1, 'drop', 8, '#cbdbfc'); snd('splash'); floater('Plop. It sank.', '#5b4630', wx, gy - 8); }
-      else (ground[area] || (ground[area] = [])).push({ kind: d.id, x: wx, y: gy, z: Math.max(0, gy - wy), vz: 0 });
+    else if (target) { if (d.src !== 'fruitinv' || ST.useFruit(d.id)) feedSprout(target, d.id); }
+    else if (!cancelled || d.src !== 'fruitinv') {
+      // no Sprout under it: drop the fruit on the grass for a Sprout to find (or it sinks in the water)
+      const cr = root.getBoundingClientRect(), overTray = e.clientY - cr.top > H - trayEl.offsetHeight - 10;
+      const q = ghostWorld(e), wx = clamp(q.x, 5, ww - 5), wy = q.y + 6, gy = clamp(wy, Lw.minY, Lw.maxY);
+      const fromTray = d.src === 'fruitinv';
+      if (!fromTray && overTray && !cancelled) { ST.addFruit(d.id, 1); snd('pop'); PS.ui.toast(`+1 ${D.FRUITS[d.id].name} in your fruit tray`, 1800); }
+      else if (fromTray && (overTray || groundList(area).length >= TUNE.maxGroundFruit)) { if (!overTray) PS.ui.toast('That\'s a lot of snacks already! Let your Sprouts eat some first.', 2600); }
+      else if (inWater(wx, gy)) {
+        if (fromTray) PS.ui.toast('Drop fruit on the grass, not in the water!', 2400);
+        else { burst(wx, gy - 1, 'drop', 8, '#cbdbfc'); snd('splash'); floater('Plop. It sank.', '#5b4630', wx, gy - 8); }
+      } else if (!fromTray || ST.useFruit(d.id)) dropFruit(d.id, wx, gy, Math.max(0, gy - wy));
     }
     if (trayDirty) renderTray();
   }
@@ -1205,13 +1729,15 @@
     if (here.some(r => r.state === 'held')) return 'Drop in the shallows to swim, or in the deep water to travel';
     if (critters.length && ST.canCatch() && !seen('catch')) return 'An animal! Tap it to catch it';
     if (PS.S.pouch.length && !seen('give')) return 'Drag an animal from your pouch onto a Sprout';
-    if (!seen('feed')) return 'Drag a fruit from the tree onto a Sprout';
+    if (!seen('feed')) { if (hintTree() >= 0) return 'Drag a fruit from a tree onto a Sprout'; if (Object.values(PS.S.fruits || {}).some(n => n > 0)) return 'Drag a fruit from your tray onto a Sprout'; }
     if (!seen('pet')) return 'Rub a Sprout to pet it';
     if ((drops[area] || []).length && !seen('drop')) return 'Something sparkly! Tap it';
     if (!seen('hold')) return 'Press and hold a Sprout to pick it up';
     if (!seen('swim')) return 'Drop a Sprout in the shallows to swim';
     if (!seen('travel')) return 'Drop a Sprout in the deep water to travel';
-    if (!seen('area')) return 'Swipe or use the arrows to visit other areas';
+    if (!seen('zoom')) return 'Pinch with two fingers to zoom in and out';
+    if (!seen('drop-fruit') && Object.keys(PS.S.fruits || {}).length) return 'Drag fruit onto the grass to leave a snack';
+    if (!seen('area')) return 'Use the arrows to visit other areas';
     return '';
   }
   function switchArea(dir) { const i = AREA_IDS.indexOf(area); setArea(AREA_IDS[(i + dir + AREA_IDS.length) % AREA_IDS.length], dir); }
@@ -1232,7 +1758,7 @@
     critters = []; fizz = []; parts = []; floaters = [];
     nextCritter = t + rand(...D.GROWTH.critterEverySec) * 0.35;
     here = PS.S.sprouts.filter(s => s.area === area).map(getRT);
-    closeCard(); buildProps(); skyKey = ''; bgKey = '';
+    closeCard(); buildProps(); skyKey = ''; bgKey = ''; focusCamera();
     cv.classList.remove('g-in-l', 'g-in-r'); void cv.offsetWidth; cv.classList.add(dir < 0 ? 'g-in-l' : 'g-in-r');
     updatePill(); snd('whoosh'); markSeen('area');
   }
@@ -1338,6 +1864,14 @@
     cardEl.addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (b) cardAction(b.dataset.a); });
     root.querySelectorAll('.g-arrow').forEach(b => b.addEventListener('click', () => { PX.Sound.unlock(); closeCard(); switchArea(+b.dataset.d); }));
     cv.addEventListener('pointerdown', onDown);
+    cv.addEventListener('wheel', e => {
+      if (!visible) return; e.preventDefault();
+      const r = cv.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top;
+      zoomAnim = null; zoomAt(Z * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0022)), sx, sy);
+      lastClient.sx = sx; lastClient.sy = sy; zoomSnapT = 0.18; markSeen('zoom');
+    }, { passive: false });
+    // iOS Safari page-zoom gestures would fight the pinch
+    for (const ev of ['gesturestart', 'gesturechange']) cv.addEventListener(ev, e => e.preventDefault());
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', e => onUp(e, false));
     window.addEventListener('pointercancel', e => onUp(e, true));
@@ -1357,7 +1891,7 @@
     });
     PS.on('night', () => { skyKey = ''; for (const c of critters) { const a = D.ANIMALS[c.id]; if (a.time !== 'any' && (a.time === 'night') !== PS.clock.isNight()) c.life = Math.min(c.life, 3); } });
     PS.on('egg:new', () => updatePill());
-    PS.on('reset', () => { RT.clear(); critters = []; for (const k in drops) delete drops[k]; for (const k in ground) delete ground[k]; closeCard(); renderTray(); });
+    PS.on('reset', () => { RT.clear(); critters = []; for (const k in drops) delete drops[k]; for (const k in ground) delete ground[k]; closeCard(); renderTray(); shownOnce = false; });
     mounted = true;
     renderTray();
   }
@@ -1370,18 +1904,23 @@
     renderTray(); updatePill();
     if (nextCritter < t) nextCritter = t + 6;
     if (nextDrop < t) nextDrop = t + rand(...D.GROWTH.dropEverySec) * 0.4;
-    if (params && params.id) { const s = ST.get(params.id); if (s && s.area === area) { here = PS.S.sprouts.filter(x => x.area === area).map(getRT); openCard(getRT(s)); } }
+    here = PS.S.sprouts.filter(x => x.area === area).map(getRT);
+    if (!shownOnce) { shownOnce = true; focusCamera(); }
+    if (params && params.id) { const s = ST.get(params.id); if (s && s.area === area) { const r = getRT(s); openCard(r); camX = r.x - viewW() / 2; camY = r.y - viewH() * 0.45; clampCam(); } }
   }
+  let shownOnce = false;
   function hide() {
     visible = false;
     if (drag) { ghostEl.style.transform = 'translate(-999px,-999px)'; if (drag.el) drag.el.classList.remove('g-lift'); drag = null; }
     if (trayPress) { clearTimeout(trayPress.timer); trayPress = null; }
-    settleAll(); flushAll(); closeCard(); PS.save();
+    touches.clear(); pinch = null; lastClient.on = false; camV.x = camV.y = 0;
+    settleAll(); flushAll(); saveGround(); closeCard(); PS.save();
   }
   function frame(dt, tt) {
     if (!visible) return;
     t = tt;
     checkSize(); if (!ww) return;
+    updateCamera(dt);
     update(dt);
     render(dt);
     uiT -= dt;
@@ -1399,8 +1938,9 @@
   PS.scenes.garden = { mount, show, hide, frame };
   // debug hook for testing
   window.__garden = {
-    RT, get here() { return here; }, get critters() { return critters; }, drops, ground, Lw, get area() { return area; }, get pxs() { return PXS; },
+    RT, get here() { return here; }, get critters() { return critters; }, drops, ground, Lw, get area() { return area; }, get pxs() { return Z; },
+    get cam() { return { x: camX, y: camY, z: Z, zmin: ZMIN, zmax: ZMAX, ww, wh }; }, zoomAt, animateZoom, focusCamera, dropFruit, groundList, setCam(x, y) { camX = x; camY = y; clampCam(); },
     spawnCritter, spawnDrop, setArea, switchArea, eggsHere, tapEgg, treeSlots, feedSprout, giveAnimal, startTravel, askTravel, openCard, closeCard,
-    toScreen: (x, y) => { const r = cv.getBoundingClientRect(); return { x: r.left + x * PXS, y: r.top + y * PXS }; },
+    toScreen: (x, y) => { const r = cv.getBoundingClientRect(), p = worldToScreen(x, y); return { x: r.left + p.x, y: r.top + p.y }; },
   };
 })();

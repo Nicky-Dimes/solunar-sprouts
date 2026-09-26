@@ -153,6 +153,57 @@
 .sp-rec .num{font-size:20px}
 .sp-rec small{display:block;font-size:12px;color:var(--ink-soft)}
 .sp-muted{font-size:14px;color:var(--ink-soft);margin:8px 0 0;line-height:1.4}
+
+/* style: paint, stickers, closet */
+.sp-dress{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px}
+.sp-dress canvas{display:block;margin:-4px 0}
+.sp-skin{display:inline-flex;align-items:center;gap:4px;border-radius:8px;padding:0 8px 0 4px;font-family:var(--f-px);font-weight:600;font-size:12px;line-height:20px;white-space:nowrap;
+  background:#fff1c9;border:1px solid #e0b040;color:#6a4a10}
+.sp-skin canvas{display:block;width:13px;height:13px}
+.sp-style-top{position:sticky;top:0;z-index:2;display:grid;grid-template-columns:104px 1fr;gap:12px;align-items:center;margin:4px -6px 0;padding:6px 6px 8px;background:var(--panel);border-radius:0 0 16px 16px}
+.sp-mirror{height:112px;cursor:pointer;border-radius:16px;background:linear-gradient(#cfeefc 0 62%, #a6dc8f 62% 100%);border:2px solid var(--line);display:flex;align-items:flex-end;justify-content:center;overflow:hidden}
+.sp-mirror canvas{display:block;margin-bottom:6px}
+.sp-style-top p{margin:0;font-size:14px;line-height:1.4;color:var(--ink-soft)}
+.sp-style-top p b{color:var(--ink);font-weight:600}
+.sp-srow{margin-top:14px}
+.sp-srow>.sp-lbl{margin:0 2px 0}
+.sp-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:8px}
+.sp-tile{position:relative;display:grid;justify-items:center;align-content:start;gap:3px;min-height:92px;background:var(--field);border:2px solid var(--line);border-bottom-width:4px;
+  border-radius:14px;padding:9px 4px 7px;text-align:center;color:var(--ink)}
+.sp-tile:active{transform:translateY(2px);border-bottom-width:2px;margin-bottom:2px}
+.sp-tile:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.sp-tile canvas{display:block;margin-bottom:3px}
+.sp-tile b{font-family:var(--f-px);font-weight:600;font-size:15px;line-height:1.1}
+.sp-tile small{font-size:12.5px;line-height:1.2;color:var(--ink-soft)}
+.sp-tile.on{border-color:var(--sun-edge);background:var(--panel);box-shadow:inset 0 0 0 2px var(--sun)}
+.sp-tile.on small{color:#8a5a10;font-weight:600}
+.sp-tile .cnt{position:absolute;top:-7px;right:-5px;min-width:26px;height:24px;padding:0 6px;display:grid;place-items:center;border-radius:12px;background:var(--sun);border:2px solid var(--sun-edge);
+  font-family:var(--f-px);font-weight:700;font-size:13px;color:#4a3210}
+.sp-none{margin:6px 2px 0;font-size:14px;line-height:1.4;color:var(--ink-soft)}
+.sp-gbcta{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center;background:var(--field);border:2px dashed var(--line);border-radius:16px;padding:10px 12px 12px;margin-top:14px}
+.sp-gbcta canvas{display:block}
+.sp-gbcta p{margin:0;font-size:15px;line-height:1.35;color:var(--ink)}
+.sp-gbcta .btn{grid-column:1/-1;min-height:48px}
+.sp-ba{display:flex;align-items:center;justify-content:center;gap:6px;margin:2px 0 12px}
+.sp-ba figure{margin:0;display:grid;justify-items:center;gap:4px}
+.sp-ba .pic{width:104px;height:104px;border-radius:16px;background:var(--slot);border:2px solid var(--line);display:flex;align-items:flex-end;justify-content:center;overflow:hidden}
+.sp-ba .pic canvas{display:block;margin-bottom:3px}
+.sp-ba .pic.after{border-color:var(--sun-edge);box-shadow:inset 0 0 0 2px var(--sun);background:var(--panel)}
+.sp-ba figcaption{font-family:var(--f-px);font-weight:600;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft)}
+.sp-ba .arr{font-family:var(--f-px);font-weight:700;font-size:28px;color:var(--edge);padding-bottom:20px}
+.sp-warn{background:#fff1c9;border:2px solid #f0c860;border-radius:12px;padding:8px 10px;font-size:14px;line-height:1.4}
+.card p.sp-m-left{text-align:center;font-size:14px;color:var(--ink-soft);margin:0 0 4px}
+
+/* sell */
+.sp-sell{display:grid;justify-items:center;gap:6px;margin-top:4px}
+.sp-sell-btn{display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:8px 16px;background:transparent;border:2px dashed var(--edge);border-bottom-width:2px;color:var(--ink-soft);font-size:15px}
+.sp-sell-btn:active{transform:translateY(1px);border-bottom-width:2px;margin-bottom:0}
+.sp-sell-btn canvas{width:18px;height:18px}
+.sp-sell-btn[disabled]{opacity:.55;cursor:default}
+.sp-sell-btn[disabled]:active{transform:none}
+.sp-sell p{margin:0;font-size:14px;color:var(--ink-soft)}
+.sp-sell-price{display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--f-px);font-weight:600;font-size:18px;margin:0 0 8px;color:var(--ink)}
+.sp-sell-price canvas{width:18px;height:18px}
 `;
   function injectCSS() { if (document.getElementById('sp-css')) return; const st = document.createElement('style'); st.id = 'sp-css'; st.textContent = CSS; document.head.appendChild(st); }
 
@@ -172,9 +223,16 @@
       else if (k === 'egg') src = PX.item('egg', id);
       else if (k === 'flower') src = PX.item('flower', id);
       else if (k === 'icon') src = PS.ui.icon(id);
+      else if (STYLE_KINDS.includes(k)) src = styleArt(k, id);
       if (src) put(cv, src, +cv.dataset.scale || 0);
       delete cv.dataset.sp;
     });
+  }
+  // paint tins, pattern stickers, hats, skins and gumballs come from shop.js (PS.styleArt), which falls back to stand-ins until pixel.js has them
+  const STYLE_KINDS = ['gumball', 'paint', 'pattern', 'hat', 'skin'];
+  function styleArt(kind, id) {
+    try { if (PS.styleArt) return PS.styleArt.item(kind, id); } catch (e) { console.error(e); }
+    try { return PX.item(kind, id); } catch (e) { return null; }
   }
   const PART_NAMES = { wings: 'Wings', ears: 'Long ears', fins: 'Fins', horns: 'Horns', tail: 'Tail', shell: 'Shell', antennae: 'Antennae', claws: 'Claws', spikes: 'Spikes',
     batwings: 'Bat wings', fairywings: 'Fairy wings', flamewings: 'Flame wings', dragonwings: 'Dragon wings', unihorn: 'Unicorn horn', multitail: 'Nine tails', fluff: 'Fluff',
@@ -219,7 +277,7 @@
         <div class="sp-pic"><canvas data-anim="${s.id}"></canvas></div>
         <div><b>${esc(s.name)}${partner ? '<span class="sp-tag">Partner</span>' : ''}</b>
           <small>${esc(fi.name)} \u00b7 ${esc(areaName(s.area))}</small>
-          <div class="sp-chips">${state.elementsOf(s).map(elChip).join('')}</div></div>
+          <div class="sp-chips">${state.elementsOf(s).map(elChip).join('')}${skinBadge(s)}</div></div>
         <div class="sp-lv"><span class="num">${tl}</span><span>Level</span></div>
       </button>`;
     }).join('');
@@ -341,7 +399,7 @@
       + (state.staminaRating ? (() => { const r = state.staminaRating(s); return `<div class="sp-race"><span class="nm">Stamina</span><div class="bar"><i style="width:${clamp(r / 15 * 100, 3, 100)}%;background:${D.STAT_META.stamina.color}"></i></div><span class="num">${r.toFixed(1)}</span></div>`; })() : '');
     return `<section class="panel sp-sec"><h2>Battle stats</h2>
       <div class="sp-bstats">${cell(b.hp, 'HP')}${cell(b.atk, 'Atk')}${cell(b.def, 'Def')}${cell(b.spd, 'Spd')}${cell(Math.round(b.eva * 100) + '%', 'Eva')}</div>
-      <p class="sp-muted">Stamina gives HP and Defence, Power gives Attack, Run gives Speed, Fly gives Evasion, Swim adds Defence.</p></section>
+      <p class="sp-muted">Stamina gives HP and Defense, Power gives Attack, Run gives Speed, Fly gives Evasion, Swim adds Defense.</p></section>
       <section class="panel sp-sec"><h2>Race ratings</h2><p class="sp-note">How fast it moves on each kind of course section. Higher is faster.</p>${races}</section>`;
   }
   function recordsHTML(s) {
@@ -352,6 +410,126 @@
       ${rec(Object.values(s.absorbed || {}).reduce((a, b) => a + b, 0), 'Animals bonded')}${rec(Math.max(0, Math.floor((Date.now() - (s.born || Date.now())) / 86400000)), 'Days old')}</div>
       ${born ? `<p class="sp-muted">Hatched ${born}${s.bornWith && creature(s.bornWith) ? `, already bonded with a ${esc(creature(s.bornWith).name)}` : ''}.</p>` : ''}</section>`;
   }
+  // ---------- style: paint tins, pattern stickers, closet ----------
+  const skinOf = s => { const k = s.look && s.look.skin; return k && D.SKINS[k] ? k : null; };
+  const skinBadge = s => { const k = skinOf(s); return k ? `<span class="sp-skin"><canvas data-sp="skin:${k}"></canvas>${esc(D.SKINS[k].name)} skin</span>` : ''; };
+  const plainNow = s => !s.look || !s.look.pattern || s.look.pattern === 'plain' || !D.PATTERNS[s.look.pattern];
+  function styleHTML(s) {
+    const it = state.items(), L = s.look || {}, skin = skinOf(s);
+    const paints = Object.keys(D.COLORS).filter(id => (it.paints || {})[id] > 0);
+    const pats = Object.keys(D.PATTERNS).filter(id => id !== 'plain' && (it.patterns || {})[id] > 0);
+    const hats = Object.keys(D.HATS).sort((a, b) => (D.HATS[a].slot === 'extra') - (D.HATS[b].slot === 'extra')).filter(id => state.ownsHat(id));
+    const tile = (attr, kind, id, name, sub, on, n) => `<button class="sp-tile ${on ? 'on' : ''}" ${attr}>${n ? `<span class="cnt">×${n}</span>` : ''}
+      <canvas data-sp="${kind}:${id}" data-scale="3"></canvas><b>${esc(name)}</b>${sub ? `<small>${sub}</small>` : ''}</button>`;
+    const paintTiles = paints.map(id => tile(`data-paint="${id}"`, 'paint', id, D.COLORS[id], L.body === id && !skin ? 'On now' : '', L.body === id && !skin, it.paints[id])).join('');
+    const patTiles = [tile('data-pattern="plain"', 'pattern', 'plain', 'Plain', plainNow(s) ? 'On now' : 'Free', plainNow(s))]
+      .concat(pats.map(id => tile(`data-pattern="${id}"`, 'pattern', id, D.PATTERNS[id], L.pattern === id ? 'On now' : '', L.pattern === id, it.patterns[id]))).join('');
+    const hatTiles = hats.map(id => { const on = L[D.HATS[id].slot] === id; return tile(`data-hat="${id}" aria-pressed="${on}"`, 'hat', id, D.HATS[id].name, on ? 'Wearing' : 'Tap to wear', on); }).join('');
+    const none = !paints.length && !pats.length && !hats.length;
+    const cta = `<div class="sp-gbcta"><canvas data-sp="gumball:${none ? 0 : 6}" data-scale="5"></canvas>
+      <p>${none ? 'Win paint, stickers and hats from the Gumball machine in the Shop.' : 'Want more? The Gumball machine in the Shop has more paint, stickers and hats.'}</p>
+      <button class="btn ${none ? 'primary' : ''}" data-gumball-go>Go to the Gumball machine</button></div>`;
+    const row = (label, tiles, empty) => `<div class="sp-srow"><div class="sp-lbl">${label}</div>${tiles ? `<div class="sp-tiles">${tiles}</div>` : `<p class="sp-none">${empty}</p>`}</div>`;
+    return `<section class="panel sp-sec" id="sp-style"><h2>Style ${skin ? `<span class="sp-aside">${skinBadge(s)}</span>` : ''}</h2>
+      <div class="sp-style-top"><div class="sp-mirror"><canvas data-mirror></canvas></div>
+        <p>Make <b>${esc(s.name)}</b> look just right. Paint and stickers get used up. Hats and accessories stay in your closet, so swap them any time.</p></div>
+      ${row('Paint', paintTiles, 'No paint tins yet.')}
+      ${row('Stickers', patTiles)}
+      ${row('Closet', hatTiles, 'No hats or accessories yet.')}
+      ${cta}</section>`;
+  }
+  function sellHTML(s) {
+    const ok = state.canSell(s);
+    return `<div class="sp-sell"><button class="btn sp-sell-btn" data-sell ${ok ? '' : 'disabled'}><canvas data-sp="icon:coin"></canvas>Sell for ${fmt(state.sellPrice(s))} coins</button>
+      ${ok ? '' : '<p>You need at least one Sprout.</p>'}</div>`;
+  }
+  // a Sprout look with some changes, for before/after previews
+  function lookWith(s, patch) {
+    const look = Object.assign({}, s.look || {}, patch);
+    for (const k of Object.keys(patch)) if (patch[k] === null) delete look[k];
+    return state.lookOf(Object.assign({}, s, { look }));
+  }
+  function beforeAfter(card, s, after) {
+    const [a, b] = card.querySelectorAll('.sp-ba canvas');
+    if (a) put(a, PX.sprig(state.lookOf(s), {}), 3);
+    if (b) put(b, PX.sprig(after, { eyes: 'happy', mouth: 'open' }), 3);
+  }
+  const BA = `<div class="sp-ba"><figure><div class="pic"><canvas></canvas></div><figcaption>Now</figcaption></figure><span class="arr">›</span>
+    <figure><div class="pic after"><canvas></canvas></div><figcaption>After</figcaption></figure></div>`;
+  function cheer() {
+    for (const a of [heroAnim, mirrorAnim]) if (a) a.happyUntil = clock + 1.3;
+  }
+  function confirmPaint(s, id) {
+    const name = D.COLORS[id], n = (state.items().paints || {})[id] || 0, skin = skinOf(s);
+    if (!name || !n) return;
+    if (s.look.body === id && !skin) { PX.Sound.play('tick'); PS.ui.toast(`${s.name} is already ${name}!`); return; }
+    PS.ui.modal({
+      eyebrow: 'Paint', title: `Paint ${esc(s.name)} ${esc(name)}?`,
+      html: `${BA}${skin ? `<p class="sp-warn">Painting covers ${esc(s.name)}'s <b>${esc(D.SKINS[skin].name)} skin</b>. The ${esc(D.SKINS[skin].name)} skin won't come back.</p>` : ''}
+        <p class="sp-m-left">Uses 1 of your ${n} ${esc(name)} paint tin${n === 1 ? '' : 's'}.</p>`,
+      row: true, buttons: [{ label: 'Not now' }, { label: 'Paint!', kind: 'primary', onClick: () => doStyle(s.id, x => state.usePaint(x, id), `${s.name} is ${name} now!`) }],
+      mount: card => beforeAfter(card, s, lookWith(s, { body: id, skin: null })),
+    });
+  }
+  function confirmPattern(s, id) {
+    const name = D.PATTERNS[id]; if (!name) return;
+    if (id === 'plain') {
+      if (plainNow(s)) { PX.Sound.play('tick'); PS.ui.toast(`${s.name} is already plain.`); return; }
+      PS.ui.modal({
+        eyebrow: 'Stickers', title: `Make ${esc(s.name)} plain?`,
+        html: `${BA}<p class="sp-m-left">It's free! The ${esc(D.PATTERNS[s.look.pattern])} pattern comes off. To get it back you'll need another ${esc(D.PATTERNS[s.look.pattern])} sticker.</p>`,
+        row: true, buttons: [{ label: 'Not now' }, { label: 'Go plain', kind: 'primary', onClick: () => doStyle(s.id, x => state.usePattern(x, 'plain'), `${s.name} is plain now.`) }],
+        mount: card => beforeAfter(card, s, lookWith(s, { pattern: 'plain' })),
+      });
+      return;
+    }
+    const n = (state.items().patterns || {})[id] || 0; if (!n) return;
+    const tint = D.PATTERN_COLORS.slice(2).find(c => c !== s.look.patternColor) || '#fff27a'; // the real colour is picked at random
+    PS.ui.modal({
+      eyebrow: 'Sticker', title: `Give ${esc(s.name)} ${/^[aeiou]/i.test(name) ? 'an' : 'a'} ${esc(name)} pattern?`,
+      html: `${BA}<p class="sp-m-left">The sticker color is a surprise! Uses 1 of your ${n} ${esc(name)} sticker${n === 1 ? '' : 's'}.</p>`,
+      row: true, buttons: [{ label: 'Not now' }, { label: 'Stick it!', kind: 'primary', onClick: () => doStyle(s.id, x => state.usePattern(x, id), `${s.name} has ${name} now!`) }],
+      mount: card => beforeAfter(card, s, lookWith(s, { pattern: id, patternColor: tint })),
+    });
+  }
+  function doStyle(id, apply, msg) {
+    const s = state.get(id); if (!s) return;
+    if (!apply(s)) { PX.Sound.play('miss'); return; }
+    PX.Sound.play('level'); PX.buzz(20); PS.ui.toast(msg); cheer();
+  }
+  function toggleHat(s, id) {
+    const H = D.HATS[id]; if (!H || !state.ownsHat(id)) return;
+    const off = s.look[H.slot] === id;
+    if (!state.wear(s, id)) return;
+    PX.Sound.play(off ? 'pop' : 'coo'); PX.buzz(8);
+    if (!off) cheer();
+  }
+  function confirmSell(s) {
+    if (!state.canSell(s)) { PX.Sound.play('miss'); PS.ui.toast('You need at least one Sprout.'); return; }
+    const price = state.sellPrice(s), id = s.id;
+    PS.ui.modal({
+      eyebrow: 'Sell', title: `Sell ${esc(s.name)} for ${fmt(price)} coins?`, sprite: s, pose: {},
+      html: `<p class="sp-sell-price"><canvas data-sp="icon:coin"></canvas><span class="num">${fmt(price)}</span></p>
+        <p>${esc(s.name)} will leave your garden for good. This can't be undone.</p>`,
+      row: true, buttons: [{ label: `Keep ${s.name}`, kind: 'primary' }, { label: 'Sell', kind: 'danger', onClick: () => doSell(id) }],
+      mount: card => hydrate(card),
+    });
+  }
+  function doSell(id) {
+    const s = state.get(id); if (!s) return;
+    const name = s.name, price = state.sellSprout(id);
+    if (!price) { PX.Sound.play('miss'); PS.ui.toast('You need at least one Sprout.'); return; }
+    PX.Sound.play('chime'); PX.buzz(20);
+    PS.ui.toast(`${name} found a new home. +${fmt(price)} coins`, 3000);
+    if (curId === id) { curId = null; view = 'list'; }
+    if (visible) render(false); else dirty = true;
+  }
+  function scrollToStyle(smooth) {
+    const sc = root.querySelector('.sp-scroll'), sec = root.querySelector('#sp-style'); if (!sc || !sec) return;
+    const top = Math.max(0, sec.offsetTop - 10);
+    if (smooth && sc.scrollTo) sc.scrollTo({ top, behavior: 'smooth' }); else sc.scrollTop = top;
+  }
+
   function detailHTML(s) {
     const fi = state.formInfo(s), partner = s.id === PS.S.activeId;
     return `<div class="sp-scroll"><div class="sp-wrap">
@@ -359,7 +537,7 @@
       <section class="panel sp-hero">
         <div class="sp-stagebox ${esc(s.area)}"><span class="sp-where">${esc(areaName(s.area))}</span><canvas data-hero title="Pet"></canvas></div>
         <div class="sp-namebox"><input class="sp-name-in" maxlength="12" value="${esc(s.name)}" aria-label="Name" enterkeyhint="done" autocomplete="off" spellcheck="false"></div>
-        <div class="sp-form"><b>${esc(fi.name)}</b> \u00b7 Stage ${fi.stage + 1} of 3</div><div class="sp-els">${state.elementsOf(s).map(elChip).join('')}</div>
+        <div class="sp-form"><b>${esc(fi.name)}</b> \u00b7 Stage ${fi.stage + 1} of 3</div><div class="sp-els">${state.elementsOf(s).map(elChip).join('')}${skinBadge(s)}</div>
         <div class="sp-mood">
           <div><small><span>Happiness</span><span>${Math.round(s.happy || 0)}</span></small><div class="bar"><i style="width:${clamp(s.happy || 0, 0, 100)}%;background:var(--berry)"></i></div></div>
           <div><small><span>Energy</span><span>${Math.round(s.energy || 0)}</span></small><div class="bar"><i style="width:${clamp(s.energy || 0, 0, 100)}%;background:var(--sun-edge)"></i></div></div>
@@ -367,10 +545,12 @@
         <div class="sp-acts">
           <button class="btn ${partner ? '' : 'primary'}" data-partner ${partner ? 'disabled' : ''}>${partner ? '\u2605 Your partner' : 'Set as partner'}</button>
           <button class="btn go" data-visit aria-label="Visit in the ${esc(areaName(s.area))}">Visit</button>
+          <button class="btn sp-dress" data-jump-style><canvas data-sp="hat:party" data-scale="2"></canvas>Dress up ${esc(s.name)}</button>
         </div>
       </section>
-      ${statsHTML(s)}${natureHTML(s)}${evoHTML(s)}${movesHTML(s)}${bondsHTML(s)}${partsHTML(s)}${battleHTML(s)}${recordsHTML(s)}
+      ${statsHTML(s)}${natureHTML(s)}${evoHTML(s)}${movesHTML(s)}${styleHTML(s)}${bondsHTML(s)}${partsHTML(s)}${battleHTML(s)}${recordsHTML(s)}
       <button class="btn sp-back" data-back style="justify-self:start">\u2039 All Sprouts</button>
+      ${sellHTML(s)}
     </div></div>`;
   }
 
@@ -387,6 +567,8 @@
     } else {
       const hero = root.querySelector('[data-hero]');
       heroAnim = animSprite(hero, state.lookOf(s), 5, { phase: 0, flap: hasWings(s) });
+      const mirror = root.querySelector('[data-mirror]');
+      mirrorAnim = mirror ? animSprite(mirror, state.lookOf(s), 3, { phase: 0.3, flap: hasWings(s) }) : null;
       // evolution previews: same Sprout, drawn as each stage
       const nk = state.natureKind(s), flower = s.stage === 2 && s.flower ? s.flower : (Object.keys(D.FLOWERS).find(k => D.FLOWERS[k].area === s.area && D.FLOWERS[k].nature === nk) || 'daisy');
       root.querySelectorAll('canvas[data-evo]').forEach(cv => {
@@ -398,7 +580,7 @@
     }
     const sc2 = root.querySelector('.sp-scroll'); if (sc2) sc2.scrollTop = keep;
   }
-  let heroAnim = null;
+  let heroAnim = null, mirrorAnim = null;
   function openDetail(id) { curId = id; view = 'detail'; render(false); }
 
   // ---------- events ----------
@@ -414,6 +596,7 @@
       PS.ui.go('garden'); return;
     }
     if (q('[data-go-garden]')) { PS.ui.go('garden'); return; }
+    if (q('[data-gumball-go]')) { PX.Sound.play('pop'); PS.ui.go('shop', { tab: 'gumball' }); return; }
     if (q('[data-dev]')) { PS.ui.devPanel(); return; }
     if (q('[data-players]')) { PS.ui.playersPanel(); return; }
     if (q('[data-backup]')) { PS.ui.backupPanel(); return; }
@@ -424,7 +607,13 @@
       if (PS.S.area !== s.area) { PS.S.area = s.area; PS.emit('area', { area: s.area }); PS.save(); }
       PS.ui.go('garden'); return;
     }
-    if (q('[data-hero]') && heroAnim) { heroAnim.happyUntil = clock + 1.1; PX.Sound.play('coo'); PX.buzz(8); }
+    if (q('[data-hero]') && heroAnim) { heroAnim.happyUntil = clock + 1.1; PX.Sound.play('coo'); PX.buzz(8); return; }
+    if (q('[data-mirror]') && mirrorAnim) { mirrorAnim.happyUntil = clock + 1.1; PX.Sound.play('coo'); PX.buzz(8); return; }
+    if (q('[data-jump-style]')) { PX.Sound.play('tick'); scrollToStyle(true); return; }
+    if ((b = q('[data-paint]'))) { PX.Sound.play('pop'); confirmPaint(s, b.dataset.paint); return; }
+    if ((b = q('[data-pattern]'))) { PX.Sound.play('pop'); confirmPattern(s, b.dataset.pattern); return; }
+    if ((b = q('[data-hat]'))) { toggleHat(s, b.dataset.hat); return; }
+    if (q('[data-sell]')) { PX.Sound.play('pop'); confirmSell(s); return; }
   }
   function commitName(inp) {
     const s = state.get(curId); if (!s) return;
@@ -446,11 +635,11 @@
       root.addEventListener('change', e => { if (e.target.classList.contains('sp-name-in')) commitName(e.target); });
       root.addEventListener('keydown', e => { if (e.target.classList.contains('sp-name-in') && e.key === 'Enter') e.target.blur(); });
       root.addEventListener('focusout', e => { if (e.target.classList && e.target.classList.contains('sp-name-in') && dirty) setTimeout(() => { if (visible && dirty) render(true); }, 0); });
-      ['sprout:update', 'sprout:evolve', 'egg:new', 'egg:hatch', 'reset'].forEach(ev => PS.on(ev, markDirty));
+      ['sprout:update', 'sprout:evolve', 'sprout:sold', 'items', 'egg:new', 'egg:hatch', 'reset'].forEach(ev => PS.on(ev, markDirty));
     },
     show(params) {
       visible = true;
-      if (params && params.id && state.get(params.id)) { curId = params.id; view = 'detail'; render(false); return; }
+      if (params && params.id && state.get(params.id)) { curId = params.id; view = 'detail'; render(false); if (params.section === 'style') scrollToStyle(false); return; }
       view = 'list'; render(false);
     },
     hide() { visible = false; },

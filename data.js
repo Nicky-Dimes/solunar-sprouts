@@ -36,15 +36,15 @@
     // seedling + buds + bloom pools
     tackle: M('Tackle', 'normal', 35, 0.95, {}, 'A bouncy body bump.'),
     leaftoss: M('Leaf Toss', 'leaf', 40, 0.95, {}, 'Flicks a sharp leaf.'),
-    sproutup: M('Sprout Up', 'leaf', 0, 1, { heal: 0.2, buff: { stat: 'def', n: 1 } }, 'Stands tall: heals a little and raises Defence.'),
+    sproutup: M('Sprout Up', 'leaf', 0, 1, { heal: 0.2, buff: { stat: 'def', n: 1 } }, 'Stands tall: heals a little and raises Defense.'),
     sunbeam: M('Sunbeam', 'light', 55, 0.95, {}, 'A warm beam of light.'),
     warmglow: M('Warm Glow', 'light', 0, 1, { heal: 0.3 }, 'Soaks up sun to heal.'),
-    solarguard: M('Solar Guard', 'light', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Sharply raises Defence.'),
+    solarguard: M('Solar Guard', 'light', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Sharply raises Defense.'),
     nightslash: M('Night Slash', 'shadow', 60, 0.9, { crit: 0.15 }, 'A quick strike from the dark. Crits often.'),
     moonveil: M('Moon Veil', 'shadow', 0, 1, { buff: { stat: 'eva', n: 2 } }, 'Fades into moonlight. Raises Evasion.'),
     dreameater: M('Dream Eater', 'shadow', 45, 0.95, { drain: 0.5 }, 'Drains energy and heals.'),
     vinewhip: M('Vine Whip', 'leaf', 55, 0.95, {}, 'A springy vine lash.'),
-    thornguard: M('Thorn Guard', 'leaf', 0, 1, { buff: { stat: 'def', n: 1 }, heal: 0.1 }, 'Grows thorns. Raises Defence.'),
+    thornguard: M('Thorn Guard', 'leaf', 0, 1, { buff: { stat: 'def', n: 1 }, heal: 0.1 }, 'Grows thorns. Raises Defense.'),
     wildgrowth: M('Wild Growth', 'leaf', 0, 1, { buff: { stat: 'atk', n: 2 } }, 'Sharply raises Attack.'),
     radiance: M('Radiance', 'light', 70, 0.95, {}, 'A bright burst of petal light.'),
     sunhalo: M('Sun Halo', 'light', 0, 1, { heal: 0.4, cleanse: true }, 'Heals well and clears status.'),
@@ -58,7 +58,7 @@
     petalstorm: M('Petal Storm', 'leaf', 22, 0.95, { hits: 4 }, 'Daisy signature. Four quick petal hits.'),
     tropicburst: M('Tropic Burst', 'fire', 85, 0.9, { status: { type: 'burn', chance: 0.25 } }, 'Hibiscus signature. Hot blossom burst. May burn.'),
     tidebloom: M('Tide Bloom', 'water', 60, 1, { drain: 0.6 }, 'Sea Lily signature. Heals with the tide.'),
-    thornsurf: M('Thorn Surf', 'water', 80, 0.9, { debuff: { stat: 'def', n: 1 } }, 'Beach Rose signature. Lowers Defence.'),
+    thornsurf: M('Thorn Surf', 'water', 80, 0.9, { debuff: { stat: 'def', n: 1 } }, 'Beach Rose signature. Lowers Defense.'),
     duskglow: M('Dusk Glow', 'light', 0, 1, { heal: 0.35, buff: { stat: 'spd', n: 1 } }, 'Primrose signature. Heals and speeds up.'),
     lunarbloom: M('Lunar Bloom', 'shadow', 90, 0.9, { crit: 0.1 }, 'Moonflower signature. A full-moon strike.'),
     toxicpetal: M('Toxic Petal', 'shadow', 50, 1, { status: { type: 'poison', chance: 0.7 } }, 'Nightshade signature. Usually poisons.'),
@@ -73,7 +73,7 @@
     doublekick: M('Double Kick', 'normal', 25, 0.95, { hits: 2 }, 'Kicks twice.'),
     burrowdash: M('Burrow Dash', 'stone', 60, 0.95, {}, 'Pops up from underground.'),
     headbutt: M('Headbutt', 'stone', 45, 0.95, { status: { type: 'stun', chance: 0.1 } }, 'May stun.'),
-    ironwool: M('Iron Wool', 'stone', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Sharply raises Defence.'),
+    ironwool: M('Iron Wool', 'stone', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Sharply raises Defense.'),
     ramcharge: M('Ram Charge', 'stone', 85, 0.9, { recoil: 0.2 }, 'Huge hit, some recoil.'),
     shellup: M('Shell Up', 'stone', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Hides in its shell.'),
     slowslam: M('Slow Slam', 'stone', 55, 1, { sure: true }, 'Never misses.'),
@@ -107,7 +107,7 @@
     otterfloat: M('Otter Float', 'water', 0, 1, { heal: 0.35 }, 'Floats and rests.'),
     aquaspin: M('Aqua Spin', 'water', 65, 0.95, {}, 'A spinning splash.'),
     bellyslide: M('Belly Slide', 'water', 50, 0.95, { first: true }, 'Goes first.'),
-    blubber: M('Blubber', 'water', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Sharply raises Defence.'),
+    blubber: M('Blubber', 'water', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Sharply raises Defense.'),
     icesplash: M('Ice Splash', 'water', 65, 0.9, { debuff: { stat: 'spd', n: 1 } }, 'Lowers Speed.'),
     echo: M('Echo', 'sky', 0, 1, { debuff: { stat: 'acc', n: 2 } }, 'Sharply lowers accuracy.'),
     wavejump: M('Wave Jump', 'water', 60, 0.95, {}, 'Leaps a wave.'),
@@ -115,11 +115,11 @@
     regrow: M('Regrow', 'sweet', 0, 1, { heal: 0.45 }, 'Heals a lot.'),
     starspin: M('Star Spin', 'sweet', 20, 0.95, { hits: 3 }, 'Three spinning hits.'),
     twinkle: M('Twinkle', 'light', 30, 1, { status: { type: 'stun', chance: 0.4 } }, 'May stun.'),
-    shellshield: M('Shell Shield', 'water', 0, 1, { buff: { stat: 'def', n: 3 } }, 'Hugely raises Defence.'),
+    shellshield: M('Shell Shield', 'water', 0, 1, { buff: { stat: 'def', n: 3 } }, 'Hugely raises Defense.'),
     currentride: M('Current Ride', 'water', 55, 1, { buff: { stat: 'spd', n: 1 } }, 'Rides the current. Raises Speed.'),
     oldtide: M('Old Tide', 'water', 85, 0.9, { heal: 0.1 }, 'A slow, ancient wave.'),
     // moonlit animals
-    screech: M('Screech', 'shadow', 0, 1, { debuff: { stat: 'def', n: 2 } }, 'Sharply lowers Defence.'),
+    screech: M('Screech', 'shadow', 0, 1, { debuff: { stat: 'def', n: 2 } }, 'Sharply lowers Defense.'),
     nip: M('Nip', 'shadow', 35, 1, { drain: 0.5 }, 'Heals half the damage.'),
     shadowflit: M('Shadow Flit', 'shadow', 65, 0.95, { buff: { stat: 'eva', n: 1 } }, 'Hits and raises Evasion.'),
     howl: M('Howl', 'shadow', 0, 1, { buff: { stat: 'atk', n: 2 } }, 'Sharply raises Attack.'),
@@ -128,7 +128,7 @@
     dust: M('Moth Dust', 'light', 0, 0.9, { status: { type: 'sleep', chance: 0.6 } }, 'Often causes sleep.'),
     flutter: M('Flutter', 'sky', 0, 1, { buff: { stat: 'eva', n: 1 }, heal: 0.15 }, 'Heals a little. Raises Evasion.'),
     moonbeam: M('Moonbeam', 'light', 65, 0.95, {}, 'A cool silver beam.'),
-    curl: M('Curl', 'stone', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Sharply raises Defence.'),
+    curl: M('Curl', 'stone', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Sharply raises Defense.'),
     spikeroll: M('Spike Roll', 'stone', 60, 0.95, {}, 'A spiky roll.'),
     quillburst: M('Quill Burst', 'stone', 20, 0.9, { hits: 4 }, 'Four quill hits.'),
     jellysting: M('Jelly Sting', 'water', 35, 1, { status: { type: 'poison', chance: 0.5 } }, 'Often poisons.'),
@@ -138,11 +138,11 @@
     gummypunch: M('Gummy Punch', 'sweet', 50, 0.95, {}, 'A bouncy punch.'),
     chew: M('Chew', 'sweet', 0, 1, { heal: 0.35 }, 'Heals.'),
     sugarrush: M('Sugar Rush', 'sweet', 0, 1, { buff: [{ stat: 'atk', n: 1 }, { stat: 'spd', n: 1 }] }, 'Raises Attack and Speed.'),
-    fluffpuff: M('Fluff Puff', 'sweet', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Sharply raises Defence.'),
+    fluffpuff: M('Fluff Puff', 'sweet', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Sharply raises Defense.'),
     cottonbash: M('Cotton Bash', 'sweet', 50, 1, {}, 'Soft but solid.'),
     cloudnap: M('Cloud Nap', 'sweet', 0, 1, { heal: 0.5, once: true }, 'Heals half. Once per battle.'),
     syruptrap: M('Syrup Trap', 'sweet', 0, 1, { debuff: { stat: 'spd', n: 2 } }, 'Sharply lowers Speed.'),
-    candyshell: M('Candy Shell', 'sweet', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Sharply raises Defence.'),
+    candyshell: M('Candy Shell', 'sweet', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Sharply raises Defense.'),
     swirlsmash: M('Swirl Smash', 'sweet', 70, 0.9, {}, 'A spiral slam.'),
     sprinkle: M('Sprinkle Shot', 'sweet', 18, 1, { hits: 3 }, 'Three sprinkle hits.'),
     sugarglide: M('Sugar Glide', 'sky', 0, 1, { buff: { stat: 'eva', n: 2 } }, 'Sharply raises Evasion.'),
@@ -153,24 +153,64 @@
     ink: M('Ink', 'shadow', 0, 1, { debuff: { stat: 'acc', n: 2 } }, 'Sharply lowers accuracy.'),
     jellygrab: M('Jelly Grab', 'sweet', 45, 1, { drain: 0.5 }, 'Heals half the damage.'),
     wobble: M('Wobble Wallop', 'sweet', 75, 0.9, {}, 'A wobbly smack.'),
+    // newer animals (meadow)
+    tongueflick: M('Tongue Flick', 'water', 35, 1, { first: true }, 'A sticky snap. Goes first.'),
+    lilyhop: M('Lily Hop', 'leaf', 0, 1, { buff: [{ stat: 'spd', n: 1 }, { stat: 'eva', n: 1 }] }, 'Hops pad to pad. Raises Speed and Evasion.'),
+    croak: M('Croak', 'water', 0, 0.9, { status: { type: 'sleep', chance: 0.5 } }, 'A sleepy song. May cause sleep.'),
+    nutthrow: M('Nut Throw', 'normal', 22, 0.95, { hits: 2 }, 'Throws two acorns.'),
+    scamper: M('Scamper', 'normal', 0, 1, { buff: { stat: 'spd', n: 2 } }, 'Sharply raises Speed.'),
+    acornbomb: M('Acorn Bomb', 'leaf', 70, 0.9, {}, 'A big acorn from high up.'),
+    wingdust: M('Wing Dust', 'sky', 30, 1, { status: { type: 'poison', chance: 0.4 } }, 'Scaly dust. May poison.'),
+    silverwind: M('Silver Wind', 'sky', 45, 0.95, { buff: { stat: 'spd', n: 1 } }, 'A shimmering breeze. Raises Speed.'),
+    petaldance: M('Petal Dance', 'leaf', 20, 0.95, { hits: 3 }, 'Three twirling hits.'),
+    // newer animals (beach)
+    beakjab: M('Beak Jab', 'sky', 45, 0.95, { crit: 0.2 }, 'Crits often.'),
+    scoop: M('Scoop', 'water', 40, 1, { drain: 0.5 }, 'Scoops up a snack. Heals.'),
+    fishdive: M('Fish Dive', 'water', 75, 0.9, {}, 'Plunges beak-first.'),
+    bubblejet: M('Bubble Jet', 'water', 40, 1, { first: true }, 'A quick jet. Goes first.'),
+    curltail: M('Curl Tail', 'water', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Holds on tight. Sharply raises Defense.'),
+    tidedance: M('Tide Dance', 'water', 0, 1, { heal: 0.3, buff: { stat: 'spd', n: 1 } }, 'Heals and raises Speed.'),
+    puffup: M('Puff Up', 'water', 0, 1, { buff: { stat: 'def', n: 2 } }, 'Puffs up big. Sharply raises Defense.'),
+    needlespray: M('Needle Spray', 'water', 18, 0.95, { hits: 3, status: { type: 'poison', chance: 0.15 } }, 'Three spines. May poison.'),
+    spinetackle: M('Spine Tackle', 'stone', 70, 0.9, { recoil: 0.1 }, 'A spiky slam.'),
+    // newer animals (moonlit)
+    swipe: M('Swipe', 'shadow', 45, 0.95, { crit: 0.2 }, 'Quick paws. Crits often.'),
+    trashtoss: M('Trash Toss', 'normal', 0, 1, { debuff: { stat: 'acc', n: 2 } }, 'Throws junk. Sharply lowers accuracy.'),
+    masquerade: M('Masquerade', 'shadow', 0, 1, { buff: [{ stat: 'eva', n: 1 }, { stat: 'atk', n: 1 }] }, 'Raises Evasion and Attack.'),
+    lure: M('Lure', 'light', 0, 0.9, { status: { type: 'stun', chance: 0.5 } }, 'A dazzling light. May stun.'),
+    deepbite: M('Deep Bite', 'shadow', 50, 0.95, { drain: 0.5 }, 'Heals half the damage.'),
+    lanternflash: M('Lantern Flash', 'light', 80, 0.9, {}, 'A blinding burst.'),
+    antlerram: M('Antler Ram', 'stone', 55, 0.95, {}, 'Charges with its antlers.'),
+    moonleap: M('Moon Leap', 'light', 0, 1, { buff: [{ stat: 'spd', n: 1 }, { stat: 'eva', n: 1 }] }, 'Leaps into the moonlight.'),
+    starcharge: M('Star Charge', 'light', 85, 0.9, {}, 'A shooting-star charge.'),
+    // newer animals (candy)
+    marshhop: M('Marsh Hop', 'sweet', 40, 1, { first: true }, 'A bouncy hop. Goes first.'),
+    puffpunch: M('Puff Punch', 'sweet', 55, 0.95, { debuff: { stat: 'atk', n: 1 } }, 'Soft punch. Lowers Attack.'),
+    toasty: M('Toasty', 'fire', 0, 1, { heal: 0.35, buff: { stat: 'def', n: 1 } }, 'Warms up golden. Heals, raises Defense.'),
+    nibble: M('Nibble', 'sweet', 35, 1, { first: true }, 'Tiny bites. Goes first.'),
+    cocoadust: M('Cocoa Dust', 'sweet', 0, 1, { debuff: { stat: 'acc', n: 2 } }, 'Sharply lowers accuracy.'),
+    fudgeslam: M('Fudge Slam', 'sweet', 75, 0.9, {}, 'A heavy chocolate slam.'),
+    licoricelash: M('Licorice Lash', 'sweet', 45, 0.95, { status: { type: 'stun', chance: 0.2 } }, 'May stun.'),
+    twist: M('Twist', 'sweet', 0, 1, { buff: { stat: 'eva', n: 2 } }, 'Twists away. Sharply raises Evasion.'),
+    sugarshock: M('Sugar Shock', 'water', 80, 0.9, { status: { type: 'stun', chance: 0.15 } }, 'A fizzy zap. May stun.'),
     // rare creatures
     pixiedust: M('Pixie Dust', 'light', 40, 1, { status: { type: 'sleep', chance: 0.4 } }, 'May cause sleep.'),
     fairykiss: M('Fairy Kiss', 'light', 0, 1, { heal: 0.55, cleanse: true }, 'Big heal. Clears status.'),
     starlight: M('Starlight', 'light', 95, 0.9, {}, 'A shower of stars.'),
     hornbeam: M('Horn Beam', 'light', 85, 0.95, {}, 'A rainbow beam from its horn.'),
     rainbowmane: M('Rainbow Mane', 'light', 0, 1, { buff: { stat: 'atk', n: 1 }, heal: 0.2 }, 'Heals and raises Attack.'),
-    purify: M('Purify', 'light', 0, 1, { heal: 0.4, cleanse: true, buff: { stat: 'def', n: 1 } }, 'Heals, cleanses, raises Defence.'),
+    purify: M('Purify', 'light', 0, 1, { heal: 0.4, cleanse: true, buff: { stat: 'def', n: 1 } }, 'Heals, cleanses, raises Defense.'),
     stomp: M('Stomp', 'stone', 75, 0.95, { status: { type: 'stun', chance: 0.2 } }, 'May stun.'),
     roar: M('Roar', 'stone', 0, 1, { debuff: { stat: 'atk', n: 2 } }, 'Sharply lowers Attack.'),
     meteortail: M('Meteor Tail', 'stone', 110, 0.85, {}, 'A prehistoric smash.'),
     ember: M('Ember', 'fire', 55, 1, { status: { type: 'burn', chance: 0.2 } }, 'May burn.'),
-    dragonscale: M('Dragon Scale', 'fire', 0, 1, { buff: { stat: 'def', n: 2 }, heal: 0.15 }, 'Heals and sharply raises Defence.'),
+    dragonscale: M('Dragon Scale', 'fire', 0, 1, { buff: { stat: 'def', n: 2 }, heal: 0.15 }, 'Heals and sharply raises Defense.'),
     dragonbreath: M('Dragon Breath', 'fire', 120, 0.85, { status: { type: 'burn', chance: 0.3 } }, 'The strongest fire there is.'),
     flamewing: M('Flame Wing', 'fire', 75, 0.95, { status: { type: 'burn', chance: 0.2 } }, 'May burn.'),
     rebirth: M('Rebirth', 'fire', 0, 1, { heal: 1, cleanse: true, once: true }, 'Fully heals. Once per battle.'),
     sunflare: M('Sun Flare', 'fire', 105, 0.9, {}, 'A blinding flare.'),
     talon: M('Talon', 'sky', 65, 0.95, { crit: 0.15 }, 'Crits often.'),
-    skyroar: M('Sky Roar', 'sky', 0, 1, { debuff: { stat: 'def', n: 2 }, buff: { stat: 'spd', n: 1 } }, 'Lowers Defence, raises Speed.'),
+    skyroar: M('Sky Roar', 'sky', 0, 1, { debuff: { stat: 'def', n: 2 }, buff: { stat: 'spd', n: 1 } }, 'Lowers Defense, raises Speed.'),
     stormdive: M('Storm Dive', 'sky', 100, 0.85, {}, 'A thunderous dive.'),
     whirlpool: M('Whirlpool', 'water', 50, 0.95, { status: { type: 'stun', chance: 0.35 } }, 'May stun.'),
     crush: M('Crush', 'water', 90, 0.9, {}, 'Eight arms squeeze.'),
@@ -217,20 +257,33 @@
     sugarfinch: A('Sugar Finch', 'candy', 'air', 'day', { fly: 15, run: 4 }, 'wings', 'sweet', ['sprinkle', 'sugarglide', 'canedive'], 1, 'Sings in sprinkles.'),
     sodafish: A('Soda Fish', 'candy', 'water', 'any', { swim: 14, run: 6 }, 'fins', 'water', ['fizz', 'poprocks', 'geyser'], 0, 'Fizzy and fast.'),
     jellyocto: A('Jelly Octopus', 'candy', 'water', 'night', { swim: 10, power: 10 }, 'tentacles', 'sweet', ['ink', 'jellygrab', 'wobble'], -2, 'Wobbly and strong.'),
+    // newer animals
+    frog: A('Frog', 'meadow', 'coast', 'any', { swim: 9, run: 8 }, 'fins', 'water', ['tongueflick', 'lilyhop', 'croak'], 1, 'Hops between land and water.'),
+    squirrel: A('Squirrel', 'meadow', 'land', 'day', { run: 10, fly: 6 }, 'tail', 'normal', ['nutthrow', 'scamper', 'acornbomb'], 1, 'A busy, bushy-tailed climber.'),
+    butterfly: A('Butterfly', 'meadow', 'air', 'day', { fly: 12, stamina: 5 }, 'wings', 'sky', ['wingdust', 'silverwind', 'petaldance'], 2, 'Floats from flower to flower.'),
+    pelican: A('Pelican', 'beach', 'air', 'day', { fly: 10, swim: 8 }, 'wings', 'sky', ['beakjab', 'scoop', 'fishdive'], 0, 'Carries lunch in its beak.'),
+    seahorse: A('Seahorse', 'beach', 'water', 'any', { swim: 11, stamina: 7 }, 'fins', 'water', ['bubblejet', 'curltail', 'tidedance'], 1, 'Dances in the waves.'),
+    pufferfish: A('Pufferfish', 'beach', 'water', 'night', { stamina: 11, power: 7 }, 'spikes', 'water', ['puffup', 'needlespray', 'spinetackle'], -1, 'Puffs up when surprised.'),
+    raccoon: A('Raccoon', 'moonlit', 'land', 'night', { run: 9, power: 8 }, 'tail', 'shadow', ['swipe', 'trashtoss', 'masquerade'], -2, 'A masked night bandit.'),
+    anglerfish: A('Anglerfish', 'moonlit', 'water', 'night', { swim: 10, power: 9 }, 'antennae', 'light', ['lure', 'deepbite', 'lanternflash'], -2, 'Carries its own lantern.'),
+    moondeer: A('Moon Deer', 'moonlit', 'land', 'any', { run: 12, stamina: 6 }, 'horns', 'light', ['antlerram', 'moonleap', 'starcharge'], 2, 'Silver spots like stars.'),
+    marshbunny: A('Marsh Bunny', 'candy', 'land', 'day', { run: 11, stamina: 7 }, 'ears', 'sweet', ['marshhop', 'puffpunch', 'toasty'], 2, 'Squishy as a marshmallow.'),
+    chocomouse: A('Choco Mouse', 'candy', 'land', 'night', { run: 10, power: 7 }, 'ears', 'sweet', ['nibble', 'cocoadust', 'fudgeslam'], -1, 'Smells like cocoa.'),
+    licoriceeel: A('Licorice Eel', 'candy', 'water', 'any', { swim: 12, run: 6 }, 'fins', 'sweet', ['licoricelash', 'twist', 'sugarshock'], -1, 'Long, twisty and chewy.'),
   };
 
   // ---------- Rare creatures: bought with coins, absorbed like animals but much stronger ----------
   const R = (name, price, gives, parts, el, moves, nature, blurb) => ({ name, price, gives, parts, el, moves, nature, blurb, rare: true });
   const RARES = {
-    fairy: R('Fairy', 1500, { fly: 45, stamina: 20 }, { fairywings: 1 }, 'light', ['pixiedust', 'fairykiss', 'starlight'], 20, 'Tiny, kind and magical.'),
-    unicorn: R('Unicorn', 2500, { run: 45, stamina: 30 }, { unihorn: 1 }, 'light', ['hornbeam', 'rainbowmane', 'purify'], 30, 'A rainbow-horned runner.'),
-    kitsune: R('Kitsune', 3200, { run: 35, power: 30 }, { tail: 1, multitail: 1 }, 'fire', ['foxwisp', 'illusion', 'ninefold'], -20, 'A nine-tailed trickster.'),
-    yeti: R('Yeti', 3500, { stamina: 45, power: 30, run: -10 }, { fluff: 1, horns: 0.5 }, 'water', ['frostbite', 'snowball', 'avalanche'], 0, 'Big, fluffy and cold.'),
-    griffin: R('Griffin', 3800, { fly: 40, power: 35 }, { wings: 1, claws: 1 }, 'sky', ['talon', 'skyroar', 'stormdive'], 0, 'Half eagle, all courage.'),
-    dinosaur: R('Dinosaur', 4200, { power: 50, stamina: 30, run: -10 }, { spikes: 1, tail: 1 }, 'stone', ['stomp', 'roar', 'meteortail'], 0, 'An ancient giant.'),
-    kraken: R('Kraken', 4800, { swim: 60, power: 30 }, { tentacles: 1, fins: 1 }, 'water', ['whirlpool', 'crush', 'abysswave'], -30, 'Lord of the deep sea.'),
-    phoenix: R('Phoenix', 6000, { fly: 55, stamina: 40 }, { flamewings: 1 }, 'fire', ['flamewing', 'rebirth', 'sunflare'], 40, 'Reborn from its own flames.'),
-    dragon: R('Dragon', 8000, { power: 50, fly: 50, stamina: 20 }, { dragonwings: 1, horns: 1, tail: 1 }, 'fire', ['ember', 'dragonscale', 'dragonbreath'], -10, 'The rarest of them all.'),
+    fairy: R('Fairy', 750, { fly: 45, stamina: 20 }, { fairywings: 1 }, 'light', ['pixiedust', 'fairykiss', 'starlight'], 20, 'Tiny, kind and magical.'),
+    unicorn: R('Unicorn', 1250, { run: 45, stamina: 30 }, { unihorn: 1 }, 'light', ['hornbeam', 'rainbowmane', 'purify'], 30, 'A rainbow-horned runner.'),
+    kitsune: R('Kitsune', 1600, { run: 35, power: 30 }, { tail: 1, multitail: 1 }, 'fire', ['foxwisp', 'illusion', 'ninefold'], -20, 'A nine-tailed trickster.'),
+    yeti: R('Yeti', 1750, { stamina: 45, power: 30, run: -10 }, { fluff: 1, horns: 0.5 }, 'water', ['frostbite', 'snowball', 'avalanche'], 0, 'Big, fluffy and cold.'),
+    griffin: R('Griffin', 1900, { fly: 40, power: 35 }, { wings: 1, claws: 1 }, 'sky', ['talon', 'skyroar', 'stormdive'], 0, 'Half eagle, all courage.'),
+    dinosaur: R('Dinosaur', 2100, { power: 50, stamina: 30, run: -10 }, { spikes: 1, tail: 1 }, 'stone', ['stomp', 'roar', 'meteortail'], 0, 'An ancient giant.'),
+    kraken: R('Kraken', 2400, { swim: 60, power: 30 }, { tentacles: 1, fins: 1 }, 'water', ['whirlpool', 'crush', 'abysswave'], -30, 'Lord of the deep sea.'),
+    phoenix: R('Phoenix', 3000, { fly: 55, stamina: 40 }, { flamewings: 1 }, 'fire', ['flamewing', 'rebirth', 'sunflare'], 40, 'Reborn from its own flames.'),
+    dragon: R('Dragon', 4000, { power: 50, fly: 50, stamina: 20 }, { dragonwings: 1, horns: 1, tail: 1 }, 'fire', ['ember', 'dragonscale', 'dragonbreath'], -10, 'The rarest of them all.'),
   };
 
   // ---------- Evolution ----------
@@ -360,18 +413,67 @@
   };
 
   // ---------- Eggs ----------
+  // bodies: body colours a hatchling can have (PX.RAMPS ids). skin: special shimmering skin the hatchling always has.
   const EGGS = {
-    meadow: { name: 'Meadow Egg', bodies: ['mint', 'leaf', 'peach', 'sky'], taps: 5 },
-    beach: { name: 'Beach Egg', bodies: ['sky', 'mint', 'sun', 'clay'], taps: 5 },
-    moonlit: { name: 'Moonlit Egg', bodies: ['night', 'plum', 'slate', 'cloud'], taps: 5 },
-    candy: { name: 'Candy Egg', bodies: ['rose', 'berry', 'sun', 'plum'], taps: 5 },
-    golden: { name: 'Golden Egg', bodies: ['sun', 'cloud', 'rose'], taps: 8, bonus: 60, sparkle: true, price: 2500, desc: 'Hatches with a head start in every stat.' },
+    meadow: { name: 'Meadow Egg', bodies: ['mint', 'leaf', 'peach', 'sky', 'lime', 'lemon', 'moss', 'teal'], taps: 5 },
+    beach: { name: 'Beach Egg', bodies: ['sky', 'mint', 'sun', 'clay', 'coral', 'aqua', 'ocean', 'tangerine'], taps: 5 },
+    moonlit: { name: 'Moonlit Egg', bodies: ['night', 'plum', 'slate', 'cloud', 'lilac', 'charcoal', 'ocean'], taps: 5 },
+    candy: { name: 'Candy Egg', bodies: ['rose', 'berry', 'sun', 'plum', 'bubblegum', 'cherry', 'cream', 'tangerine'], taps: 5 },
+    golden: { name: 'Golden Egg', bodies: ['sun', 'cloud', 'rose'], skin: 'gold', taps: 8, bonus: 60, sparkle: true, price: 1250, desc: 'Hatches a shiny gold Sprout with a head start in every stat.' },
     // rare eggs sold in the shop (golden above is also sold, and awarded for top-tier wins)
-    rainbow: { name: 'Rainbow Egg', bodies: ['rose', 'sky', 'sun', 'plum', 'mint'], taps: 8, bonus: 30, sparkle: true, price: 4500, hatchWith: 'random', desc: 'Hatches already bonded with a random rare creature.' },
-    crystal: { name: 'Crystal Egg', bodies: ['cloud', 'sky', 'plum'], taps: 8, bonus: 45, sparkle: true, price: 6500, hatchWith: 'fairy', desc: 'Hatches bonded with a Fairy. Glitters.' },
-    dragon: { name: 'Dragon Egg', bodies: ['berry', 'clay', 'night'], taps: 10, bonus: 40, price: 9500, hatchWith: 'dragon', desc: 'Hatches bonded with a Dragon.' },
+    rainbow: { name: 'Rainbow Egg', bodies: ['rose', 'sky', 'sun', 'plum', 'mint'], skin: 'rainbow', taps: 8, bonus: 30, sparkle: true, price: 2250, hatchWith: 'random', desc: 'Hatches a rainbow Sprout bonded with a random rare creature.' },
+    crystal: { name: 'Crystal Egg', bodies: ['cloud', 'sky', 'plum'], skin: 'crystal', taps: 8, bonus: 45, sparkle: true, price: 3250, hatchWith: 'fairy', desc: 'Hatches a glittering crystal Sprout bonded with a Fairy.' },
+    // Halloween eggs: spooky skins, sold in the shop and found in gumballs
+    pumpkin: { name: 'Pumpkin Egg', bodies: ['tangerine', 'clay'], skin: 'pumpkin', taps: 6, bonus: 10, price: 600, spooky: true, desc: 'Hatches a jack-o\'-lantern Sprout with a glowing grin.' },
+    ghost: { name: 'Ghost Egg', bodies: ['cloud', 'lilac'], skin: 'ghost', taps: 6, bonus: 10, price: 700, spooky: true, desc: 'Hatches a friendly see-through ghost Sprout. Boo!' },
+    mummy: { name: 'Mummy Egg', bodies: ['cream', 'sun'], skin: 'mummy', taps: 6, bonus: 10, price: 700, spooky: true, desc: 'Hatches a Sprout wrapped up in bandages.' },
+    candycorn: { name: 'Candy Corn Egg', bodies: ['lemon', 'tangerine'], skin: 'candycorn', taps: 6, bonus: 10, price: 600, spooky: true, desc: 'Hatches a stripy candy-corn Sprout.' },
+    vampire: { name: 'Vampire Egg', bodies: ['charcoal', 'night'], skin: 'vampire', taps: 8, bonus: 20, price: 1100, spooky: true, hatchWith: 'bat', desc: 'Hatches a little vampire Sprout with bat wings.' },
+    witch: { name: 'Witch Egg', bodies: ['plum', 'lime'], skin: 'witch', taps: 8, bonus: 20, price: 1200, spooky: true, hat: 'witch', desc: 'Hatches a magical witch Sprout, pointy hat included.' },
+    dragon: { name: 'Dragon Egg', bodies: ['berry', 'clay', 'night'], skin: 'ember', taps: 10, bonus: 40, price: 4750, hatchWith: 'dragon', desc: 'Hatches a scaly ember Sprout bonded with a Dragon.' },
   };
-  const SHOP_EGGS = ['golden', 'rainbow', 'crystal', 'dragon'];
+  // special skins (from rare eggs)
+  const SKINS = {
+    gold: { name: 'Gold', from: 'golden' },
+    rainbow: { name: 'Rainbow', from: 'rainbow' },
+    crystal: { name: 'Crystal', from: 'crystal' },
+    ember: { name: 'Ember', from: 'dragon' },
+    pumpkin: { name: 'Pumpkin', from: 'pumpkin', spooky: true },
+    ghost: { name: 'Ghost', from: 'ghost', spooky: true },
+    mummy: { name: 'Mummy', from: 'mummy', spooky: true },
+    candycorn: { name: 'Candy Corn', from: 'candycorn', spooky: true },
+    vampire: { name: 'Vampire', from: 'vampire', spooky: true },
+    witch: { name: 'Witch', from: 'witch', spooky: true },
+  };
+
+  // ---------- Looks: colours, patterns, hats (gumball prizes) ----------
+  const COLORS = {
+    mint: 'Mint', leaf: 'Leaf', sky: 'Sky', peach: 'Peach', rose: 'Rose', sun: 'Sunny', berry: 'Berry', plum: 'Plum', cloud: 'Cloud', slate: 'Slate',
+    night: 'Night', clay: 'Clay', moss: 'Moss', cocoa: 'Cocoa', lilac: 'Lilac', teal: 'Teal', coral: 'Coral', lemon: 'Lemon', lime: 'Lime',
+    ocean: 'Ocean', cherry: 'Cherry', cream: 'Cream', charcoal: 'Charcoal', tangerine: 'Tangerine', bubblegum: 'Bubblegum', aqua: 'Aqua',
+  };
+  const PATTERNS = { plain: 'Plain', spots: 'Spots', stripes: 'Stripes', twotone: 'Two-tone', mask: 'Mask', star: 'Belly star', freckles: 'Freckles', heart: 'Heart', socks: 'Socks' };
+  const PATTERN_COLORS = ['#fbf3dc', '#ffffff', '#fff27a', '#f7b6c8', '#c9a2f0', '#9fd8ff', '#a6f2d3', '#f5a86a'];
+  // hats (slot 'hat') and accessories (slot 'extra'): once won they belong to the player; any Sprout can wear them
+  const HATS = {
+    bow: { name: 'Bow', slot: 'hat', tier: 1 }, flower: { name: 'Flower clip', slot: 'hat', tier: 1 }, leafcap: { name: 'Leaf cap', slot: 'hat', tier: 1 },
+    beanie: { name: 'Beanie', slot: 'hat', tier: 1 }, cap: { name: 'Cap', slot: 'hat', tier: 1 }, party: { name: 'Party hat', slot: 'hat', tier: 1 },
+    sunhat: { name: 'Sun hat', slot: 'hat', tier: 2 }, tophat: { name: 'Top hat', slot: 'hat', tier: 2 }, wizard: { name: 'Wizard hat', slot: 'hat', tier: 2 },
+    witch: { name: 'Witch hat', slot: 'hat', tier: 2 }, crown: { name: 'Crown', slot: 'hat', tier: 3 }, star: { name: 'Star sparkle', slot: 'extra', tier: 2 }, moon: { name: 'Moon charm', slot: 'extra', tier: 2 },
+    halo: { name: 'Halo', slot: 'extra', tier: 3 },
+  };
+
+  // ---------- Gumball machine ----------
+  // price per gumball. prizes: [type, weight]. Prize types are handled in state.gumball().
+  const GUMBALL = {
+    small: { name: 'Gumball', price: 25, prizes: [['coins', 20], ['fruit', 24], ['goldfruit', 2], ['paint', 20], ['pattern', 12], ['hat', 10], ['animal', 8], ['egg', 2], ['spookyegg', 1], ['goldenegg', 0.25], ['rare', 0.15]], coins: [8, 40] },
+    mega: { name: 'Mega gumball', price: 150, prizes: [['coins', 14], ['goldfruit', 10], ['paint', 14], ['pattern', 8], ['hat', 20], ['animal', 10], ['egg', 10], ['spookyegg', 6], ['goldenegg', 3], ['rainbowegg', 1], ['rare', 2]], coins: [60, 240] },
+  };
+  // selling a Sprout: base + per total level + per stage, plus a share of any rare creatures it was bonded with
+  const SELL = { base: 20, perLevel: 6, stage: [0, 100, 400], rareShare: 0.3, skin: 300 };
+  const MAX_PARTS = 4; // a Sprout shows at most this many animal body parts; the oldest drops off when a new one grows
+  const SHOP_EGGS = ['golden', 'rainbow', 'crystal', 'dragon', 'pumpkin', 'candycorn', 'ghost', 'mummy', 'vampire', 'witch'];
+  const SPOOKY_EGGS = ['pumpkin', 'ghost', 'mummy', 'candycorn', 'vampire', 'witch'];
   const NAMES = ['Nib', 'Clover', 'Bramble', 'Pebble', 'Juniper', 'Sorrel', 'Tansy', 'Wren', 'Moss', 'Fennel', 'Poppy', 'Nimbus', 'Basil', 'Olive', 'Pip', 'Sage', 'Ivy', 'Rowan', 'Hazel', 'Minnow', 'Pudding', 'Maple', 'Kelp', 'Dewdrop'];
 
   const PART_NAMES = { wings: 'Wings', ears: 'Long ears', fins: 'Fins', horns: 'Horns', tail: 'Tail', shell: 'Shell', antennae: 'Antennae', claws: 'Claws',
@@ -382,5 +484,6 @@
   const CLOCK = { phaseMinutes: 15, fadeSeconds: 45 }; // switches every 15 real minutes
 
   window.PSDATA = { STATS, STAT_META, ELEMENTS, MOVES, ANIMALS, RARES, EVO, FORMS, BLOOM_POOL, FLOWERS, STAT_TITLES, AREAS, AREA_ORDER,
-    GROWTH, DROPS, FRUITS, TREE_FRUITS, RACE_TIERS, RACES, RACE_PLACE_SHARE, RACE_STAT, LEAGUES, BATTLE, EGGS, SHOP_EGGS, NAMES, CLOCK, PART_NAMES };
+    GROWTH, DROPS, FRUITS, TREE_FRUITS, RACE_TIERS, RACES, RACE_PLACE_SHARE, RACE_STAT, LEAGUES, BATTLE, EGGS, SHOP_EGGS, SPOOKY_EGGS, NAMES, CLOCK, PART_NAMES,
+    SKINS, COLORS, PATTERNS, PATTERN_COLORS, HATS, GUMBALL, SELL, MAX_PARTS };
 })();

@@ -161,7 +161,7 @@
   }
   function drawBg(tNow) {
     const cv = root.querySelector('.mm-bg'), W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
-    const PXS = clamp(Math.round(W / 100), 3, 5), ww = Math.ceil(W / PXS), wh = Math.ceil(H / PXS);
+    const PXS = clamp(Math.round(W / 125), 3, 5), ww = Math.ceil(W / PXS), wh = Math.ceil(H / PXS);
     if (!drawBg.buf || drawBg.buf.width !== ww || drawBg.buf.height !== wh) { drawBg.buf = document.createElement('canvas'); drawBg.buf.width = ww; drawBg.buf.height = wh; drawBg.stars = Array.from({ length: 36 }, () => [Math.random(), Math.random() * 0.7]); }
     const b = drawBg.buf, g = b.getContext('2d'); g.imageSmoothingEnabled = false;
     const day = ['#6cc3f2', '#86cff5', '#a4dcf8', '#c4e9fb'], night = ['#171644', '#22205a', '#2c2c66', '#3a347a'];
