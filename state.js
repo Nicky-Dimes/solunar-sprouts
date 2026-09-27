@@ -93,6 +93,7 @@
       for (const st of D.STATS) { const x = sp.stats[st]; sp.stats[st] = isObj(x) ? { lv: Math.max(0, Math.min(D.GROWTH.maxLevel, Math.round(num(x.lv, 0)))), xp: Math.max(0, num(x.xp, 0)) } : { lv: 0, xp: 0 }; }
       if (!isObj(sp.parts)) sp.parts = {}; if (!isObj(sp.absorbed)) sp.absorbed = {}; if (!isObj(sp.look)) sp.look = {};
       if (!Array.isArray(sp.partOrder)) sp.partOrder = Object.keys(sp.parts).filter(p => p !== 'spots' && sp.parts[p] > 0);
+      if (sp.moveset != null && (!Array.isArray(sp.moveset) || sp.moveset.some(x => typeof x !== 'string'))) { repairs.push('moveset'); delete sp.moveset; } // chosen battle moves (optional)
       sp.record = Object.assign({ races: 0, raceWins: 0, battles: 0, battleWins: 0 }, isObj(sp.record) ? sp.record : {});
       sp.nature = num(sp.nature, 0); if (sp.stage == null) sp.stage = 0; if (!sp.form) sp.form = 'seedling';
       sp.happy = num(sp.happy, 70); if (sp.energy == null) sp.energy = 100; if (!D.AREAS[sp.area]) sp.area = 'meadow';
@@ -394,12 +395,71 @@
     e.sort((a, b) => (!!D.RARES[b[0]] - !!D.RARES[a[0]]) || (b[1] - a[1]));
     return e[0][0];
   }
-  // Every animal/rare and every form has exactly 3 moves. A Sprout battles with its form's 3 + the best unlocked move of its top animal.
-  function movesOf(s) {
+  // Every animal/rare and every form has exactly 3 moves. By default a Sprout battles with its form's 3 + the best unlocked move of its
+  // top animal. The player can instead pick any MAX_MOVES of the moves it has learned (s.moveset); NPCs always use the default.
+  const MAX_MOVES = 4;
+  function defaultMoves(s) {
     const ids = formInfo(s).moves.slice();
     const top = topAnimal(s);
     if (top) { const c = creature(top), t = tierOf(top, s.absorbed[top]); const m = c.moves[t - 1]; if (m && !ids.includes(m)) ids.push(m); }
     return ids;
+  }
+  // every move it can use right now: its form's 3, plus each bonded creature's unlocked moves
+  function learnedMoves(s) {
+    const ids = formInfo(s).moves.filter(id => D.MOVES[id]);
+    for (const [aid, n] of Object.entries(s.absorbed || {})) { const c = creature(aid); if (!c) continue; c.moves.slice(0, tierOf(aid, n)).forEach(id => { if (D.MOVES[id] && !ids.includes(id)) ids.push(id); }); }
+    return ids;
+  }
+  function movesOf(s) {
+    const def = defaultMoves(s);
+    if (s.npc || !Array.isArray(s.moveset) || !s.moveset.length) return def;
+    const known = new Set(learnedMoves(s)), pick = s.moveset.filter((id, i, a) => known.has(id) && a.indexOf(id) === i).slice(0, MAX_MOVES);
+    if (!pick.length) return def;
+    for (const id of def) if (pick.length < Math.min(MAX_MOVES, known.size) && !pick.includes(id)) pick.push(id); // a move lost when it evolved: fill the gap
+    return pick;
+  }
+  // pick the battle moves (null or the usual set = let the game choose, which then follows new forms and animals by itself)
+  function setMoves(s, ids) {
+    const known = new Set(learnedMoves(s)), pick = (ids || []).filter((id, i, a) => known.has(id) && a.indexOf(id) === i).slice(0, MAX_MOVES);
+    const def = defaultMoves(s);
+    if (!pick.length || (pick.length === def.length && pick.every(id => def.includes(id)))) delete s.moveset; else s.moveset = pick;
+    emit('sprout:update', { s }); save(); return movesOf(s);
+  }
+  // How well a move suits this Sprout, from its stats and types: { score, why } (why = one short line for kids, or '')
+  function moveFit(s, id) {
+    const m = D.MOVES[id]; if (!m) return { score: 0, why: '' };
+    const L = k => s.stats[k].lv, fx = m.fx || {}, sum = L('power') + L('stamina') + L('run') + L('fly') + 4;
+    const share = k => (L(k) + 1) / sum, top = ['power', 'stamina', 'run', 'fly'].sort((a, b) => L(b) - L(a))[0];
+    const stab = m.el !== 'normal' && elementsOf(s).includes(m.el), nm = s.name;
+    if (m.pow > 0) {
+      let v = m.pow * (fx.hits || 1) * m.acc * (stab ? D.BATTLE.stab : 1) * (1 + (fx.crit || 0) * 0.6) * (0.85 + share('power') * 0.9);
+      v *= 1 + (fx.drain || 0) * 0.5 * (0.6 + share('stamina')) - (fx.recoil || 0) * 0.6 + (fx.first ? 0.06 + share('run') * 0.3 : 0);
+      if (fx.status) v += fx.status.chance * 25; if (fx.debuff) v += 6; if (fx.buff) v += 6;
+      const why = stab ? `Same type as ${nm}: extra strong` : fx.hits > 1 ? `Hits ${fx.hits} times` : fx.drain ? `Heals ${nm} while it hits` : fx.first ? 'Always goes first' : top === 'power' && m.pow >= 60 ? `Great with ${nm}'s strong Power` : '';
+      return { score: v, why };
+    }
+    let v = 0; const bufs = [].concat(fx.buff || []), debs = [].concat(fx.debuff || []);
+    if (fx.heal) v += fx.heal * 110 * (0.6 + share('stamina') * 1.4) * (fx.once ? 0.8 : 1);
+    for (const b of bufs) v += b.n * ({ atk: 22 * (0.6 + share('power') * 1.4), def: 18 * (0.6 + share('stamina') * 1.4), spd: 12 * (0.6 + share('run') * 1.4), eva: 16 * (0.6 + share('fly') * 1.4), acc: 8 }[b.stat] || 10);
+    for (const b of debs) v += b.n * ({ atk: 18, def: 18, spd: 10, acc: 14, eva: 12 }[b.stat] || 10);
+    if (fx.status) v += fx.status.chance * ({ stun: 40, sleep: 45, poison: 32, burn: 36 }[fx.status.type] || 30) * m.acc;
+    if (fx.cleanse) v += 8;
+    const b0 = bufs[0] && bufs[0].stat;
+    const why = fx.heal && top === 'stamina' ? `Great for tough ${nm}: heals` : fx.heal ? `Heals ${nm}` : b0 === 'atk' ? (top === 'power' ? `Makes strong ${nm} even stronger` : 'Raises Attack')
+      : b0 === 'def' ? (top === 'stamina' ? `Makes tough ${nm} even tougher` : 'Raises Defense') : b0 === 'eva' ? (top === 'fly' ? `Floaty ${nm} dodges even more` : 'Helps it dodge')
+        : b0 === 'spd' ? (top === 'run' ? `Speedy ${nm} gets even faster` : 'Makes it faster') : fx.status ? `May make them ${{ stun: 'dizzy', sleep: 'sleep', poison: 'poisoned', burn: 'burned' }[fx.status.type] || 'weaker'}` : debs.length ? 'Makes them weaker' : '';
+    return { score: v, why };
+  }
+  // the moves that suit it best: its strongest attacks (different types where it can, so something hits hard), plus its best helper move
+  function bestMoves(s) {
+    const all = learnedMoves(s).map(id => ({ id, m: D.MOVES[id], f: moveFit(s, id).score }));
+    const atk = all.filter(x => x.m.pow > 0).sort((a, b) => b.f - a.f), sup = all.filter(x => x.m.pow <= 0).sort((a, b) => b.f - a.f);
+    const pick = [], els = new Set();
+    for (const x of atk) { if (pick.length >= 3) break; if (pick.length && els.has(x.m.el) && atk.some(y => !pick.includes(y.id) && !els.has(y.m.el) && y.f > x.f * 0.8)) continue; pick.push(x.id); els.add(x.m.el); }
+    for (const x of atk) if (pick.length < 2 && !pick.includes(x.id)) pick.push(x.id);
+    if (sup.length && pick.length < MAX_MOVES) pick.push(sup[0].id);
+    for (const x of atk.concat(sup)) if (pick.length < Math.min(MAX_MOVES, all.length) && !pick.includes(x.id)) pick.push(x.id);
+    return pick;
   }
   // everything it knows, with where it came from (for the roster screen)
   function knownMoves(s) {
@@ -514,6 +574,8 @@
   }
   function useFruit(id) { if (!PS.S.fruits[id]) return false; PS.S.fruits[id]--; if (!PS.S.fruits[id]) delete PS.S.fruits[id]; emit('pouch'); save(); return true; }
   function addFruit(id, n) { PS.S.fruits[id] = (PS.S.fruits[id] || 0) + (n || 1); emit('pouch'); save(); }
+  // throw fruit away from the tray; returns how many went
+  function discardFruit(id, n) { const have = PS.S.fruits[id] || 0, k = Math.max(0, Math.min(have, Math.floor(n || 1))); if (!k) return 0; PS.S.fruits[id] = have - k; if (!PS.S.fruits[id]) delete PS.S.fruits[id]; emit('pouch'); save(); return k; }
 
   // random garden drops: returns {type:'coin'|'xp', amount, stat?}
   function rollDrop() {
@@ -728,8 +790,9 @@
     util: { rand, irand, pick, clamp, newId },
     state: {
       makeSprout, addXp, gain, happyBonus, totalLevels, natureKind, domStat, formInfo, movesOf, knownMoves, elementsOf, battleStats,
+      learnedMoves, defaultMoves, setMoves, moveFit, bestMoves, MAX_MOVES,
       raceRating, staminaRating, lookOf, absorb, feed, pet, roughHandle, creature, tierOf, topAnimal,
-      canCatch, addToPouch, takeFromPouch, addCoins, spend, buy, useFruit, addFruit, rollDrop,
+      canCatch, addToPouch, takeFromPouch, addCoins, spend, buy, useFruit, addFruit, discardFruit, rollDrop,
       addEgg, hatchEgg, moveSprout, homeName, renameSprout, get, active, setActive,
       raceProgress, raceUnlocked, raceRivals, finishRace,
       leagueProgress, leagueUnlocked, makeNPC, checkEvolve, evolveTo, flowerFor, PART_RACE, esc,

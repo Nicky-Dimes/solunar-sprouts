@@ -716,7 +716,8 @@
 .b-mrow canvas{width:14px;height:14px;grid-row:span 2}
 .b-mrow b{font-family:var(--f-ui);font-weight:700;font-size:15px;line-height:1.1;color:var(--ink)}
 .b-mrow small{font-size:14px;color:var(--ink);line-height:1.2}
-.b-how{font-size:14px;line-height:1.4;color:var(--ink-soft);margin:10px 2px 0}
+.b-how{font-size:14px;line-height:1.4;color:var(--ink-soft);margin:0}
+.b-howrow{display:flex;align-items:center;gap:10px;margin:10px 2px 0}.b-howrow .btn{flex:0 0 auto;padding:8px 12px;font-size:15px}
 .b-lg header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .b-lname{font-size:20px;color:var(--ink)}
 .b-lsub{font-family:var(--f-ui);font-weight:700;font-size:14px;color:var(--ink);margin-top:2px}
@@ -1132,7 +1133,10 @@
   }
   function moveSource(s, id) {
     if (ST.formInfo(s).moves.includes(id)) return ST.formInfo(s).short;
-    const top = ST.topAnimal(s); return top ? ST.creature(top).name : '';
+    // (a picked move can come from any bonded creature: prefer the top one, then any that teaches it)
+    const top = ST.topAnimal(s); if (top && ST.creature(top).moves.includes(id)) return ST.creature(top).name;
+    for (const aid of Object.keys(s.absorbed || {})) { const c = ST.creature(aid); if (c && c.moves.includes(id)) return c.name; }
+    return top ? ST.creature(top).name : '';
   }
   const TABS = [['leagues', 'Leagues', 'league'], ['wild', 'Wild', 'paw'], ['legends', 'Legends', 'crown'], ['tower', 'Tower', 'tower'], ['friends', 'Friends', 'friends']];
   function tabBadge(id) {
@@ -1164,6 +1168,7 @@
     hubSprite = hubEl.querySelector('.b-psprite'); hubFrame = -1;
     if (hubSprite) {
       PS.ui.drawSproutTo(hubSprite, s);
+      const mvBtn = hubEl.querySelector('.b-pickmoves'); if (mvBtn) mvBtn.onclick = () => { sfx('pop'); PS.ui.pickMoves(s, () => renderHub()); };
       hubEl.querySelector('.b-change').onclick = () => { sfx('pop'); PS.ui.pickSprout({ title: 'Choose a fighter', eyebrow: 'Battle', extra: x => ST.movesOf(x).map(id => D.MOVES[id].name).join(', '), onPick: x => { ST.setActive(x.id); renderHub(); } }); };
     }
     if (hubTab === 'wild') bindWild(); else if (hubTab === 'legends') bindLegends(); else if (hubTab === 'tower') bindTower(); else if (hubTab === 'friends') bindFriends(); else bindLeagues();
@@ -1175,7 +1180,7 @@
         <div class="b-chips">${bs.els.map(chip).join('')}</div></div>
         <button class="btn b-change" type="button">Change</button></div>
         <div class="b-mlist">${mv.map(id => { const m = D.MOVES[id]; return `<div class="b-mrow" style="--c:${elColor(m.el)}"><canvas class="px" data-el="${m.el}"></canvas><b>${m.name}</b><small>${moveKind(m)} · ${esc(moveSource(s, id))}</small></div>`; }).join('')}</div>
-        <p class="b-how">Moves come from its form (3) and its strongest animal (1). Evolve or bond with animals to change them.</p>
+        <div class="b-howrow"><p class="b-how">${s.moveset ? 'You picked these moves.' : 'The game picks these moves.'} ${esc(s.name)} knows ${ST.learnedMoves ? ST.learnedMoves(s).length : mv.length}. Bond with more animals to learn more.</p><button class="btn b-pickmoves" type="button">Choose moves</button></div>
       </section>`;
   }
   function leaguesHtml() {

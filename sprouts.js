@@ -406,9 +406,10 @@
       return `<div class="sp-grp"><h3>${title}</h3><div class="sp-moves">${g.list.map(k => moveHTML(k.id, { compact: true, locked: k.locked, unlockAt: k.unlockAt, inBattle: !k.locked && active.includes(k.id) })).join('')}</div></div>`;
     }).join('');
     const chips = active.map(id => { const m = D.MOVES[id]; if (!m) return ''; const E = D.ELEMENTS[m.el] || D.ELEMENTS.normal; return `<span class="sp-mchip"><i style="background:${E.color}"></i>${esc(m.name)}</span>`; }).join('');
-    const body = `<p class="sp-note">In battle it uses its ${fi.short} form's 3 moves plus the best unlocked move of its top animal.</p>
+    const body = `<p class="sp-note">${s.moveset ? `You picked the ${active.length} moves it uses in battle.` : `The game picks its battle moves: its ${fi.short} form's 3 moves plus the best move of its top animal.`} You can choose any ${state.MAX_MOVES || 4} moves it knows.</p>
       <div class="sp-lbl" style="margin:0 0 6px">Battle moves</div>
       <div class="sp-moves" style="margin-top:0">${active.map(id => moveHTML(id, { active: true })).join('')}</div>
+      <button class="btn primary" data-pick-moves style="width:100%;margin-top:10px">Choose battle moves</button>
       <div class="sp-grp"><h3>Elements</h3><div style="display:flex;gap:5px;flex-wrap:wrap">${state.elementsOf(s).map(elChip).join('')}</div></div>
       <div class="sp-lbl" style="margin:16px 0 -6px">Every move it knows</div>
       ${grp}`;
@@ -673,6 +674,7 @@
     if (q('[data-backup]')) { PS.ui.backupPanel(); return; }
     const s = state.get(curId); if (!s || view !== 'detail') return;
     if (q('[data-partner]')) { state.setActive(s.id); PX.Sound.play('chime'); PS.ui.toast(`${s.name} is now your partner.`); render(true); return; }
+    if (q('[data-pick-moves]')) { PX.Sound.play('pop'); PS.ui.pickMoves(s, () => render(true)); return; }
     if (q('[data-visit]')) {
       PX.Sound.play('pop');
       if (PS.S.area !== s.area) { PS.S.area = s.area; PS.emit('area', { area: s.area }); PS.save(); }

@@ -134,6 +134,51 @@
     });
   }
 
+  // ---------------- battle move picker ----------------
+  // Pick which of its learned moves a Sprout takes into battle (up to state.MAX_MOVES). Each move shows why it suits this Sprout
+  // (from its stats and types); "Best picks" chooses for you; "Let the game choose" goes back to the automatic set.
+  function pickMoves(s, onDone) {
+    if (!s) return;
+    const MAX = state.MAX_MOVES, name = PS.state.esc(s.name), learned = state.learnedMoves(s);
+    let chosen = state.movesOf(s).filter(id => learned.includes(id));
+    const src = {}; for (const k of state.knownMoves(s)) if (!k.locked && !src[k.id]) src[k.id] = k.from;
+    const later = []; // moves it can still learn from animals it has bonded with
+    for (const [aid, n] of Object.entries(s.absorbed || {})) { const c = state.creature(aid); if (!c || D.RARES[aid]) continue; c.moves.forEach((id, i) => { const at = [1, 3, 6][i]; if (n < at && D.MOVES[id] && !learned.includes(id)) later.push({ id, left: at - n, animal: c.name }); }); }
+    const card = (id, on) => {
+      const m = D.MOVES[id], f = state.moveFit(s, id), E = D.ELEMENTS[m.el] || D.ELEMENTS.normal;
+      return `<button class="mv-card${on ? ' on' : ''}" data-mv-id="${id}" type="button"><canvas class="px" data-el="${m.el}" width="7" height="7"></canvas>
+        <span><b>${PS.state.esc(m.name)}</b><small>${m.pow > 0 ? `Pow ${m.pow}${m.fx.hits > 1 ? ' ×' + m.fx.hits : ''}` : 'Helper'} · ${E.label}${src[id] ? ' · ' + PS.state.esc(src[id]) : ''}</small>${f.why ? `<i>${PS.state.esc(f.why)}</i>` : ''}</span>${on ? '<em>✓</em>' : ''}</button>`;
+    };
+    modal({ eyebrow: 'Battle moves', title: `${name}'s moves`, sprite: s, row: true,
+      html: `<p>Pick ${MAX} moves for battles. Tap a move to add it or take it out.</p><div class="mv-slots"></div>
+        <div class="mv-tools"><button class="btn" type="button" data-mv="best">★ Best picks for ${name}</button><button class="pl-link" type="button" data-mv="auto">Let the game choose</button></div>
+        <div class="label">Moves ${name} knows (${learned.length})</div><div class="mv-list"></div>
+        ${later.length ? `<div class="label" style="margin-top:12px">Still to learn</div><div class="mv-later">${later.slice(0, 6).map(x => `<div><b>${PS.state.esc(D.MOVES[x.id].name)}</b> · bond with a ${PS.state.esc(x.animal)} ${x.left} more time${x.left > 1 ? 's' : ''}</div>`).join('')}</div>` : ''}`,
+      buttons: [{ label: 'Cancel' }, { label: 'Save', kind: 'primary', onClick: () => {
+        const now = state.setMoves(s, chosen); PX.Sound.play('chime');
+        toast(`${s.name} will battle with ${now.map(id => D.MOVES[id].name).join(', ')}.`, 3200); if (onDone) setTimeout(onDone, 0);
+      } }],
+      mount(el, close) {
+        const draw = () => {
+          el.querySelector('.mv-slots').innerHTML = Array.from({ length: MAX }, (_, i) => chosen[i] ? card(chosen[i], true) : '<div class="mv-empty">Empty</div>').join('');
+          el.querySelector('.mv-list').innerHTML = learned.filter(id => !chosen.includes(id)).map(id => card(id, false)).join('') || '<p class="bk-ver" style="margin:0">It uses every move it knows.</p>';
+          el.querySelectorAll('canvas[data-el]').forEach(c => paint(c, PX.item('element', c.dataset.el)));
+        };
+        el.addEventListener('click', e => {
+          const b = e.target.closest('[data-mv-id],[data-mv]'); if (!b) return;
+          if (b.dataset.mv === 'best') { chosen = state.bestMoves(s); PX.Sound.play('pop'); draw(); return; }
+          if (b.dataset.mv === 'auto') { state.setMoves(s, null); PX.Sound.play('pop'); toast(`The game will choose ${s.name}'s moves.`, 2600); close(); if (onDone) setTimeout(onDone, 0); return; }
+          const id = b.dataset.mvId, i = chosen.indexOf(id);
+          if (i >= 0) { if (chosen.length > 1) chosen.splice(i, 1); else toast('Keep at least one move.'); }
+          else if (chosen.length < MAX) chosen.push(id);
+          else { toast(`${MAX} moves is the most. Tap one at the top to take it out.`, 2600); return; }
+          PX.Sound.play('tick'); draw();
+        });
+        draw();
+      },
+    });
+  }
+
   // ---------------- global reactions ----------------
   // freezeCoins(true) holds the HUD coin total (e.g. while a gumball rolls, so the prize isn't spoiled); false shows the real total
   let coinFreeze = null;
@@ -309,6 +354,41 @@
   });
   function askPersistentStorage() { try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) { /* optional */ } }
 
+  // ---------------- crisp pixel icons ----------------
+  // Pixel art only looks right when every art pixel covers a whole number of screen pixels. Many icons are sized "by eye" in the
+  // stylesheets (a 32px Sprout shown at 34 or 76 CSS px, a 26px critter squeezed into 22), which doubles some pixel rows and not
+  // others. This snaps every small pixel-art canvas to the nearest whole-pixel scale for this screen (1x, 2x or 3x), preferring
+  // a slightly smaller size over a bigger one so layouts don't overflow. Big scene canvases draw at device resolution and are skipped.
+  const snapQ = new Set(); let snapRaf = 0;
+  const pxOf = v => (typeof v === 'string' && /px$/.test(v) ? parseFloat(v) : 0);
+  function queueSnap(c) { snapQ.add(c); if (!snapRaf) { snapRaf = 1; Promise.resolve().then(flushSnap); } } // before the next paint
+  function flushSnap() {
+    snapRaf = 0;
+    const dpr = window.devicePixelRatio || 1, todo = [];
+    for (const c of snapQ) { // read everything first (one style pass), then write
+      if (!c.isConnected || !c.width || !c.height || c.width > 200 || c.height > 200 || 'nosnap' in c.dataset) continue;
+      const cs = getComputedStyle(c); if (!/pixelated|crisp/.test(cs.imageRendering)) continue;
+      const mine = c.dataset.sw && c.style.width === c.dataset.sw && c.style.height === c.dataset.sh;
+      let rw = mine ? +c.dataset.rw : pxOf(c.style.width) || pxOf(cs.width), rh = mine ? +c.dataset.rh : pxOf(c.style.height) || pxOf(cs.height);
+      if (!rw && !rh) continue;
+      const k = Math.min(rw ? rw / c.width : Infinity, rh ? rh / c.height : Infinity), phys = k * dpr;
+      const lo = Math.max(1, Math.floor(phys)), hi = Math.max(1, Math.ceil(phys));
+      const n = Math.abs(phys - lo) / phys <= 1.25 * Math.abs(hi - phys) / phys || lo === hi ? lo : hi;
+      const w = c.width * n / dpr, h = c.height * n / dpr;
+      if (mine && Math.abs(w - pxOf(c.style.width)) < 0.01 && Math.abs(h - pxOf(c.style.height)) < 0.01) continue;
+      todo.push([c, rw || w, rh || h, w, h]);
+    }
+    snapQ.clear();
+    for (const [c, rw, rh, w, h] of todo) { c.dataset.rw = rw; c.dataset.rh = rh; c.style.width = c.dataset.sw = w + 'px'; c.style.height = c.dataset.sh = h + 'px'; }
+  }
+  function watchCanvases() {
+    const add = n => { if (n.nodeType !== 1) return; if (n.tagName === 'CANVAS') queueSnap(n); else n.querySelectorAll && n.querySelectorAll('canvas').forEach(queueSnap); };
+    new MutationObserver(list => { for (const m of list) { if (m.type === 'attributes') { if (m.target.tagName === 'CANVAS') queueSnap(m.target); else add(m.target); } else m.addedNodes.forEach(add); } })
+      .observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['width', 'height', 'class', 'hidden'] });
+    add(document.body);
+    window.addEventListener('resize', () => add(document.body));
+  }
+
   // ---------------- loop ----------------
   let last = performance.now(), hudT = 0;
   function frame(now) {
@@ -323,6 +403,7 @@
   document.addEventListener('visibilitychange', () => { last = performance.now(); });
 
   function boot() {
+    watchCanvases();
     document.querySelectorAll('#nav button').forEach(b => { paint(b.querySelector('canvas'), icon(b.dataset.go)); b.onclick = () => { PX.Sound.unlock(); PX.Sound.play('tick'); go(b.dataset.go); }; });
     paint($('coinIcon'), icon('coin'));
     document.addEventListener('pointerdown', () => PX.Sound.unlock()); // every tap: iOS can stop the audio after a call or a trip to another app
@@ -364,5 +445,5 @@
     $('playerChip').onclick = () => { PX.Sound.play('tick'); PS.ui.mainMenu(); };
   }
 
-  PS.ui = { boot, go, toast, modal, closeModal, pickSprout, chrome, hold, refresh, devPanel, playersPanel: () => PS.ui.mainMenu(), backupPanel, parentGate, icon, paint, drawSproutTo, freezeCoins, setMuted, isMuted: () => !!PX.Sound.muted, get current() { return current; }, get modalOpen() { return !!open || queue.length > 0; } };
+  PS.ui = { boot, go, toast, modal, closeModal, pickSprout, pickMoves, chrome, hold, refresh, devPanel, playersPanel: () => PS.ui.mainMenu(), backupPanel, parentGate, icon, paint, drawSproutTo, freezeCoins, setMuted, isMuted: () => !!PX.Sound.muted, get current() { return current; }, get modalOpen() { return !!open || queue.length > 0; } };
 })();

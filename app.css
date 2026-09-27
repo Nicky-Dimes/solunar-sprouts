@@ -44,6 +44,22 @@
 .pick-item[disabled]{opacity:.45}
 .pick-item .tag{font-family:var(--f-ui);font-weight:600;font-size:14px;background:var(--slot);border-radius:8px;padding:2px 8px}
 
+/* battle move picker (PS.ui.pickMoves) */
+.mv-slots{display:grid;gap:6px;margin:8px 0 10px}
+.mv-list{display:grid;gap:6px;margin-top:6px}
+.mv-card{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;text-align:left;background:var(--field);border:2px solid var(--line);border-bottom-width:4px;border-radius:14px;padding:7px 10px;color:var(--ink);width:100%}
+.mv-card.on{background:#fff4c2;border-color:var(--sun-edge)}
+.mv-card canvas{width:21px;height:21px}
+.mv-card b{display:block;font-size:16px}
+.mv-card small{display:block;font-size:13.5px;color:var(--ink-soft);line-height:1.3}
+.mv-card i{display:block;font-style:normal;font-size:13.5px;font-weight:600;color:#2b8243;line-height:1.3}
+.mv-card em{font-style:normal;font-weight:700;font-size:18px;color:var(--sun-edge)}
+.mv-empty{border:2px dashed var(--line);border-radius:14px;padding:12px;text-align:center;font-size:14px;color:var(--ink-soft)}
+.mv-tools{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.mv-tools .btn{padding:8px 12px;font-size:15px}
+.mv-later{display:grid;gap:4px;margin-top:6px;font-size:14px;color:var(--ink-soft)}
+.mv-later b{color:var(--ink)}
+
 /* dev panel */
 .dev-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 

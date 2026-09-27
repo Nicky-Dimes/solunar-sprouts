@@ -22,9 +22,9 @@
 .sh-earn b{color:var(--ink);font-weight:600}
 .sh-earn canvas{flex:0 0 auto;width:22px;height:22px;margin-top:1px}
 .sh-tabs{position:sticky;top:0;z-index:3;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:10px 0 8px;background:var(--ground)}
-.sh-tab{display:flex;flex-direction:column;align-items:center;gap:2px;border:2px solid var(--line);border-bottom-width:4px;border-radius:16px;background:var(--slot);
+.sh-tab{display:grid;grid-template-rows:34px auto;justify-items:center;align-items:center;row-gap:2px;border:2px solid var(--line);border-bottom-width:4px;border-radius:16px;background:var(--slot);
   padding:6px 4px 5px;font-family:var(--f-ui);font-weight:600;font-size:15px;color:var(--ink-soft);min-height:62px}
-.sh-tab canvas{height:30px;width:auto}
+.sh-tab canvas{height:30px;width:auto} /* (app.js snaps it to a crisp size; the 34px row keeps every label on one line) */
 .sh-tab[aria-selected="true"]{background:var(--panel);border-color:var(--sun-edge);color:var(--ink);box-shadow:inset 0 -4px 0 var(--sun)}
 .sh-tab:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
 .sh-intro{font-size:14px;line-height:1.4;color:var(--ink-soft);margin:2px 4px 10px}

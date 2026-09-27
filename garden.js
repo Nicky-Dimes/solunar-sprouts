@@ -1833,7 +1833,72 @@
     if (src === 'pouch') {
       const c = ST.creature(id), g = Object.entries(c.gives).map(([k, v]) => `${v > 0 ? '+' : ''}${v} ${D.STAT_META[k].label}`).join(', ');
       PS.ui.toast(`${c.name}: ${g}. Drag it onto a Sprout.`, 3000);
-    } else { const f = D.FRUITS[id]; PS.ui.toast(`${f.name}: ${f.desc} Drag it onto a Sprout.`, 3000); }
+    } else openFruit(id);
+  }
+
+  // ---------------- fruit panel: tap a fruit in the tray to feed one or more to a Sprout here, or throw some away ----------------
+  function feedMany(r, k, n) {
+    if (n <= 1) { if (!ST.useFruit(k)) return 0; feedSprout(r, k); return 1; } // one: the usual snack
+    let fed = 0;
+    for (let i = 0; i < n; i++) { if (!ST.useFruit(k)) break; ST.feed(r.s, k); fed++; }
+    if (!fed) return 0;
+    const f = D.FRUITS[k]; // a big meal: one long munch, with the totals
+    wake(r); r.state = 'eat'; r.timer = Math.min(3, 1.2 + fed * 0.25); r.eat = k; r.mood = null; r.target = null; emote(r, 'heart', 1.5); snd('munch'); markSeen('feed');
+    for (const [st, v] of Object.entries(f.gives || {})) floaterFor(r, `+${v * fed} ${D.STAT_META[st].label}`, D.STAT_META[st].color);
+    if (f.nature) floaterFor(r, f.nature > 0 ? 'Sun +' : 'Moon +', f.nature > 0 ? '#c7861c' : '#76428a');
+    heartUp(r.x, r.y - 24); heartUp(r.x + 4, r.y - 20);
+    return fed;
+  }
+  function openFruit(k) {
+    const f = D.FRUITS[k]; if (!f) return;
+    const have = () => (PS.S.fruits || {})[k] || 0;
+    const eaters = () => here.filter(r => !busy(r) && PS.S.sprouts.includes(r.s));
+    const list = eaters(), selR = sel && RT.get(sel);
+    let who = (selR && list.includes(selR) ? selR : list.find(r => r.s.id === PS.S.activeId) || list[0] || null), n = 1, armed = 0;
+    closeCard();
+    const gains = m => Object.entries(f.gives || {}).map(([st, v]) => `<span class="chip-el" style="background:${D.STAT_META[st].color}">+${v * m} ${D.STAT_META[st].label}</span>`).join('')
+      + (f.happy ? `<span class="chip-el" style="background:#e07ba0">+${f.happy * m} happy</span>` : '') + (f.nature ? `<span class="chip-el" style="background:${f.nature > 0 ? '#c7861c' : '#76428a'}">${f.nature > 0 ? 'Sun' : 'Moon'} +${Math.abs(f.nature) * m}</span>` : '');
+    PS.ui.modal({
+      eyebrow: 'Fruit', title: ST.esc(f.name), sprite: itemSpr('fruit', k),
+      html: `<p>${ST.esc(f.desc)} You have <b class="g-fr-have">${have()}</b>.</p>
+        ${list.length ? `${list.length > 1 ? '<div class="label">Who gets it?</div><div class="g-fr-who"></div>' : ''}
+          <div class="g-fr-n"><button class="btn" type="button" data-fn="-1" aria-label="One less">−</button><b class="g-fr-count num">1</b><button class="btn" type="button" data-fn="1" aria-label="One more">+</button><button class="btn" type="button" data-fn="all">All</button></div>
+          <div class="chips-list g-fr-gain"></div>`
+        : `<p class="bk-ver">No Sprouts are out playing here. Visit an area with a Sprout to feed it, or throw fruit away.</p>
+          <div class="g-fr-n"><button class="btn" type="button" data-fn="-1" aria-label="One less">−</button><b class="g-fr-count num">1</b><button class="btn" type="button" data-fn="1" aria-label="One more">+</button><button class="btn" type="button" data-fn="all">All</button></div>`}`,
+      buttons: (list.length ? [{ label: 'Feed', kind: 'go', onClick: () => {
+        if (!who || busy(who) || !PS.S.sprouts.includes(who.s)) { PS.ui.toast('That Sprout is busy right now.'); return true; }
+        const fed = feedMany(who, k, Math.min(n, have())); if (!fed) return true;
+        PS.ui.toast(fed > 1 ? `${who.s.name} ate ${fed} ${f.name}s! Yum!` : `${who.s.name} ate the ${f.name}. Yum!`, 2400);
+      } }] : []).concat([{ label: 'Throw away', kind: 'danger', onClick: () => {
+        if (Date.now() - armed > 3000) { armed = Date.now(); relabel(true); return true; }
+        const gone = ST.discardFruit(k, Math.min(n, have())); snd('pop');
+        PS.ui.toast(gone > 1 ? `Threw away ${gone} ${f.name}s.` : `Threw away the ${f.name}.`, 2200);
+      } }, { label: 'Close' }]),
+      mount(card) {
+        const btns = [...card.querySelectorAll('.modal-btns button')], feedB = list.length ? btns[0] : null, tossB = btns[list.length ? 1 : 0];
+        function relabel(ask) {
+          const m = Math.min(n, have()), nm = who ? who.s.name : '';
+          card.querySelector('.g-fr-count').textContent = m; card.querySelector('.g-fr-have').textContent = have();
+          if (feedB) feedB.textContent = m > 1 ? `Feed ${nm} ×${m}` : `Feed ${nm}`;
+          tossB.textContent = ask ? `Tap again to throw away ${m}` : m > 1 ? `Throw away ${m}` : 'Throw away';
+          const g = card.querySelector('.g-fr-gain'); if (g) g.innerHTML = gains(m);
+          card.querySelectorAll('.g-fr-who button').forEach(b => b.classList.toggle('on', !!who && b.dataset.sid === who.s.id));
+        }
+        openFruit.relabel = relabel;
+        const whoBox = card.querySelector('.g-fr-who');
+        if (whoBox) for (const r of list) {
+          const b = document.createElement('button'); b.type = 'button'; b.className = 'g-fr-pick'; b.dataset.sid = r.s.id;
+          b.innerHTML = `<canvas class="px"></canvas><span>${ST.esc(r.s.name)}</span>`; PS.ui.drawSproutTo(b.querySelector('canvas'), r.s, { eyes: 'happy', mouth: 'open' });
+          b.onclick = () => { who = RT.get(r.s.id) || r; snd('tick'); relabel(false); }; whoBox.appendChild(b);
+        }
+        card.querySelectorAll('[data-fn]').forEach(b => b.onclick = () => {
+          const v = b.dataset.fn; n = v === 'all' ? have() : Math.max(1, Math.min(have(), n + +v)); armed = 0; snd('tick'); relabel(false);
+        });
+        relabel(false);
+      },
+    });
+    function relabel(ask) { if (openFruit.relabel) openFruit.relabel(ask); }
   }
 
   // ---------------- info card ----------------
@@ -2022,6 +2087,14 @@
 .g-empty{font-size:13px;color:var(--ink-soft);font-weight:600;padding-left:2px;white-space:nowrap}
 .g-ghost{position:absolute;left:0;top:0;pointer-events:none;z-index:30;transform:translate(-999px,-999px);image-rendering:pixelated;image-rendering:crisp-edges;filter:drop-shadow(0 4px 0 rgba(34,32,52,.25))}
 .g-hint{z-index:3;width:max-content;max-width:calc(100% - 40px)}
+.g-fr-who{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}
+.g-fr-pick{display:flex;align-items:center;gap:4px;border:2px solid var(--line);border-bottom-width:4px;border-radius:14px;background:var(--field);padding:2px 10px 2px 2px;font:600 15px var(--f-ui);color:var(--ink)}
+.g-fr-pick.on{background:#fff4c2;border-color:var(--sun-edge)}
+.g-fr-pick canvas{width:40px;height:40px}
+.g-fr-n{display:flex;align-items:center;gap:8px;margin:4px 0 8px}
+.g-fr-n .btn{min-width:48px;padding:8px 10px;font-size:18px}
+.g-fr-n .btn[data-fn="all"]{font-size:15px}
+.g-fr-count{min-width:36px;text-align:center;font-size:24px}
 .g-hint.g-hint-up{transform:translate(-50%,-58px)}
 .g-hand{position:absolute;left:0;top:0;width:44px;height:48px;z-index:7;pointer-events:none;image-rendering:pixelated;image-rendering:crisp-edges;filter:drop-shadow(0 2px 0 rgba(34,32,52,.3))}
 .g-card{position:absolute;left:8px;right:8px;bottom:8px;z-index:6;padding:10px 12px 12px;animation:gUp .2s ease-out;box-shadow:0 -6px 24px rgba(60,44,24,.25)}
