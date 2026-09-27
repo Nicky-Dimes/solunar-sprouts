@@ -42,9 +42,15 @@
   .mm-newform .btn{width:100%}
   .mm-tools{display:flex;justify-content:center;gap:4px;border-top:2px dashed var(--line);padding:2px;flex-wrap:wrap}
   .mm-tools .field-input{margin:4px 6px 0}
-  .mm-foot{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .mm-foot.solo{grid-template-columns:1fr}
+  .mm-foot{display:flex;flex-wrap:wrap;gap:8px}
+  .mm-foot .btn{flex:1 1 130px}
   .mm-ver{text-align:center;font-size:13px;font-weight:600;color:#fff;text-shadow:0 1px 0 #222034;margin:0}
+  .mm-sound{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+  .mm-sound canvas{width:20px;height:17px}
+  .mm-remind{display:flex;align-items:center;gap:10px;background:#fff4c2;border:2px solid #e0a800;border-bottom-width:4px;border-radius:16px;padding:8px 10px 8px 12px;font-size:14px;font-weight:600;line-height:1.3}
+  .mm-remind span{flex:1}
+  .mm-remind .btn{flex:0 0 auto;padding:7px 12px;font-size:15px}
+  .mm-tip{background:var(--panel);border:2px dashed var(--edge);border-radius:14px;padding:8px 12px;font-size:13.5px;font-weight:600;line-height:1.35;margin:0;text-align:center}
   `;
   document.head.appendChild(style);
 
@@ -56,23 +62,43 @@
     return days === 1 ? 'Played yesterday' : `Played ${days} days ago`;
   }
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  function paintSound() {
+    const b = root && root.querySelector('.mm-sound'); if (!b) return;
+    const off = PS.ui.isMuted && PS.ui.isMuted();
+    PS.ui.paint(b.querySelector('canvas'), PS.ui.icon(off ? 'mute' : 'sound'));
+    b.querySelector('span').textContent = off ? 'Sound off' : 'Sound on';
+    b.setAttribute('aria-label', off ? 'Sound is off. Tap to turn it on' : 'Sound is on. Tap to turn it off');
+  }
+  // a gentle nudge for grown-ups when a player with Sprouts hasn't been backed up for 2 weeks (never for brand-new players)
+  function remindBackup(list) {
+    const el = root.querySelector('.mm-remind'); if (!el) return;
+    const DAY = 86400000, now = Date.now();
+    const due = list.filter(p => PS.players.summary(p.id).sprouts > 0 && now - (p.created || now) > 3 * DAY && now - PS.players.lastBackup(p.id) > 14 * DAY);
+    el.hidden = !due.length || PS.players.isTesting();
+    if (!el.hidden) el.querySelector('span').textContent = due.length === 1 ? `Time for a backup of ${due[0].name}'s Sprouts!` : 'Time for a backup of everyone’s Sprouts!';
+  }
 
   function build() {
     root = document.createElement('div');
     root.className = 'mm'; root.id = 'mainMenu'; root.hidden = true;
+    // an iPhone playing in a Safari tab (not the Home Screen app) can lose its saves after a week without visits
+    const safariTab = navigator.standalone === false && window.top === window;
     root.innerHTML = `<canvas class="px mm-bg" aria-hidden="true"></canvas>
       <div class="mm-scroll"><div class="mm-inner">
         <header class="mm-head">
           <div class="mm-row"><canvas class="px" data-ic="sun" width="9" height="9"></canvas><div class="mm-logo"><span class="mm-l1">Solunar</span><span class="mm-l2">Sprouts</span></div><canvas class="px" data-ic="moon" width="9" height="9"></canvas></div>
           <p class="mm-tag">Raise, race and battle your Sprouts</p>
         </header>
+        <div class="mm-remind" hidden><span></span><button class="btn primary" data-a="backup">Back up</button></div>
         <div class="mm-who"><span>Who's playing?</span></div>
         <div class="mm-grid"></div>
-        <div class="mm-foot"><button class="btn" data-a="backup">Backups</button><button class="btn" data-a="manage">Manage players</button></div>
+        <div class="mm-foot"><button class="btn" data-a="backup">Backups</button><button class="btn" data-a="manage">Manage players</button><button class="btn mm-sound" data-a="sound" type="button"><canvas class="px" width="13" height="11"></canvas><span>Sound on</span></button></div>
+        ${safariTab ? '<p class="mm-tip">Grown-ups: add Solunar Sprouts to the Home Screen (Share, then Add to Home Screen) and play from its icon, so progress is kept safe.</p>' : ''}
         <p class="mm-ver"></p>
       </div></div>`;
     document.getElementById('app').appendChild(root);
     root.querySelectorAll('[data-ic]').forEach(c => PS.ui.paint(c, PS.ui.icon(c.dataset.ic)));
+    paintSound();
     root.addEventListener('click', onClick);
     root.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'mmName') create(); });
   }
@@ -111,6 +137,7 @@
     root.querySelector('[data-a="manage"]').hidden = fresh;
     root.querySelector('.mm-foot').classList.toggle('solo', fresh);
     root.querySelector('.mm-ver').textContent = 'Version ' + (window.SOLUNAR_VERSION || 'dev');
+    remindBackup(list);
     setWalkers(looks);
     if (fresh || newForm) setTimeout(() => { const i = root.querySelector('#mmName'); if (i && !fresh) i.focus(); }, 50);
   }
@@ -137,6 +164,7 @@
     if (a === 'cancelnew') { renderCards(false); return; }
     if (a === 'create') { create(); return; }
     if (a === 'backup') { PX.Sound.play('pop'); PS.ui.backupPanel(); return; }
+    if (a === 'sound') { PS.ui.setMuted(!PS.ui.isMuted()); paintSound(); PS.ui.toast(PS.ui.isMuted() ? 'Sound off' : 'Sound on', 1400); return; }
     if (a === 'manage') { PX.Sound.play('tick'); manage = !manage; renderCards(false); return; }
     if (t.dataset.rename) {
       const p = PS.players.list().find(x => x.id === t.dataset.rename); const tools = t.closest('.mm-tools');
@@ -199,11 +227,11 @@
     if (!root) build();
     inGame = !(opts && opts.launch);
     manage = false;
-    renderCards(false);
-    root.hidden = false; root.querySelector('.mm-scroll').scrollTop = 0;
+    renderCards(false); paintSound();
+    root.hidden = false; root.querySelector('.mm-scroll').scrollTop = 0; PS.ui.menuOpen = true;
     lastT = 0; if (!raf) raf = requestAnimationFrame(loop);
   }
-  function close() { if (root) root.hidden = true; }
+  function close() { if (root) root.hidden = true; PS.ui.menuOpen = false; }
 
   PS.ui.mainMenu = open;
   PS.ui.closeMainMenu = close;

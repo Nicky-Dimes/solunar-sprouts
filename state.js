@@ -43,43 +43,139 @@
       v: SAVE_VERSION, created: Date.now(), coins: 60, area: 'meadow', activeId: null, clockOffset: 0,
       sprouts: [], eggs: [{ id: newId('e'), kind: 'meadow', source: 'Your first egg', area: 'meadow', taps: 0 }],
       pouch: [], fruits: { apple: 3 }, progress: { races: {}, leagues: {} },
-      seen: {}, bestTier: 0, totals: { races: 0, raceWins: 0, battles: 0, battleWins: 0, coinsEarned: 0, gumballs: 0, sold: 0 },
+      seen: {}, bestTier: 0, totals: { races: 0, raceWins: 0, battles: 0, battleWins: 0, coinsEarned: 0, gumballs: 0, sold: 0, playSec: 0 },
       items: { paints: {}, patterns: {}, hats: {} },
     };
   }
   // Save format version. When the save shape changes, bump this and add a step to migrate() so old saves upgrade instead of breaking.
-  const SAVE_VERSION = 2;
-  function migrate(s) {
-    if (!s || typeof s !== 'object' || !Array.isArray(s.sprouts)) return null;
+  // migrate() must never throw: it repairs what it can (and notes it in `repairs`) so one bad entry can't cost a whole game.
+  const SAVE_VERSION = 3;
+  const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
+  const num = (v, d) => (typeof v === 'number' && isFinite(v) ? v : d);
+  function migrate(s, repairs) {
+    repairs = repairs || [];
+    if (!isObj(s) || !Array.isArray(s.sprouts)) return null;
     // v1 -> v2: Sprouts keep at most D.MAX_PARTS animal parts (the biggest ones stay); gumball items
     if (!s.v || s.v < 2) {
       for (const sp of s.sprouts) {
-        const keep = Object.keys(sp.parts || {}).filter(p => p !== 'spots' && sp.parts[p] > 0).sort((a, b) => sp.parts[b] - sp.parts[a]);
-        for (const p of keep.slice(D.MAX_PARTS)) delete sp.parts[p];
+        if (!isObj(sp)) continue;
+        const pp = isObj(sp.parts) ? sp.parts : {};
+        const keep = Object.keys(pp).filter(p => p !== 'spots' && pp[p] > 0).sort((a, b) => pp[b] - pp[a]);
+        for (const p of keep.slice(D.MAX_PARTS)) delete pp[p];
         sp.partOrder = keep.slice(0, D.MAX_PARTS).reverse();
       }
     }
+    // v3: every field gets a sane type (older builds could only add missing fields), extras written by race/battle/garden are normalised
     const f = fresh();
     for (const k of Object.keys(f)) if (s[k] === undefined || s[k] === null) s[k] = k === 'eggs' ? [] : f[k];
-    s.progress.races = s.progress.races || {}; s.progress.leagues = s.progress.leagues || {};
+    for (const k of ['eggs', 'pouch']) if (!Array.isArray(s[k])) { repairs.push(k); s[k] = []; }
+    for (const k of ['fruits', 'progress', 'seen', 'totals', 'items']) if (!isObj(s[k])) { repairs.push(k); s[k] = f[k]; }
+    s.coins = Math.max(0, Math.round(num(s.coins, 0)));
+    s.progress.races = isObj(s.progress.races) ? s.progress.races : {}; s.progress.leagues = isObj(s.progress.leagues) ? s.progress.leagues : {};
+    for (const k of ['raceExtra', 'battleExtra']) if (s.progress[k] != null && !isObj(s.progress[k])) { repairs.push(k); delete s.progress[k]; }
+    if (s.garden != null && !isObj(s.garden)) { repairs.push('garden'); delete s.garden; }
+    fixBattleExtra(s.progress.battleExtra, repairs);
+    fixRaceExtra(s.progress.raceExtra, repairs);
+    if (s.garden) for (const k of ['trees', 'ground']) {
+      if (s.garden[k] != null && !isObj(s.garden[k])) { repairs.push('garden.' + k); delete s.garden[k]; continue; }
+      for (const [a, list] of Object.entries(s.garden[k] || {})) if (!Array.isArray(list)) { repairs.push('garden.' + k); delete s.garden[k][a]; }
+    }
     s.totals = Object.assign({}, f.totals, s.totals);
     s.items = Object.assign({ paints: {}, patterns: {}, hats: {} }, s.items);
+    for (const k of ['paints', 'patterns', 'hats']) if (!isObj(s.items[k])) s.items[k] = {};
+    s.pouch = s.pouch.filter(id => typeof id === 'string');
+    s.eggs = s.eggs.filter(e => { if (isObj(e) && typeof e.kind === 'string') return true; repairs.push('egg'); return false; });
+    for (const e of s.eggs) { if (!e.id) e.id = newId('e'); e.taps = num(e.taps, 0); if (!D.AREAS[e.area]) e.area = D.AREAS[e.kind] ? e.kind : 'meadow'; }
+    s.sprouts = s.sprouts.filter(sp => { if (isObj(sp)) return true; repairs.push('sprout'); return false; });
     for (const sp of s.sprouts) {
-      sp.stats = sp.stats || {}; for (const st of D.STATS) sp.stats[st] = sp.stats[st] || { lv: 0, xp: 0 };
-      sp.parts = sp.parts || {}; sp.absorbed = sp.absorbed || {}; sp.look = sp.look || {};
+      if (!sp.id) sp.id = newId('s'); if (typeof sp.name !== 'string' || !sp.name) sp.name = 'Sprout';
+      if (!isObj(sp.stats)) sp.stats = {};
+      for (const st of D.STATS) { const x = sp.stats[st]; sp.stats[st] = isObj(x) ? { lv: Math.max(0, Math.min(D.GROWTH.maxLevel, Math.round(num(x.lv, 0)))), xp: Math.max(0, num(x.xp, 0)) } : { lv: 0, xp: 0 }; }
+      if (!isObj(sp.parts)) sp.parts = {}; if (!isObj(sp.absorbed)) sp.absorbed = {}; if (!isObj(sp.look)) sp.look = {};
       if (!Array.isArray(sp.partOrder)) sp.partOrder = Object.keys(sp.parts).filter(p => p !== 'spots' && sp.parts[p] > 0);
-      sp.record = Object.assign({ races: 0, raceWins: 0, battles: 0, battleWins: 0 }, sp.record);
-      if (sp.nature == null) sp.nature = 0; if (sp.stage == null) sp.stage = 0; if (!sp.form) sp.form = 'seedling';
-      if (sp.happy == null) sp.happy = 70; if (sp.energy == null) sp.energy = 100; if (!D.AREAS[sp.area]) sp.area = 'meadow';
+      sp.record = Object.assign({ races: 0, raceWins: 0, battles: 0, battleWins: 0 }, isObj(sp.record) ? sp.record : {});
+      sp.nature = num(sp.nature, 0); if (sp.stage == null) sp.stage = 0; if (!sp.form) sp.form = 'seedling';
+      sp.happy = num(sp.happy, 70); if (sp.energy == null) sp.energy = 100; if (!D.AREAS[sp.area]) sp.area = 'meadow';
     }
     if (!s.v || s.v < SAVE_VERSION) s.v = SAVE_VERSION;
     return s;
   }
-  function parseSave(raw) { try { return raw ? migrate(JSON.parse(raw)) : null; } catch (e) { return null; } }
-  function load() { try { return parseSave(localStorage.getItem(KEY)); } catch (e) { return null; } }
-  let saveTimer = null;
-  function saveNow() { try { localStorage.setItem(KEY, JSON.stringify(PS.S)); } catch (e) { /* storage may be blocked */ } }
+  // battle.js keeps its own progress in progress.battleExtra (bosses, tower, friend, snack, seen, wild). Only wrong types are fixed;
+  // missing parts are fine (battle.js fills them in when it needs them).
+  function fixBattleExtra(bx, repairs) {
+    if (!isObj(bx)) return;
+    const bad = k => repairs.push('battleExtra.' + k);
+    for (const k of ['bosses', 'friend', 'seen']) if (bx[k] != null && !isObj(bx[k])) { bad(k); bx[k] = {}; }
+    for (const [id, b] of Object.entries(bx.bosses || {})) if (!isObj(b)) { bad('bosses'); delete bx.bosses[id]; }
+    if (bx.tower != null && !isObj(bx.tower)) { bad('tower'); bx.tower = { best: 0, runs: 0, run: null }; }
+    if (bx.tower) {
+      for (const k of ['best', 'runs']) if (bx.tower[k] != null && typeof bx.tower[k] !== 'number') { bad('tower'); bx.tower[k] = 0; }
+      const r = bx.tower.run;
+      if (r != null && (!isObj(r) || typeof r.sid !== 'string' || !(num(r.floor, 0) >= 1))) { bad('tower.run'); bx.tower.run = null; }
+      else if (r && r.fighting != null && typeof r.fighting !== 'number') delete r.fighting;
+    }
+    if (bx.wild != null && !isObj(bx.wild)) { bad('wild'); bx.wild = {}; }
+    if (bx.wild) {
+      if (bx.wild.animals != null && !isObj(bx.wild.animals)) { bad('wild'); bx.wild.animals = {}; }
+      if (bx.wild.areas != null && !isObj(bx.wild.areas)) { bad('wild'); bx.wild.areas = {}; }
+      for (const [id, v] of Object.entries(bx.wild.animals || {})) if (!Array.isArray(v) || v.length !== 3 || v.some(x => typeof x !== 'number')) { bad('wild'); delete bx.wild.animals[id]; }
+    }
+    if (bx.snack != null && typeof bx.snack !== 'string') delete bx.snack;
+  }
+  // race.js keeps the extra/wild series, time trials (with ghost runs), the Daily Cup and hint counters in progress.raceExtra.
+  function fixRaceExtra(rx, repairs) {
+    if (!isObj(rx)) return;
+    const bad = k => repairs.push('raceExtra.' + k);
+    for (const k of ['series', 'trials', 'daily', 'hint']) if (rx[k] != null && !isObj(rx[k])) { bad(k); rx[k] = {}; }
+    for (const [key, v] of Object.entries(rx.series || {})) if (!isObj(v)) { bad('series'); delete rx.series[key]; }
+    for (const [key, v] of Object.entries(rx.trials || {})) {
+      if (!isObj(v)) { bad('trials'); delete rx.trials[key]; continue; }
+      if (v.g != null && (!Array.isArray(v.g) || v.g.some(x => typeof x !== 'number'))) { bad('trials'); delete v.g; delete v.dt; delete v.len; } // a broken ghost goes; the best time stays
+    }
+  }
+  function parseSave(raw, repairs) { try { return raw ? migrate(JSON.parse(raw), repairs) : null; } catch (e) { return null; } }
+
+  // ---------------- safety net: automatic daily backups + a kept copy of any save that fails to load ----------------
+  // They live under their own prefixes (never a player key). SNAP: up to 3 known-good saves from different days (race-ghost
+  // replays left out to save space). RESCUE: the raw text of a save that couldn't be opened, so nothing is ever overwritten blind.
+  const SNAP = 'solunar:snap:v1:', RESCUE = 'solunar:rescue:v1:', SNAP_KEEP = 3;
+  const dayOf = ts => new Date(ts).toDateString();
+  function readSnaps(key) { try { const v = JSON.parse(localStorage.getItem(SNAP + (key || KEY))); return v && Array.isArray(v.list) ? v.list.filter(x => x && x.raw && x.at) : []; } catch (e) { return []; } }
+  function snapshot(raw) {
+    try {
+      const list = readSnaps();
+      if (list.length && dayOf(list[0].at) === dayOf(Date.now())) return; // one per day: the first good load of the day
+      const obj = JSON.parse(raw), rx = obj && obj.progress && obj.progress.raceExtra;
+      if (rx && isObj(rx.trials)) for (const t of Object.values(rx.trials)) if (isObj(t)) delete t.g;
+      list.unshift({ at: Date.now(), raw: JSON.stringify(obj) });
+      try { localStorage.setItem(SNAP + KEY, JSON.stringify({ list: list.slice(0, SNAP_KEEP) })); }
+      catch (e) { try { localStorage.setItem(SNAP + KEY, JSON.stringify({ list: list.slice(0, 1) })); } catch (e2) { localStorage.removeItem(SNAP + KEY); } } // never crowd out the real save
+    } catch (e) { /* optional */ }
+  }
+  function keepRescue(raw) { try { localStorage.setItem(RESCUE + KEY, JSON.stringify({ at: Date.now(), raw })); } catch (e) { /* storage full: the raw save is still in place until the next save */ } }
+  let loadNote = null; // tells the app (once) that a save had to be repaired, restored from a daily backup, or restarted
+  function load() {
+    let raw = null;
+    try { raw = localStorage.getItem(KEY); } catch (e) { return null; }
+    if (raw == null) return null; // a brand-new player
+    const repairs = [], s = parseSave(raw, repairs);
+    if (s && !repairs.length) { snapshot(raw); return s; }
+    keepRescue(raw); // keep the original text before anything overwrites it
+    if (s) { loadNote = { kind: 'repaired', what: repairs }; return s; }
+    for (const sn of readSnaps()) { const b = parseSave(sn.raw); if (b) { loadNote = { kind: 'snapshot', at: sn.at }; return b; } }
+    loadNote = { kind: 'fresh' };
+    return null;
+  }
+  let saveTimer = null, saveLockUntil = 0, saveFailed = false;
+  // returns false (and tells the app once) when the device refuses to save
+  function saveNow() {
+    if (Date.now() < saveLockUntil) return true;
+    try { localStorage.setItem(KEY, JSON.stringify(PS.S)); if (saveFailed) { saveFailed = false; emit('save:ok'); } return true; }
+    catch (e) { if (!saveFailed) { saveFailed = true; emit('save:failed', { error: e }); } return false; }
+  }
   function save() { if (saveTimer) return; saveTimer = setTimeout(() => { saveTimer = null; saveNow(); }, 400); }
+  // Before a reload that must not write the old in-memory game back (a restore, or removing the current player): stop saving.
+  function lockSaves(ms) { saveLockUntil = Date.now() + (ms || 10000); if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; } }
   function reset() { PS.S = fresh(); saveNow(); emit('reset'); }
 
   // ---------------- player management ----------------
@@ -100,8 +196,11 @@
       const p = { id: newId('p'), name: nm, created: Date.now() }; players.list.push(p); writePlayers(players); return p;
     },
     rename(id, name) { const p = players.list.find(x => x.id === id); if (!p) return; p.name = String(name || '').trim().slice(0, 14) || p.name; if (id === players.current) players.named = true; writePlayers(players); },
+    // (its daily automatic backups are kept for a while, so a removal by mistake can still be undone from Backups)
     remove(id) {
       if (players.list.length < 2) return false;
+      const wasCurrent = players.current === id && !SLOT;
+      if (wasCurrent) lockSaves(60000); // the reload that follows must not write this game back
       players.list = players.list.filter(p => p.id !== id);
       try { localStorage.removeItem(keyFor(id)); } catch (e) { /* blocked */ }
       if (players.current === id) players.current = players.list[0].id;
@@ -111,10 +210,13 @@
     // skipMenu: after the reload, go straight into the game instead of showing the main menu again
     switchTo(id, skipMenu) {
       if (!players.list.some(p => p.id === id)) return;
-      saveNow(); players.current = id; players.named = true; writePlayers(players);
+      saveNow(); lockSaves(); players.current = id; players.named = true; writePlayers(players);
       if (skipMenu) { try { sessionStorage.setItem('solunar:skipMenu', '1'); } catch (e) { /* blocked */ } }
       location.reload();
     },
+    // backup reminders: when each player's game was last copied or shared as a backup code (kept with the player list)
+    markBackedUp(ids) { if (SLOT) return; players.backedUp = Object.assign({}, players.backedUp); for (const id of ids) players.backedUp[id] = Date.now(); writePlayers(players); },
+    lastBackup: id => (players.backedUp && players.backedUp[id]) || 0,
     touch() { const p = players.list.find(x => x.id === players.current); if (p) { p.lastPlayed = Date.now(); writePlayers(players); } },
     // a brand-new install: one unnamed player who hasn't hatched anything yet
     isFreshInstall() { return players.list.length === 1 && !players.named && playersApi.summary(players.list[0].id).sprouts === 0; },
@@ -161,7 +263,7 @@
     const good = entries.map(e => ({ name: e.name, save: migrate(e.save) })).filter(e => e.save);
     if (!good.length) throw new Error('This backup has no saved games in it.');
     if (mode === 'replace' && obj.kind === 'player') {
-      try { localStorage.setItem(KEY, JSON.stringify(good[0].save)); } catch (e) { throw new Error('This device would not let the game save.'); }
+      replaceCurrent(good[0].save);
       return [playersApi.current().name];
     }
     const names = [];
@@ -170,6 +272,26 @@
       try { localStorage.setItem(keyFor(p.id), JSON.stringify(e.save)); } catch (err) { throw new Error('This device would not let the game save.'); }
     }
     return names;
+  }
+  // Put a whole saved game in place of the current player's, then hold saves until the caller reloads:
+  // the old game still in memory (and every save-on-exit handler) must never be written back over it.
+  function replaceCurrent(saveObj) {
+    try { localStorage.setItem(KEY, JSON.stringify(saveObj)); } catch (e) { throw new Error('This device would not let the game save.'); }
+    PS.S = saveObj; lockSaves(10000);
+  }
+  // Automatic daily backups of the current player (newest first) and the kept copy of a save that failed to load.
+  const autoBackups = () => readSnaps().map((sn, i) => { const s = parseSave(sn.raw); return { i, at: sn.at, ok: !!s, sprouts: s ? s.sprouts.length : 0, coins: s ? s.coins : 0 }; });
+  function restoreAuto(i) { const sn = readSnaps()[i], s = sn && parseSave(sn.raw); if (!s) throw new Error('That backup could not be opened.'); replaceCurrent(s); return true; }
+  function rescued() { try { const v = JSON.parse(localStorage.getItem(RESCUE + KEY)); return v && v.raw ? v : null; } catch (e) { return null; } }
+  // tidy up: automatic backups of players removed more than 30 days ago
+  function pruneSnaps() {
+    try {
+      const live = new Set(players.list.map(p => SNAP + keyFor(p.id)));
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i); if (!k || !k.startsWith(SNAP) || live.has(k) || k === SNAP + KEY) continue;
+        const list = readSnaps(k.slice(SNAP.length)); if (!list.length || Date.now() - list[0].at > 30 * 86400000) localStorage.removeItem(k);
+      }
+    } catch (e) { /* optional */ }
   }
 
   // ---------------- clock (switches day/night every 15 real minutes) ----------------
@@ -201,12 +323,14 @@
     const egg = D.EGGS[opts.kind] || D.EGGS.meadow;
     const s = {
       id: newId('s'), name: opts.name || uniqueName(), area: opts.area || 'meadow', born: Date.now(), kind: opts.kind || 'meadow',
-      look: { body: opts.body || pick(egg.bodies), eyes: egg.sparkle ? 'sparkle' : pick(['round', 'round', 'sparkle', 'dot', 'sleepy']),
-        pattern: Math.random() < 0.4 ? pick(['spots', 'stripes', 'twotone', 'freckles', 'heart', 'socks']) : 'plain', patternColor: pick(D.PATTERN_COLORS), hat: 'none' },
+      look: { body: opts.body || pick(egg.bodies), eyes: egg.sparkle ? 'sparkle' : pick(['round', 'round', 'round', 'sparkle', 'dot', 'sleepy', 'star', 'wink', 'big']),
+        pattern: Math.random() < 0.4 ? pick(['spots', 'stripes', 'twotone', 'freckles', 'heart', 'socks', 'zigzag', 'patches', 'tiger', 'moonmark']) : 'plain', patternColor: pick(D.PATTERN_COLORS), hat: 'none' },
       stats: blankStats(), parts: {}, partOrder: [], absorbed: {}, nature: 0, stage: 0, form: 'seedling', flower: null,
       happy: 70, energy: 100, record: { races: 0, raceWins: 0, battles: 0, battleWins: 0 },
     };
+    if (s.look.pattern !== 'plain') s.look.patternColor = patternColorFor(s, s.look.pattern); // one you can see on this body
     if (egg.skin) s.look.skin = egg.skin;
+    else if (!opts.npc && Math.random() < D.SHINY_CHANCE) s.look.shiny = true; // a rare shimmering Shiny (about 1 in 30 ordinary hatches)
     if (egg.hat && D.HATS[egg.hat]) { s.look[D.HATS[egg.hat].slot] = egg.hat; if (!s.npc && PS.S) items().hats[egg.hat] = true; }
     if (egg.bonus) D.STATS.forEach(st => addXp(s, st, egg.bonus, true));
     return s;
@@ -221,10 +345,12 @@
     if (ups && !quiet && !s.npc) emit('levelup', { s, stat, lv: st.lv });
     return ups;
   }
+  // a very happy Sprout (happiness 75+, from petting, snacks and new friends) learns a little faster: +10% on every XP gain
+  const happyBonus = s => (s && !s.npc && (s.happy || 0) >= 75 ? 1.1 : 1);
   // gives = {stat: xp}. Returns {ups:{stat:n}, evolved}
   function gain(s, gives, opts) {
-    opts = opts || {}; const ups = {};
-    for (const [stat, amt] of Object.entries(gives || {})) { const n = addXp(s, stat, amt * (opts.mult || 1), opts.quiet); if (n) ups[stat] = n; }
+    opts = opts || {}; const ups = {}, k = (opts.mult || 1) * (opts.quiet ? 1 : happyBonus(s));
+    for (const [stat, amt] of Object.entries(gives || {})) { const n = addXp(s, stat, amt > 0 ? amt * k : amt * (opts.mult || 1), opts.quiet); if (n) ups[stat] = n; }
     const evolved = s.npc ? null : checkEvolve(s);
     if (!s.npc) { emit('sprout:update', { s }); save(); }
     return { ups, evolved };
@@ -261,10 +387,11 @@
   }
   const creature = id => D.ANIMALS[id] || D.RARES[id];
   function tierOf(id, count) { if (!count) return 0; if (D.RARES[id]) return 3; return count >= 6 ? 3 : count >= 3 ? 2 : 1; }
+  // the bonded creature a Sprout battles with: any rare creature beats ordinary animals (you paid for it, you see it), then the most-bonded
   function topAnimal(s) {
     const e = Object.entries(s.absorbed || {}).filter(([id]) => creature(id));
     if (!e.length) return null;
-    e.sort((a, b) => (b[1] * (D.RARES[b[0]] ? 10 : 1)) - (a[1] * (D.RARES[a[0]] ? 10 : 1)));
+    e.sort((a, b) => (!!D.RARES[b[0]] - !!D.RARES[a[0]]) || (b[1] - a[1]));
     return e[0][0];
   }
   // Every animal/rare and every form has exactly 3 moves. A Sprout battles with its form's 3 + the best unlocked move of its top animal.
@@ -320,7 +447,9 @@
     L.parts = Object.assign({ wings: 0, ears: 0, fins: 0, horns: 0, tail: 0, shell: 0 }, s.parts || {});
     const nk = natureKind(s);
     L.leaf = nk === 'sun' ? 'sun' : nk === 'moon' ? 'plum' : 'leaf';
-    if ((s.parts || {}).spots && L.pattern === 'plain') { L.pattern = 'star'; L.patternColor = '#f7b6c8'; }
+    // a Starfish friend gives star spots, unless the player chose "Plain" with a sticker
+    if ((s.parts || {}).spots && L.pattern === 'plain' && !L.noSpots) { L.pattern = 'star'; L.patternColor = '#f7b6c8'; }
+    delete L.noSpots;
     if (s.stage === 1) L.bud = nk;
     if (s.stage === 2 && s.flower) { L.bloom = s.flower; delete L.bud; }
     return L;
@@ -338,9 +467,12 @@
     const lost = trackParts(s, c.rare ? Object.keys(c.parts) : c.part ? [c.part] : []);
     s.nature = clamp(s.nature + (c.nature || 0) * (c.rare ? 1 : 3), -100, 100);
     s.happy = clamp(s.happy + 6, 0, 100);
-    const res = gain(s, c.gives);
+    // animals stay worth catching as a Sprout grows: their XP scales with the stat's level (x1 at Lv 0, x2 at Lv 20, x3.5 at Lv 50)
+    const gives = {};
+    for (const [st, v] of Object.entries(c.gives)) gives[st] = v > 0 && s.stats[st] ? Math.round(v * (1 + s.stats[st].lv / 20)) : v;
+    const res = gain(s, gives);
     const unlocked = afterTier > beforeTier ? c.moves.slice(beforeTier, afterTier) : [];
-    return { id, name: c.name, gives: c.gives, ups: res.ups, grew: grew.filter(p => !lost.includes(p)), lost, unlocked, evolved: res.evolved };
+    return { id, name: c.name, gives, ups: res.ups, grew: grew.filter(p => !lost.includes(p)), lost, unlocked, evolved: res.evolved };
   }
   // The newest parts go to the end of s.partOrder (touching a part again makes it new). Past D.MAX_PARTS, the oldest drops off.
   function trackParts(s, touched) {
@@ -374,6 +506,10 @@
     if (kind === 'fruit') { const f = D.FRUITS[id]; if (!f || !spend(f.price)) return false; PS.S.fruits[id] = (PS.S.fruits[id] || 0) + 1; emit('pouch'); save(); return true; }
     if (kind === 'rare') { const r = D.RARES[id]; if (!r || !spend(r.price)) return false; PS.S.pouch.push(id); PS.S.seen['rare:' + id] = true; emit('pouch'); save(); return true; }
     if (kind === 'egg') { const e = D.EGGS[id]; if (!e || !e.price || !spend(e.price)) return false; addEgg(id, 'Bought at the shop'); return true; }
+    // pick the exact paint colour or sticker you want (the gumball machine only gives random ones)
+    const CP = D.CLOSET_PRICES || {};
+    if (kind === 'paint') { if (!D.COLORS[id] || !spend(CP.paint || 60)) return false; bump(items().paints, id); emit('items'); save(); return true; }
+    if (kind === 'pattern') { if (!D.PATTERNS[id] || id === 'plain' || !spend(CP.pattern || 80)) return false; bump(items().patterns, id); emit('items'); save(); return true; }
     return false;
   }
   function useFruit(id) { if (!PS.S.fruits[id]) return false; PS.S.fruits[id]--; if (!PS.S.fruits[id]) delete PS.S.fruits[id]; emit('pouch'); save(); return true; }
@@ -415,6 +551,7 @@
   const bump = (bag, id, n) => { bag[id] = (bag[id] || 0) + (n || 1); };
   // Spends the price and gives one prize. Returns null (unknown tier), {ok:false, reason:'coins'} or
   // {ok:true, tier, color (0..7 gumball colour), type, id?, n?, title, text}
+  const inArea = a => (a === 'candy' ? '' : 'the ') + ((D.AREAS[a] || {}).name || 'Garden');
   function gumball(tier) {
     const G = D.GUMBALL[tier]; if (!G) return null;
     if (!spend(G.price)) return { ok: false, reason: 'coins' };
@@ -428,7 +565,7 @@
     }
     if (type === 'animal') {
       const id = pick(Object.keys(D.ANIMALS));
-      if (canCatch()) { PS.S.pouch.push(id); PS.S.seen['animal:' + id] = true; emit('pouch'); out = { type, id, title: `A ${D.ANIMALS[id].name}!`, text: `It hopped into your pouch. It lives in ${D.AREAS[D.ANIMALS[id].area].name}.` }; }
+      if (canCatch()) { PS.S.pouch.push(id); PS.S.seen['animal:' + id] = true; emit('pouch'); out = { type, id, title: `A ${D.ANIMALS[id].name}!`, text: `It hopped into your pouch. It lives in ${inArea(D.ANIMALS[id].area)}.` }; }
       else type = 'coins';
     }
     if (!out) switch (type) {
@@ -441,10 +578,15 @@
       case 'goldfruit': { const n = mega ? 2 : 1; bump(PS.S.fruits, 'goldfruit', n); emit('pouch'); out = { type, id: 'goldfruit', n, title: `${n} Golden Fruit`, text: 'XP to every stat. Find it in the Garden fruit tray.' }; break; }
       case 'paint': { const id = pick(Object.keys(D.COLORS)); bump(it.paints, id); out = { type, id, title: `${D.COLORS[id]} paint`, text: 'Paint a Sprout this color from its page in Sprouts.' }; break; }
       case 'pattern': { const id = pick(Object.keys(D.PATTERNS).filter(k => k !== 'plain')); bump(it.patterns, id); out = { type, id, title: `${D.PATTERNS[id]} sticker`, text: 'Give a Sprout this pattern from its page in Sprouts.' }; break; }
-      case 'egg': { const k = pick(D.AREA_ORDER); addEgg(k, 'Gumball machine'); out = { type, id: k, title: D.EGGS[k].name, text: `It's waiting in ${D.AREAS[k].name}. Tap it to hatch.` }; break; }
-      case 'spookyegg': { const k = pick(D.SPOOKY_EGGS); const e = addEgg(k, 'Gumball machine'); out = { type: 'egg', id: k, title: D.EGGS[k].name + '!', text: `A spooky surprise! It's waiting in ${D.AREAS[e.area].name}.` }; break; }
-      case 'goldenegg': case 'rainbowegg': { const k = type === 'goldenegg' ? 'golden' : 'rainbow'; const e = addEgg(k, 'Gumball machine'); out = { type: 'egg', id: k, title: D.EGGS[k].name + '!', text: `A jackpot! It's waiting in ${D.AREAS[e.area].name}.` }; break; }
-      case 'rare': { const id = pick(Object.keys(D.RARES)); PS.S.pouch.push(id); PS.S.seen['rare:' + id] = true; emit('pouch'); out = { type, id, title: `A ${D.RARES[id].name}!`, text: 'The jackpot! It is waiting in your pouch in the Garden.' }; break; }
+      case 'egg': { const k = pick(D.AREA_ORDER); addEgg(k, 'Gumball machine'); out = { type, id: k, title: D.EGGS[k].name, text: `It's waiting in ${inArea(k)}. Tap it to hatch.` }; break; }
+      case 'spookyegg': { const k = pick(D.SPOOKY_EGGS); const e = addEgg(k, 'Gumball machine'); out = { type: 'egg', id: k, title: D.EGGS[k].name + '!', text: `A spooky surprise! It's waiting in ${inArea(e.area)}.` }; break; }
+      case 'goldenegg': case 'rainbowegg': { const k = type === 'goldenegg' ? 'golden' : 'rainbow'; const e = addEgg(k, 'Gumball machine'); out = { type: 'egg', id: k, title: D.EGGS[k].name + '!', text: `A special egg! It's waiting in ${inArea(e.area)}.` }; break; }
+      case 'fancyegg': {
+        const pool = (D.FANCY_EGGS || []).filter(k => D.EGGS[k]);
+        if (!pool.length) { out = coins(irand(G.coins[0], G.coins[1])); break; }
+        const k = pick(pool), e = addEgg(k, 'Gumball machine'); out = { type: 'egg', id: k, title: D.EGGS[k].name + '!', text: `A fancy egg! It's waiting in ${inArea(e.area)}.` }; break;
+      }
+      case 'rare': { const id = pick(Object.keys(D.RARES)); PS.S.pouch.push(id); PS.S.seen['rare:' + id] = true; emit('pouch'); out = { type, id, title: `A ${D.RARES[id].name}!`, text: 'A rare creature! It is waiting in your pouch in the Garden.' }; break; }
       default: out = coins(irand(G.coins[0], G.coins[1]));
     }
     PS.S.totals.gumballs = (PS.S.totals.gumballs || 0) + 1;
@@ -458,13 +600,25 @@
     s.look.body = color; delete s.look.skin;
     emit('sprout:update', { s }); emit('items'); save(); return true;
   }
-  // use one pattern sticker ('plain' is free: it removes the pattern)
+  // use one pattern sticker ('plain' is free: it removes the pattern). Re-applying the pattern it already has is free too.
   function usePattern(s, pat) {
     const it = items(); if (!s || !D.PATTERNS[pat]) return false;
+    if (pat !== 'plain' && s.look.pattern === pat && !s.look.noSpots) return true;
     if (pat !== 'plain') { if (!it.patterns[pat]) return false; if (--it.patterns[pat] <= 0) delete it.patterns[pat]; }
     s.look.pattern = pat;
-    if (pat !== 'plain') s.look.patternColor = pick(D.PATTERN_COLORS.filter(c => c !== s.look.patternColor));
+    if (pat === 'plain') s.look.noSpots = true; else delete s.look.noSpots;
+    if (pat !== 'plain') s.look.patternColor = patternColorFor(s, pat);
     emit('sprout:update', { s }); emit('items'); save(); return true;
+  }
+  // a sticker colour you can actually see: not too close to the body colour, nor to the belly for belly patterns
+  const rgbOf = h => [1, 3, 5].map(i => parseInt(String(h).slice(i, i + 2), 16) || 0);
+  const colDist = (a, b) => { const A = rgbOf(a), B = rgbOf(b); return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]); };
+  function patternColorFor(s, pat) {
+    const PX = window.PX, body = !s.look.skin && PX && PX.RAMPS[s.look.body] ? PX.RAMPS[s.look.body][1] : null, belly = (PX && PX.BELLY) || '#fbf3dc';
+    const onBelly = pat === 'star' || pat === 'heart';
+    const all = D.PATTERN_COLORS.filter(c => c !== s.look.patternColor);
+    const good = all.filter(c => (!body || colDist(c, body) > 70) && (!onBelly || colDist(c, belly) > 60));
+    return pick(good.length ? good : all);
   }
   // hats are kept forever once won; id 'none' takes off whatever is in that slot ('hat' or 'extra')
   const ownsHat = id => !!items().hats[id];
@@ -516,7 +670,7 @@
     const bodies = ['clay', 'plum', 'sky', 'rose', 'leaf', 'slate', 'sun', 'berry', 'night', 'cocoa'];
     return names.map((name, i) => {
       const base = T.rating[0] + (T.rating[1] - T.rating[0]) * (i / 2);
-      const rt = seg => +(base * (0.8 + sr() * 0.4)).toFixed(2);
+      const rt = seg => +Math.min(T.rating[1], base * (0.8 + sr() * 0.4)).toFixed(2); // never stronger than the tier's stated range
       const parts = {}; const specialty = ['wings', 'fins', 'ears', 'horns'][Math.floor(sr() * 4)]; if (tier > 0) parts[specialty] = tier >= 2 ? 1 : 0.5;
       return { name, look: Object.assign(window.PX.cloneLook(window.PX.DEFAULT_LOOK), { body: bodies[Math.floor(sr() * bodies.length)], parts: Object.assign({ wings: 0, ears: 0, fins: 0, horns: 0, tail: 0, shell: 0 }, parts), eyes: ['round', 'brave', 'dot'][Math.floor(sr() * 3)] }),
         rating: { run: rt(), swim: rt(), climb: rt(), fly: rt(), stamina: rt() }, cheer: T.cheerSkill };
@@ -564,43 +718,26 @@
     if (o.stage >= 2) { s.stage = 2; s.flower = o.flower; s.form = 'bloom'; }
     return s;
   }
-  function finishBattle(s, leagueId, index, won) {
-    const L = D.LEAGUES.find(l => l.id === leagueId), p = leagueProgress(leagueId);
-    const coins = addCoins(won ? L.coins * (1 + index * 0.25) : L.coins * D.BATTLE.loseCoinsShare, 'battle');
-    const g = L.xp * (won ? 1 : 0.35);
-    const res = gain(s, { power: g * 1.2, stamina: g, run: g * 0.6, fly: g * 0.4, swim: g * 0.4 });
-    s.record.battles++; if (won) s.record.battleWins++;
-    PS.S.totals.battles++; if (won) PS.S.totals.battleWins++;
-    let egg = null, cleared = false, bonus = 0;
-    if (won) {
-      p.beaten[index] = true;
-      if (!p.cleared && p.beaten.every(Boolean)) {
-        p.cleared = true; cleared = true;
-        bonus = addCoins(L.coins * 3, 'league');
-        egg = addEgg(L.egg, L.name);
-        PS.S.bestTier = Math.max(PS.S.bestTier, Math.min(3, Math.ceil((D.LEAGUES.indexOf(L) + 1) / 2)));
-      }
-    }
-    PS.S.progress.leagues[leagueId] = p; save();
-    return { coins: coins + bonus, bonus, ups: res.ups, evolved: res.evolved, egg, cleared };
-  }
+  // (battle rewards are paid in battle.js by one function, grant(), using D.BATTLE's prize settings)
 
   // ---------------- boot ----------------
   const PS = window.PS = {
-    D, S: load() || fresh(), save, saveNow, reset, on, emit, clock, players: playersApi,
-    backup: { exportBackup, decodeBackup, importBackup },
+    D, S: load() || fresh(), save, saveNow, reset, lockSaves, on, emit, clock, players: playersApi,
+    get loadNote() { return loadNote; }, clearLoadNote() { loadNote = null; },
+    backup: { exportBackup, decodeBackup, importBackup, autoBackups, restoreAuto, rescued },
     util: { rand, irand, pick, clamp, newId },
     state: {
-      makeSprout, addXp, gain, totalLevels, natureKind, domStat, formInfo, movesOf, knownMoves, elementsOf, battleStats,
+      makeSprout, addXp, gain, happyBonus, totalLevels, natureKind, domStat, formInfo, movesOf, knownMoves, elementsOf, battleStats,
       raceRating, staminaRating, lookOf, absorb, feed, pet, roughHandle, creature, tierOf, topAnimal,
       canCatch, addToPouch, takeFromPouch, addCoins, spend, buy, useFruit, addFruit, rollDrop,
       addEgg, hatchEgg, moveSprout, homeName, renameSprout, get, active, setActive,
       raceProgress, raceUnlocked, raceRivals, finishRace,
-      leagueProgress, leagueUnlocked, makeNPC, finishBattle, checkEvolve, evolveTo, flowerFor, PART_RACE, esc,
+      leagueProgress, leagueUnlocked, makeNPC, checkEvolve, evolveTo, flowerFor, PART_RACE, esc,
       sellPrice, canSell, sellSprout, gumball, items, usePaint, usePattern, ownsHat, wear,
     },
   };
   lastNight = clock.isNight();
+  pruneSnaps();
   document.addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); });
   window.addEventListener('pagehide', saveNow);
 })();

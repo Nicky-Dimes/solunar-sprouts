@@ -159,9 +159,20 @@
     const k = n / 15; g.px([[Math.round(5 * k), Math.round(5 * k)], [Math.round(6 * k), Math.round(5 * k)], [Math.round(9 * k), Math.round(8 * k)], [Math.round(6 * k), Math.round(10 * k)], [Math.round(10 * k), Math.round(4 * k)]], '#d9cfa0');
     const cv = g.canvas(); if (big) bigMoonC = cv; else moonC = cv; return cv;
   }
+  // the guide's pointing hand: a white glove with a sunny cuff, index finger pointing down; fingertip at (4.5, 11.5) of 11x12
+  let handC = null;
+  function handSprite() {
+    if (handC) return handC;
+    return (handC = PX.fromStrings([
+      '.kkkkkkk...', '.kyyyyyk...', '.kooooook..', 'kwwwwwwwWk.', 'kwkwkwwwWWk', 'kwwwwwwwWWk',
+      '.kwwwwwwWk.', '..kkwwWkk..', '...kwwWk...', '...kwwWk...', '...kwwWk...', '....kkk....'], { y: '#ffcc44', o: '#d99a1a' }).canvas());
+  }
+  // sparkle colours for special skins (pixel.js knows every skin; the fallbacks cover older art files)
+  const FX_FALLBACK = { gold: ['#fff27a', '#ffffff'], rainbow: ['#f07a84', '#f6a83a', '#fbf236', '#99e550', '#5fcde4', '#c9a2f0'], crystal: ['#ffffff', '#c8ecfa', '#d8ccf8'], ember: ['#f6a83a', '#fff27a'], shiny: ['#ffffff', '#fff6c8'] };
+  const fxColors = k => (PX.SKIN_FX && PX.SKIN_FX[k]) || FX_FALLBACK[k] || (SPOOKY[k] && SPOOKY[k].c) || ['#ffffff', '#fff27a'];
 
   // ---------------- module state ----------------
-  let root, cv, ctx, buf, bx, skyC, skx, bgC, bgx, pillName, pillSub, dotsEl, trayEl, pouchStrip, fruitStrip, pouchCnt, hintEl, cardEl, ghostEl, gctx, labelsEl;
+  let root, cv, ctx, buf, bx, skyC, skx, bgC, bgx, pillName, pillSub, dotsEl, trayEl, pouchStrip, fruitStrip, pouchCnt, hintEl, cardEl, ghostEl, gctx, labelsEl, handEl, guideNow = null;
   const card = {};
   let W = 0, H = 0, DPR = 1, ww = 0, wh = 0, t = 0, visible = false, mounted = false, area = 'meadow';
   // camera (Z = CSS px per world px; cam = world px at the top-left of the screen)
@@ -721,7 +732,7 @@
       else { const q = lawnPoint(); x = q.x; y = q.y; }
       r = { id: s.id, s, x, y, z: 0, vz: 0, state, timer: rand(0.4, 2), tx: x, ty: y, facing: Math.random() < 0.5 ? 1 : -1, emote: null, emoteT: 0,
         blinkT: rand(1, 4), mood: null, target: null, flutter: false, z0: 0, eat: null, cheerT: 0, hopT: 0, feetY: y, dangle: 0, acc: {}, look: null, lookT: 0,
-        flutterAt: -99, dest: null, ripT: 0, awake: t + 25 };
+        flutterAt: -99, dest: null, ripT: 0, awake: t + 25, ph: Math.random() * 2 };
       if (state === 'arrive') { const q = shallowPoint(); r.tx = q.x; r.ty = y; r.facing = -1; emote(r, '!', 1.4); }
       RT.set(s.id, r);
     }
@@ -777,9 +788,9 @@
     if (r.emoteT > 0) { r.emoteT -= dt; if (r.emoteT <= 0) r.emote = null; }
     if (r.cheerT > 0) r.cheerT -= dt;
     if (r.hopT > 0) r.hopT -= dt;
-    const skin = s.look && s.look.skin, spook = SPOOKY[skin], dark = night || TH[area].bigMoon;
-    if (skin && r.state !== 'travel' && Math.random() < dt * (spook ? (dark ? 1.2 : 0.5) : 1.6)) {
-      const col = spook ? pick(spook.c) : skin === 'rainbow' ? pick(['#f07a84', '#f6a83a', '#fbf236', '#99e550', '#5fcde4', '#c9a2f0']) : skin === 'gold' ? pick(['#fff27a', '#ffffff']) : skin === 'crystal' ? pick(['#ffffff', '#c8ecfa', '#d8ccf8']) : pick(['#f6a83a', '#fff27a']);
+    const skin = s.look && s.look.skin, spook = SPOOKY[skin], dark = night || TH[area].bigMoon, shiny = !skin && s.look && s.look.shiny;
+    if ((skin || shiny) && r.state !== 'travel' && Math.random() < dt * (spook ? (dark ? 1.2 : 0.5) : shiny ? 0.9 : 1.6)) {
+      const col = pick(fxColors(shiny ? 'shiny' : skin));
       parts.push({ x: r.x + rand(-9, 9), y: r.y - rand(6, 20) - (r.state === 'fall' ? r.z : 0), vx: 0, vy: -4, life: 0.7, type: 'spark', color: col });
     }
     // now and then at night a tiny bat or ghost wisp floats up from a spooky Sprout
@@ -1051,14 +1062,17 @@
     setTimeout(() => { if (RT.get(s.id) === r) emote(r, 'heart', 2); }, 1400);
     burst(o.x, o.y - c.height / 2, 'shell', 14); burst(o.x, o.y - 16, 'spark', 16, '#fbf236'); burst(o.x, o.y - 16, 'spark', 8, '#ffffff');
     snd('evolve'); buzz(40);
-    floaterFor(r, `Hi, ${s.name}!`, '#c0612a');
-    PS.ui.toast(`It hatched! Say hi to ${s.name}.`, 3000);
-    nextCritter = t + 10; updatePill();
+    const shiny = !!(s.look && s.look.shiny);
+    if (shiny) { burst(o.x, o.y - 16, 'spark', 24, '#ffffff'); burst(o.x, o.y - 16, 'spark', 12, '#fff6c8'); }
+    floaterFor(r, shiny ? `A Shiny ${s.name}!` : `Hi, ${s.name}!`, '#c0612a');
+    PS.ui.toast(shiny ? `✦ A Shiny Sprout! It shimmers. Say hi to ${s.name}!` : `It hatched! Say hi to ${s.name}.`, 3200);
+    nextCritter = t + (first ? 25 : 10); updatePill();
+    // the first time, a short hello; then the garden's pointing hand teaches one thing at a time (pet, feed, catch, give)
     if (first) {
       setTimeout(() => PS.ui.modal({
         eyebrow: 'It hatched!', title: `Say hi to ${s.name}`, sprite: s,
-        html: '<ol><li>Rub it to pet it. Tap it to see its stats.</li><li>Drag fruit from the tree onto it, or onto the grass as a snack to find.</li><li>Tap animals that wander in to catch them, then drag them from your pouch onto it. They change its stats, body and moves.</li><li>Press and hold to pick it up. Drop it in the shallows to swim, or in the deep water to travel.</li><li>Pinch to zoom in and out, and drag the grass to look around.</li></ol>',
-        buttons: [{ label: 'Let\'s play', kind: 'primary' }],
+        html: `<p>${ST.esc(s.name)} is yours to look after. Follow the pointing hand to learn how!</p>`,
+        buttons: [{ label: 'Let\'s play', kind: 'primary', onClick: () => { hintReset = true; } }],
       }), 900);
     }
   }
@@ -1068,24 +1082,39 @@
     const night = PS.clock.isNight();
     return Object.keys(D.ANIMALS).filter(id => { const a = D.ANIMALS[id]; return a.area === area && (a.time === 'any' || (a.time === 'night') === night); });
   }
+  // is a world point on screen right now (clear of the top bar and the tray)? m = margin in world px
+  function inView(x, y, m) {
+    const trayH = trayEl ? trayEl.offsetHeight || 110 : 110;
+    return x > camX + m && x < camX + viewW() - m && y > camY + 76 / Z + m && y < camY + (H - trayH - 12) / Z - m;
+  }
+  function critterSpot(a) {
+    if (a.where === 'water') return waterPoint(0.1, 0.85);
+    if (a.where === 'coast') return coastPoint();
+    if (a.where === 'air') return { x: rand(10, ww - 10), y: rand(Lw.minY - 4, Lw.minY + Lw.span * 0.55) };
+    return lawnPoint();
+  }
+  // animals show up where the player is looking when they can (a kid shouldn't have to hunt off-screen for a 30-second visitor)
   function spawnCritter() {
     const pool = critterPool(); if (!pool.length) return;
-    const fresh = pool.filter(id => !critters.some(c => c.id === id));
-    const id = pick(fresh.length ? fresh : pool), a = D.ANIMALS[id];
-    let p;
-    if (a.where === 'water') p = waterPoint(0.1, 0.85);
-    else if (a.where === 'coast') p = coastPoint();
-    else if (a.where === 'air') p = { x: rand(10, ww - 10), y: rand(Lw.minY - 4, Lw.minY + Lw.span * 0.55) };
-    else p = lawnPoint();
+    const fresh = pool.filter(id => !critters.some(c => c.id === id)), ids = (fresh.length ? fresh : pool).slice().sort(() => Math.random() - 0.5);
+    let id = ids[0], p = null;
+    for (const cand of ids) {
+      for (let i = 0; i < 10 && !p; i++) { const q = critterSpot(D.ANIMALS[cand]); if (inView(q.x, q.y - 6, 10)) p = q; }
+      if (p) { id = cand; break; }
+    }
+    const a = D.ANIMALS[id];
+    if (!p) p = critterSpot(a);
     const c = { id, where: a.where, x: p.x, y: p.y, fx: p.x, fy: p.y, tx: p.x, ty: p.y, hopT: 1, next: rand(0.6, 1.6), life: D.GROWTH.critterLifeSec, facing: Math.random() < 0.5 ? 1 : -1, ph: rand(0, 6), by: p.y, vx: rand(6, 10) * (Math.random() < 0.5 ? 1 : -1) };
     if (a.kind === 'plant') { c.plant = true; c.rooted = !!ROOTED[id]; if (a.where === 'air') c.vx *= 0.45; }
     critters.push(c);
     if (a.where === 'water') { burst(p.x, p.y - 2, 'drop', 6, '#cbdbfc'); } else if (c.plant && a.where !== 'air') { burst(p.x, p.y - 2, 'dust', 6, '#b8946a'); burst(p.x, p.y - 6, 'spark', 5, PLANT_COL[id] || '#ffffff'); } else burst(p.x, p.y - 4, 'spark', 8, '#ffffff');
   }
   function updateCritters(dt) {
+    // first session: no visitors until the new Sprout has been petted and fed, then the first one comes quickly
+    if (PS.S.sprouts.length && !seen('catch') && (!seen('pet') || !seen('feed')) && here.length) nextCritter = Math.max(nextCritter, t + 4);
     if (PS.S.sprouts.length && critters.length < TUNE.maxCritters && t > nextCritter) { spawnCritter(); nextCritter = t + rand(...D.GROWTH.critterEverySec); }
     for (const c of critters) {
-      c.life -= dt; c.next -= dt;
+      c.life -= dt * (inView(c.x, c.y - 6, 0) ? 1 : 0.5); c.next -= dt; // off-screen visitors stay a little longer
       if (c.where === 'air') {
         c.x += c.vx * dt; c.y = c.by + (c.plant ? Math.sin(t * 1.1 + c.ph) * 6 : Math.sin(t * 2 + c.ph) * 4);
         if (c.plant && Math.random() < dt * 1.2) parts.push({ x: c.x + rand(-4, 4), y: c.y - rand(8, 14), vx: rand(3, 8), vy: rand(-5, -2), life: rand(1.4, 2.4), type: 'seed', color: '#ffffff' });
@@ -1199,7 +1228,8 @@
       emQ.push([r, r.x, r.y + sink - head]); return;
     }
     const hopY = r.hopT > 0 ? Math.round(Math.sin((1 - r.hopT / 0.35) * Math.PI) * 4) : 0;
-    shadow(r.x, r.y, 13); put(r.x, r.y - hopY);
+    const breathe = !hopY && (r.state === 'idle' || r.state === 'pet') && Math.floor(t * 1.4 + r.ph) % 2 ? 1 : 0; // a slow 1px breath while standing
+    shadow(r.x, r.y, 13); put(r.x, r.y - hopY - breathe);
     if (r.state === 'eat' && r.eat) bx.drawImage(itemSpr('fruit', r.eat), Math.round(r.x - 5), Math.round(r.y - 11 - hopY), 9, 9);
     emQ.push([r, r.x, r.y - hopY - head]);
   }
@@ -1474,6 +1504,16 @@
     const night = PS.clock.isNight();
     here = PS.S.sprouts.filter(isOut).map(getRT);
     for (const r of here) updateSprout(r, dt, night);
+    // carrying a snack or an animal: nearby Sprouts stop to look at it (easier to drop onto, and it's cute)
+    if (drag && lastClient.on) {
+      const g = ghostWorld({ clientX: lastClient.x, clientY: lastClient.y });
+      for (const r of here) {
+        if (busy(r) || r.state === 'eat' || r.state === 'swim' || Math.hypot(r.x - g.x, r.y - g.y) > 70) continue;
+        if (r.state !== 'idle' && r.state !== 'pet') { r.state = 'idle'; r.target = null; }
+        r.timer = Math.max(r.timer, 0.6); r.facing = g.x > r.x ? 1 : -1;
+        if (!(t < r.watchT)) { emote(r, drag.src === 'pouch' ? '!' : 'heart', 1.2); r.watchT = t + 3; }
+      }
+    }
     updateCritters(dt);
     // drops
     if (t > nextDrop) { spawnDrop(); nextDrop = t + rand(...D.GROWTH.dropEverySec); }
@@ -1535,12 +1575,14 @@
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.textAlign = 'center'; ctx.lineJoin = 'round';
     if (here.some(r => r.state === 'held')) drawZoneLabels();
+    drawCritterArrows();
+    if (guideNow && guideNow.mode !== 'tray') drawHand(guideNow);
     ctx.font = '700 17px "Fredoka", sans-serif';
     for (const f of floaters) {
       if (f.delay > 0) { f.delay -= dt; continue; }
       f.life -= dt; f.y -= 10 * dt;
       if (f.life < 0.3 && Math.floor(t * 20) % 2) continue;
-      const sp = worldToScreen(f.x, f.y), X = Math.round(clamp(sp.x, 80, W - 80)), Y = Math.round(clamp(sp.y, 28, H - 20));
+      const sp = worldToScreen(f.x, f.y), X = Math.round(clamp(sp.x, 80, W - 80)), Y = Math.round(clamp(sp.y, 88, H - 20)); // below the area sign, so rewards are never hidden
       ctx.lineWidth = 5; ctx.strokeStyle = '#fff8e6'; ctx.strokeText(f.text, X, Y); ctx.fillStyle = f.color; ctx.fillText(f.text, X, Y);
     }
     floaters = floaters.filter(f => f.life > 0);
@@ -1818,7 +1860,8 @@
       row.bar.style.width = Math.round(clamp(st.xp / D.GROWTH.xpForLevel(st.lv), 0, 1) * 100) + '%';
     });
     card.happy.style.width = Math.round(s.happy) + '%';
-    card.energy.style.width = Math.round(s.energy) + '%';
+    const hb = ST.happyBonus && ST.happyBonus(s) > 1, hbText = hb ? '♥ +10% XP' : 'Pet me!';
+    if (card.hb.textContent !== hbText) { card.hb.textContent = hbText; card.hb.classList.toggle('on', hb); }
     card.partner.disabled = s.id === PS.S.activeId;
     card.partner.textContent = s.id === PS.S.activeId ? 'Partner' : 'Set partner';
   }
@@ -1848,10 +1891,11 @@
     if (!PS.S.sprouts.length) { const e = PS.S.eggs[0]; return e ? `Your egg is waiting in ${toArea(e.area)}` : 'Get an egg from the Shop'; }
     if (!mine.length) return PS.S.sprouts.some(s => s.area === area) ? `Everyone is resting in the ${ST.homeName(area)}. Tap it to call them out.` : `No Sprouts live here yet. Send one swimming from another area.`;
     if (here.some(r => r.state === 'held')) return 'Drop in the shallows to swim, or in the deep water to travel';
-    if (critters.length && ST.canCatch() && !seen('catch')) return 'An animal! Tap it to catch it';
-    if (PS.S.pouch.length && !seen('give')) return 'Drag an animal from your pouch onto a Sprout';
-    if (!seen('feed')) { if (hintTree() >= 0) return 'Drag a fruit from a tree onto a Sprout'; if (Object.values(PS.S.fruits || {}).some(n => n > 0)) return 'Drag a fruit from your tray onto a Sprout'; }
-    if (!seen('pet')) return 'Rub a Sprout to pet it';
+    // the first-session lessons, in order: pet, feed, catch, give (the pointing hand shows each one)
+    if (!seen('pet')) return 'Rub your Sprout with your finger to pet it';
+    if (!seen('feed')) { if (hintTree() >= 0) return 'Drag a fruit from the tree onto your Sprout'; if (Object.values(PS.S.fruits || {}).some(n => n > 0)) return 'Drag a fruit from your tray onto your Sprout'; }
+    if (ST.canCatch() && !seen('catch')) return critters.length ? 'An animal! Tap it to catch it' : 'Animals visit the garden. Watch for one!';
+    if (PS.S.pouch.length && !seen('give')) return 'Drag the animal from your pouch onto your Sprout';
     if ((drops[area] || []).length && !seen('drop')) return 'Something sparkly! Tap it';
     if (!seen('hold')) return 'Press and hold a Sprout to pick it up';
     if (!seen('swim')) return 'Drop a Sprout in the shallows to swim';
@@ -1861,6 +1905,65 @@
     if (!seen('area')) return 'Use the arrows to visit other areas';
     if (!seen('home') && Lw.home) return `Tap the ${ST.homeName(area)} to let Sprouts rest inside`;
     return '';
+  }
+  // ---------------- first-session guide: one lesson at a time, with a pointing hand (many players can't read yet) ----------------
+  const learning = () => !seen('pet') || !seen('feed') || !seen('catch') || !seen('give');
+  // returns what to point at: {mode:'tap'|'rub'|'drag', x, y, x2?, y2?} in world px, {mode:'tray', el} for a tray slot, or null
+  function guide() {
+    if (!cardEl || !cardEl.hidden || drag || pinch || here.some(r => r.state === 'held') || PS.ui.modalOpen) return null;
+    const eggs = eggsHere();
+    if (!PS.S.sprouts.length) { const o = eggs[0]; if (!o) return null; const c = itemSpr('egg', o.e.kind); return { mode: 'tap', x: o.x, y: o.y - c.height + 3 }; }
+    if (!learning()) return null;
+    const r = here.find(q => !busy(q) && q.state !== 'eat' && inView(q.x, q.y - 10, 0));
+    if (!seen('pet')) return r ? { mode: 'rub', x: r.x, y: r.y - 12 } : null;
+    if (!seen('feed')) {
+      const sl = treeSlots();
+      if (r) for (let i = 0; i < Lw.slots.length; i++) { const q = Lw.slots[i]; if (q && sl[i] && growK(sl[i]) >= 1 && inView(q.x, q.y, 4)) return { mode: 'drag', x: q.x, y: q.y + 2, x2: r.x, y2: r.y - 10 }; }
+      return Object.values(PS.S.fruits || {}).some(n => n > 0) ? { mode: 'tray', el: fruitStrip.querySelector('.g-slot') } : null;
+    }
+    if (!seen('catch') && ST.canCatch()) { const c = critters.find(q => inView(q.x, q.y - 6, 0)); return c ? { mode: 'tap', x: c.x, y: c.y - (c.where === 'water' ? 7 : 12) } : null; }
+    if (!seen('give') && PS.S.pouch.length) return { mode: 'tray', el: pouchStrip.querySelector('.g-slot') };
+    return null;
+  }
+  // drawn at display resolution so it stays big and crisp at any zoom (HS css px per hand pixel); gd is in world px
+  const HS = 4;
+  function drawHand(gd) {
+    let x = gd.x, y = gd.y, lift = 0;
+    if (gd.mode === 'tap') lift = Math.abs(Math.sin(t * 4)) * 14;
+    if (gd.mode === 'rub') x += Math.sin(t * 6) * 6;
+    let carry = false;
+    if (gd.mode === 'drag') { // press on the fruit, glide to the Sprout, let go
+      const k = (t * 0.5) % 1; if (k > 0.88) return;
+      const e = clamp((k - 0.18) / 0.62, 0, 1), ee = e * e * (3 - 2 * e);
+      x = lerp(gd.x, gd.x2, ee); y = lerp(gd.y, gd.y2, ee); carry = k > 0.18;
+    }
+    const p = worldToScreen(x, y), hs = handSprite();
+    ctx.imageSmoothingEnabled = false;
+    if (carry) { const f = itemSpr('fruit', 'apple'), fz = Math.max(2, Math.round(Z)); ctx.globalAlpha = 0.75; ctx.drawImage(f, Math.round(p.x - f.width * fz / 2), Math.round(p.y - f.height * fz - 8), f.width * fz, f.height * fz); ctx.globalAlpha = 1; }
+    ctx.drawImage(hs, Math.round(p.x - 5 * HS), Math.round(p.y - 11.5 * HS - lift), hs.width * HS, hs.height * HS);
+  }
+  // the same hand as a little overlay on a tray slot, sliding up towards the garden ("drag it up")
+  function placeTrayHand(gd) {
+    if (!handEl) return;
+    const el = gd && gd.mode === 'tray' && gd.el;
+    hintEl.classList.toggle('g-hint-up', !!el); // make room for the hand above the tray
+    if (!el) { if (!handEl.hidden) handEl.hidden = true; return; }
+    const r = root.getBoundingClientRect(), b = el.getBoundingClientRect(), up = ((t * 0.7) % 1) * 46;
+    handEl.style.transform = `translate(${Math.round(b.left - r.left + b.width / 2 - 20)}px, ${Math.round(b.top - r.top - 34 - up)}px)`;
+    handEl.style.opacity = up > 38 ? 0.3 : 1; handEl.hidden = false;
+  }
+  // animals that wandered in off-screen: a bouncing arrow at the edge points the way
+  function drawCritterArrows() {
+    if (!critters.length || pinch) return;
+    const trayH = trayEl.offsetHeight || 110, top = 86, bot = H - trayH - 24;
+    for (const c of critters) {
+      if (inView(c.x, c.y - 6, -4)) continue;
+      const p = worldToScreen(c.x, c.y - 6), X = clamp(p.x, 22, W - 22), Y = clamp(p.y, top, bot), a = Math.atan2(p.y - Y, p.x - X), b = Math.sin(t * 6) * 3;
+      const cx = X + Math.cos(a) * b, cy = Y + Math.sin(a) * b;
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
+      ctx.beginPath(); ctx.moveTo(11, 0); ctx.lineTo(-7, -9); ctx.lineTo(-3, 0); ctx.lineTo(-7, 9); ctx.closePath();
+      ctx.fillStyle = '#ffcc44'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = INK; ctx.stroke(); ctx.restore();
+    }
   }
   function switchArea(dir) { const i = AREA_IDS.indexOf(area); setArea(AREA_IDS[(i + dir + AREA_IDS.length) % AREA_IDS.length], dir); }
   function settleAll() {
@@ -1919,6 +2022,8 @@
 .g-empty{font-size:13px;color:var(--ink-soft);font-weight:600;padding-left:2px;white-space:nowrap}
 .g-ghost{position:absolute;left:0;top:0;pointer-events:none;z-index:30;transform:translate(-999px,-999px);image-rendering:pixelated;image-rendering:crisp-edges;filter:drop-shadow(0 4px 0 rgba(34,32,52,.25))}
 .g-hint{z-index:3;width:max-content;max-width:calc(100% - 40px)}
+.g-hint.g-hint-up{transform:translate(-50%,-58px)}
+.g-hand{position:absolute;left:0;top:0;width:44px;height:48px;z-index:7;pointer-events:none;image-rendering:pixelated;image-rendering:crisp-edges;filter:drop-shadow(0 2px 0 rgba(34,32,52,.3))}
 .g-card{position:absolute;left:8px;right:8px;bottom:8px;z-index:6;padding:10px 12px 12px;animation:gUp .2s ease-out;box-shadow:0 -6px 24px rgba(60,44,24,.25)}
 @keyframes gUp{from{transform:translateY(24px);opacity:.4}to{transform:none;opacity:1}}
 .g-ch{display:flex;align-items:center;gap:10px}
@@ -1933,7 +2038,8 @@
 .g-st b{display:block;font-family:var(--f-ui);font-size:15px;color:var(--ink)}
 .g-mb{height:6px;border-radius:3px;background:var(--slot);border:1px solid var(--line);overflow:hidden;margin-top:2px}
 .g-mb i{display:block;height:100%;width:0}
-.g-cmood{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:6px 8px;align-items:center;font-family:var(--f-ui);font-weight:600;font-size:14px;color:var(--ink-soft);margin-bottom:10px}
+.g-cmood{display:grid;grid-template-columns:auto 1fr auto;gap:6px 8px;align-items:center;font-family:var(--f-ui);font-weight:600;font-size:14px;color:var(--ink-soft);margin-bottom:10px}
+.g-hb{font-size:13.5px;white-space:nowrap}.g-hb.on{color:#c0407a}
 .g-cmood .bar{height:9px}
 .g-cbtns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .g-cbtns .btn{padding:9px 6px;font-size:15px;min-height:44px}
@@ -1972,10 +2078,11 @@
           <button class="g-x" data-a="close" type="button" aria-label="Close"><svg width="14" height="14" viewBox="0 0 7 7" shape-rendering="crispEdges" fill="currentColor"><path d="M0 0h2v1h1v1h1V1h1V0h2v2H6v1H5v1h1v1h1v2H5V6H4V5H3v1H2v1H0V5h1V4h1V3H1V2H0z"/></svg></button>
         </div>
         <div class="g-cstats">${D.STATS.map(k => `<div class="g-st" style="color:${D.STAT_META[k].color}">${D.STAT_META[k].label}<b>0</b><div class="g-mb"><i style="background:${D.STAT_META[k].color}"></i></div></div>`).join('')}</div>
-        <div class="g-cmood"><span>Happy</span><div class="bar"><i class="g-hp" style="background:#e07ba0"></i></div><span>Energy</span><div class="bar"><i class="g-en" style="background:#6abe30"></i></div></div>
+        <div class="g-cmood"><span>Happy</span><div class="bar"><i class="g-hp" style="background:#e07ba0"></i></div><span class="g-hb"></span></div>
         <div class="g-cbtns"><button class="btn" data-a="travel" type="button">Travel</button><button class="btn" data-a="partner" type="button">Set partner</button><button class="btn primary" data-a="details" type="button">Details</button></div>
       </section>
-      <canvas class="g-ghost" width="18" height="18"></canvas>`;
+      <canvas class="g-ghost" width="18" height="18"></canvas>
+      <canvas class="g-hand" width="11" height="12" hidden aria-hidden="true"></canvas>`;
     const q = s => root.querySelector(s);
     cv = q('.g-cv'); ctx = cv.getContext('2d');
     buf = document.createElement('canvas'); bx = buf.getContext('2d');
@@ -1984,9 +2091,10 @@
     pillName = q('.g-pill b'); pillSub = q('.g-pill span'); dotsEl = q('.g-dots');
     trayEl = q('.g-tray'); pouchStrip = q('.g-pouch'); fruitStrip = q('.g-fruit'); pouchCnt = q('.g-pc');
     hintEl = q('.g-hint'); cardEl = q('.g-card'); ghostEl = q('.g-ghost'); gctx = ghostEl.getContext('2d');
+    handEl = q('.g-hand'); { const hx = handEl.getContext('2d'); hx.imageSmoothingEnabled = false; hx.drawImage(handSprite(), 0, 0); }
     card.spr = q('.g-ch canvas'); card.name = q('.g-nm'); card.tag = q('.g-tag'); card.sub = q('.g-csub');
     card.stats = [...root.querySelectorAll('.g-st')].map(el2 => ({ lv: el2.querySelector('b'), bar: el2.querySelector('.g-mb i') }));
-    card.happy = q('.g-hp'); card.energy = q('.g-en'); card.partner = q('[data-a="partner"]');
+    card.happy = q('.g-hp'); card.hb = q('.g-hb'); card.partner = q('[data-a="partner"]');
     cardEl.addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (b) cardAction(b.dataset.a); });
     root.querySelectorAll('.g-arrow').forEach(b => b.addEventListener('click', () => { PX.Sound.unlock(); closeCard(); switchArea(+b.dataset.d); }));
     cv.addEventListener('pointerdown', onDown);
@@ -2049,14 +2157,17 @@
     checkSize(); if (!ww) return;
     updateCamera(dt);
     update(dt);
+    guideNow = guide();
     render(dt);
+    placeTrayHand(guideNow);
     uiT -= dt;
     if (uiT <= 0) {
       uiT = 0.4;
-      // hints pop up briefly on arrival; the holding hint and a new player's first-egg hint stay while they apply
+      // hints pop up briefly on arrival; the holding hint, a new player's first-egg hint and the first lessons stay while they apply
       if (hintReset) { hintReset = false; hintUntil = t + 4; }
       const holding = here.some(r => r.state === 'held'), firstEgg = !PS.S.sprouts.length && PS.S.eggs.some(e => e.area === area);
-      const h = !cardEl.hidden ? '' : holding ? 'Drop in the shallows to swim, in deep water to travel, or on the house to rest' : (firstEgg || t < hintUntil) ? hintText() : '';
+      const lesson = here.length && learning() && !PS.ui.modalOpen;
+      const h = !cardEl.hidden ? '' : holding ? 'Drop in the shallows to swim, in deep water to travel, or on the house to rest' : (firstEgg || lesson || t < hintUntil) ? hintText() : '';
       if (hintEl.textContent !== h) hintEl.textContent = h;
       hintEl.style.opacity = h ? 1 : 0;
       if (sel) renderCard();

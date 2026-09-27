@@ -28,16 +28,25 @@ This folder is the **built site**. Don't edit files here by hand. The game sourc
 ## Publishing an update
 
 1. Ask Claude to make changes; Claude runs `python3 tools/build_web.py`, which refreshes this folder.
+   Before building, it runs `tools/check_game.js`: every script must load, every egg/look/icon must draw, and old,
+   current and damaged saves must load without losing progress. If anything fails, the build stops and nothing here changes.
 2. In GitHub Desktop, write a short summary (e.g. "New animals"), click **Commit to main**, then **Push origin**.
 3. Within a few minutes, open phones see "A new version is ready" (or get it the next time the app is opened).
    Saves are kept: they live on each device and don't change when the game files do.
 
 ## Keeping progress safe
 
-- **Sprouts › Backups** makes a backup code for one player or all players. Save it in Notes, Files or an email.
-  If a phone is replaced, reset or its website data is cleared, paste the code into **Restore** to get everything back.
-- Make a fresh backup every week or two, and before changing phones.
-- Parent-only actions (testing shortcuts, erasing or replacing a game) ask a quick maths question first.
+- **Sprouts › Backups** (also on the main menu) makes a backup code for one player or all players. Save it in Notes,
+  Files or an email. If a phone is replaced, reset or its website data is cleared, paste the code into **Restore**.
+  "Restore as new player" adds the game alongside the others; "Replace …'s game" swaps it in for the current player.
+- The main menu reminds you when a player hasn't been backed up for two weeks.
+- **Automatic backups:** each device also keeps the last three days' saves of every player on its own. If a saved game
+  ever can't be opened, the game brings back the newest automatic backup, keeps a copy of the damaged save, and tells
+  you. You can also go back to an earlier day from **Backups › Automatic backups on this device**. (These live on the
+  device, so they don't replace backup codes for a lost or reset phone.)
+- If the phone refuses to save (storage full, website data blocked), the game shows a warning for grown-ups.
+- Parent-only actions (testing shortcuts, erasing, removing or replacing a game) ask a quick maths question first.
+  A right answer unlocks them for two minutes, and they lock again as soon as the app is put away.
 
 ## Good to know
 

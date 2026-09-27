@@ -2,7 +2,9 @@
 // pass-and-play Friend Battles and battle snacks.
 // Owns PS.scenes.battle. CSS is injected from here (classes prefixed .b-).
 // The rules engine (makeFighter / resolveRound / aiChoose) is pure and has no DOM, so it can run headless
-// for balance sims: window.__battle.engine.sim(sprout, leagueId, index, n), .simBoss(sprout, bossId, n), .simTower(sprout, n).
+// for balance sims: window.__battle.engine.sim(sprout, leagueId, index, n), .simBoss(sprout, bossId, n), .simTower(sprout, n),
+// .estimate(sprout, spec, n) (the same kid-level estimate the pre-battle screens show).
+// Every battle prize is decided by prize() and paid by grant(), once, the moment a battle is decided.
 // New save data lives only in PS.S.progress.battleExtra (created lazily by extra(); old saves simply don't have it yet).
 (function () {
   'use strict';
@@ -67,7 +69,7 @@
     xp: lv => (0.75 * lv + 5) * 0.6,
   };
   const STAT_FRUITS = ['swiftberry', 'wingseed', 'seakelp', 'powernut', 'heartyroot'];
-  const FRIEND = { coinsWin: 12, coinsLose: 6, perDay: 5 };
+  const FRIEND = { coinsWin: 12, coinsLose: 6, coinsDraw: 9, xp: 2.8, perDay: 5 }; // xp: base XP (× the battle XP split = 10)
   const SNACK = '__snack';
   const SNACK_HEAL = { goldfruit: 0.5 }; // share of max HP; everything else heals TUNE.snackHeal
   const NPC_NAMES = ['Biscuit', 'Nova', 'Ziggy', 'Mochi', 'Pickle', 'Tango', 'Comet', 'Sprocket', 'Dot', 'Echo', 'Fern', 'Gizmo', 'Jinx', 'Kiwi', 'Lumen', 'Marble',
@@ -89,21 +91,27 @@
     braceMult: 0.3, bossDot: 0.3, bossTireAt: 22,    // bosses: blocked giant attacks deal 30%; poison/burn/tiring hurt bosses 30% as much
     snackHeal: 0.3,
   };
-  const SURE = new Set(['slowslam']); // "Never misses" (ignores evasion)
-  const STAT_NAME = { atk: 'Attack', def: 'Defense', spd: 'Speed', eva: 'Evasion', acc: 'Accuracy' };
-  const STAT_SHORT = { atk: 'Attack', def: 'Defense', spd: 'Speed', eva: 'Dodge', acc: 'Aim' }; // plate tags: words kids can read
+  const SURE = new Set(['slowslam']); // "Never misses" (ignores Dodge)
+  // One set of kid words everywhere in battle: Dodge (not Evasion) and Aim (not Accuracy)
+  const STAT_NAME = { atk: 'Attack', def: 'Defense', spd: 'Speed', eva: 'Dodge', acc: 'Aim' };
+  const STAT_SHORT = STAT_NAME; // plate tags use the same words
+  const kidWords = t => String(t).replace(/\bEvasion\b/g, 'Dodge').replace(/\bevasion\b/g, 'dodge').replace(/\baccuracy\b/gi, 'Aim');
   const STATUS_SHORT = { poison: 'Poison', burn: 'Burn', sleep: 'Asleep', stun: 'Stunned' };
   const arr = v => (!v ? [] : Array.isArray(v) ? v : [v]);
   const sm = n => D.BATTLE.stageMult[clamp(Math.round(n), -3, 3) + 3];
 
+  // healed / dealt / dealtStrong (super-effective damage) / dealtWeak / bigHits (unblocked giant attacks taken) feed the
+  // "why did we lose?" tips on the results screen.
   function baseFighter(side) {
     return { side, st: { atk: 0, def: 0, spd: 0, eva: 0, acc: 0 }, status: null, statusT: 0, stun: false, used: {}, heals: 0,
-      boss: null, charging: false, bc: 0, braced: false, snack: null, revived: false };
+      boss: null, charging: false, bc: 0, braced: false, snack: null, revived: false, healed: 0, dealt: 0, dealtStrong: 0, dealtWeak: 0, strongEl: null, bigHits: 0 };
   }
-  function makeFighter(s, side, mult) {
+  // mult: the league's strength scale (HP, Attack, Defense). k: an optional per-opponent tweak from data.js ({hp, atk, def}).
+  function makeFighter(s, side, mult, k, noLook) {
     const bs = Object.assign({}, ST.battleStats(s));
     if (mult && mult !== 1) { bs.hp = Math.round(bs.hp * mult); bs.atk = Math.round(bs.atk * mult); bs.def = Math.round(bs.def * mult); }
-    let look = null; try { look = ST.lookOf(s); } catch (e) { look = null; }
+    if (k) { if (k.hp) bs.hp = Math.round(bs.hp * k.hp); if (k.atk) bs.atk = Math.round(bs.atk * k.atk); if (k.def) bs.def = Math.round(bs.def * k.def); }
+    let look = null; if (!noLook) try { look = ST.lookOf(s); } catch (e) { look = null; }
     return Object.assign(baseFighter(side), {
       s, name: s.name, npc: !!s.npc, look, moves: ST.movesOf(s).filter(id => D.MOVES[id]), els: bs.els.slice(), lv: bs.level,
       max: bs.hp, hp: bs.hp, atk: bs.atk, def: bs.def, spd: bs.spd, eva: bs.eva,
@@ -135,8 +143,11 @@
     const wt = Object.values(w).reduce((a, b) => a + b, 0), lv = {};
     for (const st of D.STATS) lv[st] = Math.min(D.GROWTH.maxLevel, Math.round(L * w[st] / wt));
     const m = S.mult;
+    // a Little one only knows its first moves, but always at least one attack (else it could never win on its own)
+    const all = A.moves.filter(x => D.MOVES[x]), moves = all.slice(0, S.moves || 3);
+    if (!moves.some(x => D.MOVES[x].pow > 0)) moves[moves.length - 1] = all.find(x => D.MOVES[x].pow > 0) || 'tackle';
     const f = Object.assign(baseFighter('o'), {
-      s: null, name: `${S.name} ${A.name}`, npc: true, look: null, critter: id, wild: { id, step }, moves: A.moves.filter(x => D.MOVES[x]).slice(0, S.moves || 3), els: [A.el || 'normal'], lv: L,
+      s: null, name: `${S.name} ${A.name}`, npc: true, look: null, critter: id, wild: { id, step }, moves, els: [A.el || 'normal'], lv: L,
       atk: Math.round((B.atkBase + lv.power * B.atkPerPower) * m), def: Math.round((B.defBase + lv.stamina * B.defPerStamina + lv.swim * B.defPerSwim) * m),
       spd: Math.round(B.spdBase + lv.run * B.spdPerRun), eva: Math.min(B.evaMax, lv.fly * B.evaPerFly),
     });
@@ -183,13 +194,14 @@
 
   function snap(b) {
     const one = f => ({ hp: f.hp, status: f.status, stun: f.stun, st: Object.assign({}, f.st), charging: f.charging });
-    return { p: one(b.p), o: one(b.o) };
+    return { p: one(b.p), o: one(b.o), tired: !!b.tired };
   }
-  // opts: npcMult, smart, rng, boss (boss id: the 'o' side is that boss instead of sO), tireAt
+  // opts: npcMult, k (per-opponent tweak), smart, rng, boss (boss id: the 'o' side is that boss instead of sO), wild, tireAt,
+  // friend (pass-and-play: a double knock-out is a draw), sim (headless: no looks, no event snapshots)
   function newBattle(sP, sO, opts) {
     opts = opts || {};
-    const o = opts.boss ? makeBoss(opts.boss) : opts.wild ? makeWild(opts.wild.id, opts.wild.step) : makeFighter(sO, 'o', opts.npcMult);
-    const b = { p: makeFighter(sP, 'p'), o, turn: 0, over: false, winner: null, rng: opts.rng || Math.random,
+    const o = opts.boss ? makeBoss(opts.boss) : opts.wild ? makeWild(opts.wild.id, opts.wild.step) : makeFighter(sO, 'o', opts.npcMult, opts.k, opts.sim);
+    const b = { p: makeFighter(sP, 'p', 1, null, opts.sim), o, turn: 0, over: false, winner: null, tie: false, tired: false, friend: !!opts.friend, sim: !!opts.sim, rng: opts.rng || Math.random,
       smart: opts.smart == null ? (o.boss ? o.boss.smart : o.wild ? WILD.steps[o.wild.step].smart : 0.6) : opts.smart, tireAt: opts.tireAt || (o.boss ? TUNE.bossTireAt : TUNE.tireAt) };
     b.p.foe = b.o; b.o.foe = b.p;
     return b;
@@ -203,11 +215,31 @@
     E('revive', f, { text: `${f.name} rose again from its flames!` });
     return true;
   }
+  // After anything that can knock a fighter out: a reborn boss rises again, otherwise whoever is at 0 HP faints.
+  // Both at 0 at once is a tie. Against the computer the player's Sprout hangs on with 1 HP and wins (kid-friendly);
+  // in a Friend Battle it's a draw (winner null).
+  function settle(b, E, tired) {
+    const P = b.p, O = b.o;
+    if (O.hp <= 0) revive(O, E);
+    if (P.hp <= 0) revive(P, E);
+    const pd = P.hp <= 0, od = O.hp <= 0;
+    if (!pd && !od) return false;
+    const out = f => E('faint', f, { text: tired ? `${f.name} is too tired to go on!` : `${f.name} fainted!` });
+    b.over = true; b.tiredEnd = !!tired;
+    if (pd && od) {
+      b.tie = true;
+      if (b.friend) { out(O); out(P); b.winner = null; E('note', null, { draw: true, text: "Both are down at the same time. It's a draw!" }); }
+      else { out(O); P.hp = 1; b.winner = 'p'; E('hang', P, { text: `Both are worn out... but ${P.name} hangs on with 1 HP!` }); }
+      return true;
+    }
+    const f = pd ? P : O; out(f); b.winner = f.foe.side;
+    return true;
+  }
 
   // Resolve one round. Returns a list of events (each carries a state snapshot taken right after it happened).
   function resolveRound(b, pMove, oMove) {
     const ev = [], P = b.p, O = b.o, rng = b.rng;
-    const E = (type, who, x) => { const e = Object.assign({ type, who: who ? who.side : null }, x || {}); e.snap = snap(b); ev.push(e); return e; };
+    const E = (type, who, x) => { const e = Object.assign({ type, who: who ? who.side : null }, x || {}); if (!b.sim) e.snap = snap(b); ev.push(e); return e; };
     b.turn++;
     // a boss either acts normally, charges up (telegraphed), or unleashes its giant attack
     let oPlan = null;
@@ -216,38 +248,31 @@
     let first = [P, pMove], second = [O, oMove];
     const pp = priority(pMove), po = oPlan ? -1 : priority(oMove);
     if (po > pp || (po === pp && (effSpd(O) > effSpd(P) || (effSpd(O) === effSpd(P) && rng() < 0.5)))) { first = [O, oMove]; second = [P, pMove]; }
-    const faintCheck = (a, t) => {
-      if (t.hp <= 0 && !revive(t, E)) { E('faint', t, { text: `${t.name} fainted!` }); b.over = true; b.winner = a.side; return true; }
-      if (a.hp <= 0 && !revive(a, E)) { E('faint', a, { text: `${a.name} fainted!` }); b.over = true; b.winner = t.side; return true; }
-      return false;
-    };
     for (const [a, id] of [first, second]) {
       const t = a.foe;
       if (a === O && oPlan) bossAct(b, a, t, oPlan, E); else act(b, a, t, id, E);
-      if (faintCheck(a, t)) return ev;
+      if (settle(b, E)) return ev;
     }
     if (O.boss && !oPlan) O.bc++;
-    // end of round: poison / burn
+    // end of round: poison / burn hurt both fighters first, then we see who is still standing (so the order never picks the winner)
     for (const f of [first[0], second[0]]) {
       if (f.status !== 'poison' && f.status !== 'burn') continue;
       const n = Math.max(1, Math.round(f.max * (f.status === 'poison' ? TUNE.poisonFrac : TUNE.burnFrac) * dotMul(f)));
       f.hp = Math.max(0, f.hp - n);
       E('dot', f, { n, kind: f.status, text: f.status === 'poison' ? `${f.name} is hurt by poison.` : `${f.name} is hurt by its burn.` });
-      if (f.hp <= 0 && !revive(f, E)) { E('faint', f, { text: `${f.name} fainted!` }); b.over = true; b.winner = f.foe.side; return ev; }
-      if (--f.statusT <= 0 && f.status) { const k = f.status; f.status = null; E('cure', f, { text: k === 'poison' ? `${f.name}'s poison wore off.` : `${f.name}'s burn healed.` }); }
+      if (f.hp > 0 && --f.statusT <= 0 && f.status) { const k = f.status; f.status = null; E('cure', f, { text: k === 'poison' ? `${f.name}'s poison wore off.` : `${f.name}'s burn healed.` }); }
     }
+    if (settle(b, E)) return ev;
+    // long battles: from round tireAt on, both lose a little HP every round (no endless stalls)
     if (b.turn >= b.tireAt) {
-      if (b.turn === b.tireAt) E('note', null, { text: O.boss ? 'Both fighters are tiring out!' : 'Both Sprouts are tiring out!' });
+      const firstTire = !b.tired;
+      if (firstTire) { b.tired = true; E('note', null, { tired: true, text: 'Both are getting tired! Now they lose a little HP every turn.' }); }
+      let i = 0;
       for (const f of [first[0], second[0]]) {
         const n = Math.max(1, Math.round(f.max * TUNE.tireFrac * dotMul(f))); f.hp = Math.max(0, f.hp - n);
-        E('dot', f, { n, kind: 'tired', text: '' });
+        E('dot', f, { n, kind: 'tired', text: i++ || firstTire ? '' : 'Both are tired and lose some HP.' });
       }
-      if (O.hp <= 0 && P.hp > 0) revive(O, E);
-      const pd = P.hp <= 0, od = O.hp <= 0;
-      if (pd || od) {
-        const loser = pd && od ? (P.hp / P.max <= O.hp / O.max ? P : O) : pd ? P : O;
-        E('faint', loser, { text: `${loser.name} is too tired to go on!` }); b.over = true; b.winner = loser.foe.side;
-      }
+      if (settle(b, E, true)) return ev;
     }
     return ev;
   }
@@ -263,7 +288,7 @@
       const sn = a.snack; if (!sn || sn.used) { E('note', a, { text: 'No snack left!' }); return; }
       sn.used = true;
       const h = Math.min(a.max - a.hp, Math.round(a.max * sn.heal));
-      a.hp += h;
+      a.hp += h; a.healed += h;
       E('snack', a, { n: h, fruit: sn.fruit, text: `${a.name} ate the ${sn.name}. Yum!` });
       if (sn.cleanse && (a.status || a.stun)) { a.status = null; a.statusT = 0; a.stun = false; E('cleanse', a, { text: `${a.name} feels refreshed.` }); }
       return;
@@ -281,6 +306,7 @@
       for (let i = 0; i < n && t.hp > 0; i++) {
         const r = rollDamage(a, t, mv, rng);
         t.hp = Math.max(0, t.hp - r.n); dealt += r.n; hits++; tm = r.tm; anyCrit = anyCrit || r.crit;
+        a.dealt += r.n; if (r.tm > 1) { a.dealtStrong += r.n; a.strongEl = mv.el; } else if (r.tm < 1) a.dealtWeak += r.n;
         E('hit', t, { by: a.side, move: id, el: mv.el, n: r.n, crit: r.crit, tm: r.tm, i, of: n, text: r.crit && n === 1 ? 'A critical hit!' : '' });
       }
       const bits = [];
@@ -289,13 +315,13 @@
       if (tm > 1) bits.push("It's super effective!"); else if (tm < 1) bits.push("It's not very effective...");
       if (bits.length) E('note', t, { text: bits.join(' ') });
     }
-    if (fx.drain && dealt) { const h = Math.min(a.max - a.hp, Math.max(1, Math.round(dealt * fx.drain))); if (h > 0) { a.hp += h; E('heal', a, { n: h, text: `${a.name} drained some energy.` }); } }
+    if (fx.drain && dealt) { const h = Math.min(a.max - a.hp, Math.max(1, Math.round(dealt * fx.drain))); if (h > 0) { a.hp += h; a.healed += h; E('heal', a, { n: h, text: `${a.name} drained some energy.` }); } }
     if (fx.recoil && dealt) { const r = Math.max(1, Math.round(dealt * fx.recoil)); a.hp = Math.max(0, a.hp - r); E('recoil', a, { n: r, text: `${a.name} is hurt by the recoil.` }); }
     if (fx.cleanse && (a.status || a.stun)) { a.status = null; a.statusT = 0; a.stun = false; E('cleanse', a, { text: `${a.name} feels refreshed.` }); }
     if (fx.heal) {
       const k = healFactor(a), h = Math.min(a.max - a.hp, Math.round(a.max * fx.heal * k));
       if (a.hp < a.max) a.heals++;
-      if (h > 0) { a.hp += h; E('heal', a, { n: h, text: k < 0.6 ? `${a.name} recovered a little HP. Healing is wearing thin.` : `${a.name} recovered HP.` }); }
+      if (h > 0) { a.hp += h; a.healed += h; E('heal', a, { n: h, text: k < 0.6 ? `${a.name} recovered a little HP. Healing is wearing thin.` : `${a.name} recovered HP.` }); }
       else if (!fx.buff) E('note', a, { text: `${a.name}'s HP is already full.` });
     }
     for (const bf of arr(fx.buff)) stage(a, bf.stat, bf.n, E);
@@ -307,7 +333,8 @@
         else {
           t.status = S.type;
           t.statusT = S.type === 'sleep' ? (t.boss ? 1 : TUNE.sleepTurns[0] + Math.floor(rng() * (TUNE.sleepTurns[1] - TUNE.sleepTurns[0] + 1))) : TUNE.dotTurns;
-          E('status', t, { st: S.type, text: S.type === 'sleep' ? `${t.name} fell asleep!` : S.type === 'poison' ? `${t.name} was poisoned!` : `${t.name} was burned!` });
+          E('status', t, { st: S.type, text: S.type === 'sleep' ? `${t.name} fell asleep!` : S.type === 'poison' ? `${t.name} was poisoned! Poison hurts each turn.`
+            : `${t.name} was burned! Burns hurt each turn and make attacks weaker.` }); // (burn: Attack counts one step lower, see effAtk)
         }
       } else if (mv.pow === 0 && !fx.debuff) E('note', t, { text: has ? 'But it failed!' : 'It had no effect.' });
     }
@@ -329,7 +356,7 @@
     E('use', a, { move: B.sup.move, giant: true, text: `${a.name} used ${B.sup.name.toUpperCase()}!` });
     const tm = typeMult(mv.el, t.els);
     const n = Math.max(1, Math.round(baseDamage(a, t, mv) * B.sup.mult * (0.95 + rng() * 0.1) * (t.braced ? TUNE.braceMult : 1)));
-    t.hp = Math.max(0, t.hp - n);
+    t.hp = Math.max(0, t.hp - n); a.dealt += n; if (tm > 1) { a.dealtStrong += n; a.strongEl = mv.el; } if (!t.braced) t.bigHits++;
     E('hit', t, { by: a.side, move: B.sup.move, el: mv.el, n, crit: false, tm, i: 0, of: 1, giant: true, braced: t.braced, text: '' });
     E('note', t, { text: t.braced ? `${t.name} was ready and blocked most of it!` : `Ouch! ${t.name} took the whole blast!` });
   }
@@ -442,6 +469,37 @@
     for (const st of D.STATS.slice().sort((a, b) => s.stats[b].lv - s.stats[a].lv)) { if (spill <= 0) break; const add = Math.min(spill, M - s.stats[st].lv); s.stats[st].lv += add; spill -= add; }
     return s;
   }
+  // One builder for every kind of opponent, used by the real battles and by the estimates, so they always agree.
+  // spec: {kind:'league', id, i} | {kind:'wild', id, step} | {kind:'boss', id} | {kind:'tower', seed, floor, hp}
+  // (spec.npc: an already-built opponent Sprout, so a batch of sims builds it once)
+  function foeBattle(sP, spec, opts) {
+    opts = Object.assign({}, opts);
+    if (spec.kind === 'league') {
+      const li = D.LEAGUES.findIndex(l => l.id === spec.id), o = D.LEAGUES[li].opponents[spec.i];
+      const k = typeof o.k === 'number' ? { hp: o.k, atk: o.k } : o.k || null; // data.js: HP and Attack × k
+      return newBattle(sP, spec.npc || leagueNPC(spec.id, spec.i), Object.assign(opts, { npcMult: TUNE.npcMult[li], k, smart: TUNE.aiSmart[li] }));
+    }
+    if (spec.kind === 'wild') return newBattle(sP, null, Object.assign(opts, { wild: { id: spec.id, step: spec.step } }));
+    if (spec.kind === 'boss') return newBattle(sP, null, Object.assign(opts, { boss: spec.id }));
+    const f = spec.floor, b = newBattle(sP, spec.npc || towerNPC(spec.seed, f), Object.assign(opts, { npcMult: TOWER.mult(f), smart: TOWER.smart(f) }));
+    b.p.hp = Math.max(1, Math.round(b.p.max * (Number.isFinite(spec.hp) ? clamp(spec.hp, 0, 1) : 1))); // at least 1 HP
+    return b;
+  }
+  const leagueBattle = (sP, id, i, opts) => foeBattle(sP, { kind: 'league', id, i }, opts);
+  // Honest matchup estimate: n quick fights with kid-level play for the player (no snack). Seeded, so the same Sprout
+  // against the same opponent always gets the same answer.
+  const KID = 0.5;
+  function estimate(sP, spec, n, seed) {
+    n = n || 36; const rng = srng(seed == null ? 12345 : seed);
+    const fixed = spec.kind === 'league' ? Object.assign({ npc: leagueNPC(spec.id, spec.i) }, spec) : spec.kind === 'tower' ? Object.assign({ npc: towerNPC(spec.seed, spec.floor) }, spec) : spec;
+    let w = 0, turns = 0;
+    for (let i = 0; i < n; i++) {
+      const b = foeBattle(sP, fixed, { rng, sim: true });
+      while (!b.over && b.turn < 60) resolveRound(b, aiChoose(b, b.p, KID), aiChoose(b, b.o, b.smart));
+      w += b.winner === 'p'; turns += b.turn;
+    }
+    return { win: w / n, turns: turns / n };
+  }
   // ---------------- headless sim (balance) ----------------
   function simBattle(sP, sO, oppSmart, pSmart, maxTurns, npcMult) {
     const b = newBattle(sP, sO, { npcMult });
@@ -449,9 +507,9 @@
     return { won: b.winner === 'p', turns: b.turn, hpLeft: b.p.hp / b.p.max };
   }
   function sim(sP, leagueId, index, n, pSmart) {
-    const li = D.LEAGUES.findIndex(l => l.id === leagueId); const o = leagueNPC(leagueId, index);
+    const spec = { kind: 'league', id: leagueId, i: index, npc: leagueNPC(leagueId, index) };
     let w = 0, turns = 0; n = n || 300;
-    for (let i = 0; i < n; i++) { const r = simBattle(sP, o, TUNE.aiSmart[li], pSmart == null ? 0.85 : pSmart, 40, TUNE.npcMult[li]); w += r.won; turns += r.turns; }
+    for (let i = 0; i < n; i++) { const b = foeBattle(sP, spec); while (!b.over && b.turn < 40) resolveRound(b, aiChoose(b, b.p, pSmart == null ? 0.85 : pSmart), aiChoose(b, b.o, b.smart)); w += b.winner === 'p'; turns += b.turn; }
     return { win: +(w / n).toFixed(2), turns: +(turns / n).toFixed(1) };
   }
   const simSnack = () => ({ fruit: 'apple', name: 'Heart Apple', heal: TUNE.snackHeal, used: false });
@@ -492,7 +550,7 @@
   }
 
   const engine = { TUNE, BOSSES, TOWER, WILD, makeWild, wildLv, wildList, simWild, makeFighter, makeBoss, newBattle, resolveRound, aiChoose, scoreMove, typeMult, hitChance, baseDamage, isBrace,
-    simBattle, sim, simBoss, simTower, genNPC, towerNPC, SNACK };
+    simBattle, sim, simBoss, simTower, genNPC, towerNPC, leagueNPC, foeBattle, leagueBattle, estimate, srng, SNACK, KID };
   window.__battle = { engine };
 
   // ======================================================================
@@ -543,6 +601,92 @@
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const elColor = el => (D.ELEMENTS[el] || D.ELEMENTS.normal).color;
   const elLabel = el => (D.ELEMENTS[el] || D.ELEMENTS.normal).label;
+  const eggKind = k => (D.EGGS[k] ? k : 'golden'); // (an egg id that isn't in data.js yet pays a Golden Egg instead)
+  const eggName = k => (D.EGGS[k] || {}).name || 'Egg';
+  const aOrAn = w => (/^[aeiou]/i.test(w) ? 'an' : 'a'); // "an Eclipse Egg", "an Owl"
+  const areaName = a => (D.AREAS[a] ? D.AREAS[a].name : 'Garden');
+  const SIDES = ['p', 'o'];
+  // prefers-reduced-motion: no screen shake, and soft instead of bright full-screen flashes
+  const RM = safe(() => window.matchMedia('(prefers-reduced-motion: reduce)'), null);
+  const calm = () => !!(RM && RM.matches);
+  // remove dead items from an array in place (no new array every frame)
+  function keep(a, alive) { let j = 0; for (let i = 0; i < a.length; i++) if (alive(a[i])) a[j++] = a[i]; a.length = j; }
+  const partAlive = p => p.life > 0, popAlive = p => p.t < p.life;
+  const ambAlive = p => p.life > 0 && p.x > -20 && p.x < WW + 30 && p.y < WH + 6 && p.y > -10;
+
+  // ---------------- matchup estimates (pre-battle "Easy / Fair / Tough / Very tough") ----------------
+  // A quick seeded sim with kid-level play, cached per Sprout (its levels, moves and elements) and opponent.
+  const estCache = new Map();
+  const sproutSig = s => `${s.id}:${D.STATS.map(k => s.stats[k].lv).join(',')}:${ST.movesOf(s).join(',')}:${ST.elementsOf(s).join(',')}`;
+  const specKey = sp => (sp.kind === 'league' ? `L:${sp.id}:${sp.i}` : sp.kind === 'wild' ? `W:${sp.id}:${sp.step}` : sp.kind === 'boss' ? `B:${sp.id}` : `T:${sp.seed}:${sp.floor}:${Math.round((sp.hp == null ? 1 : sp.hp) * 20)}`);
+  function matchup(s, spec, n) {
+    n = n || 36;
+    const key = `${sproutSig(s)}|${specKey(spec)}|${n}`;
+    let e = estCache.get(key);
+    if (!e) { e = safe(() => estimate(s, spec, n, hashStr(key)), { win: 0.5, turns: 10 }); if (estCache.size > 300) estCache.clear(); estCache.set(key, e); }
+    return e;
+  }
+  const ODDS = [{ min: 0.8, word: 'Easy', c: 'easy' }, { min: 0.55, word: 'Fair', c: 'fair' }, { min: 0.25, word: 'Tough', c: 'tough' }, { min: -1, word: 'Very tough', c: 'vtough' }];
+  const oddsOf = w => ODDS.find(o => w >= o.min);
+  // one short reason, from the types first (what a kid can act on), then levels and healing
+  function matchReason(s, spec, win) {
+    const b = safe(() => foeBattle(s, spec, { sim: true }), null); if (!b) return '';
+    const P = b.p, O = b.o, good = win >= 0.55, me = esc(P.name), foe = esc(O.boss ? 'The ' + O.name : O.name), gap = O.lv - P.lv;
+    const atk = f => f.moves.map(id => D.MOVES[id]).filter(m => m && m.pow > 0);
+    const hit = atk(P).find(m => typeMult(m.el, O.els) > 1), hurt = atk(O).find(m => typeMult(m.el, P.els) > 1);
+    const weak = atk(P).length && atk(P).every(m => typeMult(m.el, O.els) < 1);
+    const hitText = () => { const on = O.els.find(d => (D.ELEMENTS[hit.el] || { strong: [] }).strong.includes(d)) || O.els[0]; return `${foe} is ${elLabel(on)} — ${elLabel(hit.el)} moves hit it hard!`; };
+    if (good && hit) return hitText();
+    if (!good && hurt) return `Watch out: ${foe}'s ${elLabel(hurt.el)} moves hit ${me} hard.`;
+    if (!good && weak) return `${me}'s moves are weak against ${elLabel(O.els[0])}.`;
+    if (!good && gap >= 5) return `${foe} is ${gap} levels higher.`;
+    if (O.boss) return good ? 'Block its giant attack and you can win!' : 'Legends are really strong. Train more first?';
+    if (!good && O.moves.some(id => D.MOVES[id] && D.MOVES[id].fx.heal)) return `${foe} can heal itself.`;
+    if (good && gap <= -5) return `${me} is ${-gap} levels higher.`;
+    if (hit) return hitText();
+    return good ? 'A fair fight. Good luck!' : `${foe} is strong. Train a bit more first?`;
+  }
+  function oddsHtml(s, spec) {
+    const e = matchup(s, spec), o = oddsOf(e.win), lvl = ODDS.indexOf(o);
+    return `<div class="b-odds ${o.c}"><span class="b-pips" aria-hidden="true">${ODDS.map((x, i) => `<i class="${i <= lvl ? 'on' : ''}"></i>`).join('')}</span>
+      <div><b>${o.word}</b><span>${matchReason(s, spec, e.win)}</span></div></div>`;
+  }
+
+  // ======================================================================
+  // Rewards: prize() says what a battle pays (the previews show these same numbers) and grant() pays it exactly once,
+  // the moment the battle is decided, so closing the app during the victory dance never loses a prize.
+  // The results card only shows what grant() actually paid.
+  // ======================================================================
+  const BT = D.BATTLE, XP_SPLIT = BT.xpSplit || { power: 1.2, stamina: 1, run: 0.6, fly: 0.4, swim: 0.4 };
+  const LOSE_XP = BT.loseXpShare == null ? 0.35 : BT.loseXpShare, WIN_STEP = BT.winCoinStep == null ? 0.25 : BT.winCoinStep, CLEAR = BT.clearCoins || 3;
+  // won: true / false ('draw' for a Friend Battle draw). x: the battle (V) or the same fields for a preview.
+  function prize(kind, x, won) {
+    const xk = won === true ? 1 : LOSE_XP, lose = BT.loseCoinsShare;
+    if (kind === 'league') return { coins: won ? x.L.coins * (1 + x.index * WIN_STEP) : x.L.coins * lose, xp: x.L.xp * xk };
+    if (kind === 'boss') return { coins: x.boss.coins * (won ? 1 : lose), xp: x.boss.xp * xk };
+    if (kind === 'wild') { const L = wildLv(x.wild.id, x.wild.step); return { coins: WILD.coins(L) * (won ? 1 : lose), xp: WILD.xp(L) * xk }; }
+    if (kind === 'tower') return { coins: won ? TOWER.coins(x.floor) : 0, xp: TOWER.xp(x.floor) * xk }; // tower coins go into the prize bag
+    if (kind === 'friend') return { coins: won === 'draw' ? FRIEND.coinsDraw : won ? FRIEND.coinsWin : FRIEND.coinsLose, xp: FRIEND.xp };
+    return { coins: 0, xp: 0 };
+  }
+  const leagueClearCoins = L => L.coins * CLEAR;
+  const alphaBonus = L => WILD.coins(L) * 2, pouchFullCoins = L => 20 + L * 2;
+  const xpCum = [0];
+  const cumXp = lv => { while (xpCum.length <= lv) xpCum.push(xpCum[xpCum.length - 1] + D.GROWTH.xpForLevel(xpCum.length - 1)); return xpCum[lv]; };
+  const xpOf = s => D.STATS.reduce((t, k) => t + (s.stats[k] ? cumXp(s.stats[k].lv) + (s.stats[k].xp || 0) : 0), 0);
+  // coins + XP (spread over the stats) + the battle record. Returns what was really paid (XP is measured, so any
+  // happy bonus is included and XP past the max level isn't counted).
+  function payout(s, coins, xp, why, won, count) {
+    const x0 = xpOf(s), happy = typeof ST.happyBonus === 'function' && safe(() => ST.happyBonus(s), 1) > 1;
+    const got = coins > 0 ? ST.addCoins(coins, why) : 0;
+    const gives = {}; for (const k of Object.keys(XP_SPLIT)) gives[k] = xp * XP_SPLIT[k];
+    const r = ST.gain(s, gives) || {};
+    if (count !== false) {
+      s.record = s.record || {}; s.record.battles = (s.record.battles || 0) + 1; PS.S.totals.battles = (PS.S.totals.battles || 0) + 1;
+      if (won) { s.record.battleWins = (s.record.battleWins || 0) + 1; PS.S.totals.battleWins = (PS.S.totals.battleWins || 0) + 1; }
+    }
+    return { coins: got, xp: Math.max(0, Math.round(xpOf(s) - x0)), ups: r.ups || {}, evolved: r.evolved, happy, maxed: ST.totalLevels(s) >= D.STATS.length * D.GROWTH.maxLevel };
+  }
 
   const CSS = `
 .b-hub,.b-fight{font-variant-ligatures:none}
@@ -651,6 +795,7 @@
 .b-runbox canvas{width:48px;height:48px}
 .b-runbox b{font-family:var(--f-ui);font-size:17px;color:var(--ink);font-weight:700}
 .b-runbox small{display:block;font-size:14px;color:var(--ink);line-height:1.3}
+.b-runbox.paused{background:#fff6d6;border-color:var(--sun-edge)}
 .b-fr .vs{display:flex;align-items:center;justify-content:center;gap:4px;margin:4px 0 8px}
 .b-fr .vs canvas{width:84px;height:84px}
 .b-fr .vs b{font-family:var(--f-px);font-weight:700;font-size:26px;color:#c0612a}
@@ -669,8 +814,24 @@
 .b-snone{font-size:14px;color:var(--ink-soft);margin:2px 0 0}
 .b-mini{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:4px 0 8px}
 .b-mini span{font-family:var(--f-ui);font-weight:700;font-size:14px;background:var(--slot);border-radius:8px;padding:2px 8px}
-.b-danger{background:#ffe9e6;border:2px solid #f0a8a0;border-radius:12px;padding:7px 10px;font-size:15px;line-height:1.35;margin:6px 0 8px;text-align:left}
-.b-danger b{color:#b43a44}
+.b-odds{display:flex;align-items:center;gap:9px;margin:8px 0 6px;padding:6px 10px;border-radius:12px;border:2px solid var(--oc);background:color-mix(in srgb,var(--oc) 16%,#fffdf6);text-align:left}
+.b-odds b{display:block;font-family:var(--f-ui);font-weight:700;font-size:17px;line-height:1.15;color:var(--ink)}
+.b-odds div span{display:block;font-size:14px;line-height:1.3;color:var(--ink)}
+.b-odds .b-pips{display:flex;align-items:flex-end;gap:2px;flex:0 0 auto}
+.b-pips i{display:block;width:6px;border-radius:2px;background:#e3dccb;border:1px solid rgba(34,32,52,.35)}
+.b-pips i:nth-child(1){height:8px}.b-pips i:nth-child(2){height:12px}.b-pips i:nth-child(3){height:16px}.b-pips i:nth-child(4){height:20px}
+.b-pips i.on{background:var(--oc)}
+.b-odds.easy,.b-ow.easy{--oc:#6abe30}.b-odds.fair,.b-ow.fair{--oc:#f6c83a}.b-odds.tough,.b-ow.tough{--oc:#df7126}.b-odds.vtough,.b-ow.vtough{--oc:#e5535f}
+.b-ow{font-family:var(--f-ui);font-weight:700;border-radius:6px;padding:0 5px;background:var(--oc);color:#fff;text-shadow:0 1px 0 rgba(34,32,52,.4)}
+.b-why{background:#fff6d6;border:2px solid var(--sun-edge);border-radius:12px;padding:7px 10px;margin:2px 0 8px;text-align:left;font-size:15px;line-height:1.35;color:var(--ink)}
+.b-why b{display:block;font-family:var(--f-ui);font-weight:700}
+.b-why span{display:block}.b-why i{font-style:normal;font-weight:700;color:var(--accent)}
+.b-alt{display:grid;grid-template-columns:44px 1fr;gap:4px 8px;align-items:center;background:#eef8e6;border:2px solid var(--accent);border-radius:12px;padding:6px 8px 8px;margin:0 0 8px;text-align:left}
+.b-alt canvas{width:44px;height:44px}
+.b-alt b{display:block;font-family:var(--f-ui);font-weight:700;font-size:16px;color:var(--ink)}
+.b-alt small{display:block;font-size:14px;line-height:1.3;color:var(--ink)}
+.b-alt .btn{grid-column:1 / -1}
+.b-happy{font-family:var(--f-ui);font-weight:700;font-size:12.5px;border-radius:6px;padding:0 5px;margin-left:4px;background:#f7b6c8;color:#6a1f3e}
 
 .b-fight{position:absolute;inset:0;display:flex;flex-direction:column;background:#222034}
 .b-arena{position:relative;flex:1 1 auto;min-height:0;overflow:hidden}
@@ -680,7 +841,9 @@
 .b-plate.p{right:10px;bottom:12px}
 .b-own{font-family:var(--f-ui);font-weight:700;font-size:13px;letter-spacing:0;text-transform:none;color:#c0612a;line-height:1.15}
 .b-prow{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
-.b-prow b{font-family:var(--f-ui);font-weight:700;font-size:17px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b-prow b{font-family:var(--f-ui);font-weight:700;font-size:17px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.b-pels{display:flex;gap:2px;flex:0 0 auto;margin-right:auto;align-self:center}
+.b-pels canvas{width:14px;height:14px;display:block}
 .b-prow .b-lv{font-family:var(--f-ui);font-weight:700;font-size:14px;color:var(--ink);white-space:nowrap}
 .b-hp{display:flex;align-items:center;gap:5px;margin-top:3px}
 .b-hp em{font-family:var(--f-ui);font-style:normal;font-weight:700;font-size:12.5px;color:#fff;background:#c0612a;border-radius:4px;padding:0 3px;line-height:15px}
@@ -695,6 +858,7 @@
 .b-tag{font-family:var(--f-ui);font-weight:700;font-size:12.5px;line-height:16px;border-radius:4px;padding:0 5px;color:#fff;border:1px solid rgba(34,32,52,.4)}
 .b-tag.up{background:#2b8243}.b-tag.down{background:#3f55b8}
 .b-tag.poison{background:#9a6ad0}.b-tag.burn{background:#df5a26}.b-tag.sleep{background:#5b6ee1}.b-tag.stun{background:#e0a800;color:#3a2a00}
+.b-tag.tired{background:#8c93a8}
 .b-tag.charge{background:#e5535f;animation:bBlink .6s steps(2) infinite}
 .b-plate.o.boss{left:10px;right:10px;width:auto;background:linear-gradient(180deg,#3a2a4a,#2a1e38);border-color:#fbf236;color:#fff;padding:5px 10px 6px}
 .b-plate.boss .b-prow b{color:#fff27a;font-size:20px;letter-spacing:.02em;font-family:var(--f-px)}
@@ -808,6 +972,14 @@
     ICON.shield = PX.fromStrings(['.bbbbb.', 'bwwwwwb', 'bwWWWwb', 'bwWWWwb', '.bwWwb.', '..bwb..', '...b...'], { b: '#3f55b8', w: '#9fd8ff', W: '#ffffff' }).canvas();
     ICON.dot = dot;
     ICON.splash = dot('#cbdbfc', 1);
+    // element hit effects (hitFx)
+    ICON.petals = [fxs('leaf'), PX.fromStrings(['.p', 'pP'], { p: '#f7b6c8', P: '#e07ba0' }).canvas(), PX.fromStrings(['gg', '.G'], { g: '#99e550', G: '#37946e' }).canvas()];
+    ICON.droplet = PX.fromStrings(['.a.', 'aba', '.a.'], { a: '#639bff', b: '#cbeeff' }).canvas();
+    ICON.embers = [dot('#ff9a3a', 1), dot('#fbf236', 1), dot('#df5a26', 2), PX.fromStrings(['y', 'o'], { y: '#fbf236', o: '#df5a26' }).canvas()];
+    ICON.chips = [PX.fromStrings(['gG', 'G.'], { g: '#d8c8a8', G: '#8c7a5e' }).canvas(), PX.fromStrings(['.g', 'gG'], { g: '#b7c2cc', G: '#595a70' }).canvas(), dot('#a8946e', 1), dot('#6a5a40', 2)];
+    ICON.streak = PX.fromStrings(['..wwWW', 'wwww..'], { w: '#ffffff', W: '#dcecfa' }).canvas();
+    ICON.wisps = [PX.fromStrings(['.p', 'pq', 'q.'], { p: '#c9a2f0', q: '#9a6ad0' }).canvas(), PX.fromStrings(['p.', 'qp', '.q'], { p: '#c9a2f0', q: '#5e3a8e' }).canvas()];
+    ICON.twinkle = [fxs('spark', '#ffffff'), fxs('bigspark', '#fbf236'), fxs('spark', '#fff27a')];
     ICON.clouds = [
       PX.fromStrings(['...wwww....', '.wwwwwwww..', 'wwwwwwwwwww', '.WWWWWWWWW.'], { w: '#ffffff', W: '#dcecfa' }).canvas(),
       PX.fromStrings(['..www..', 'wwwwwww', '.WWWWW.'], { w: '#ffffff', W: '#dcecfa' }).canvas(),
@@ -856,7 +1028,7 @@
   let root, hubEl, fightEl, resEl, passEl, arenaEl, cv, ctx, logEl, movesEl, infoEl, runBtn, snackBtn, warnEl, plateEls = {};
   const lo = document.createElement('canvas'), lx = lo.getContext('2d');
   const bgC = document.createElement('canvas'), bgx = bgC.getContext('2d');
-  let cssW = 0, cssH = 0, dpr = 1, PXS = 4, SC = 12, WPX = 4, WW = 100, WH = 120, bgKey = '', sizeDirty = true, sizeCheckT = 0;
+  let cssW = 0, cssH = 0, dpr = 1, PXS = 4, SC = 12, WPX = 4, WW = 100, WH = 120, bgKey = -1, sizeDirty = true, sizeCheckT = 0;
   // SC = device pixels per world pixel (always a whole number, so pixel art stays crisp); WPX = CSS px per world pixel
   let V = null; // live battle view
   let hubT = 0, hubFrame = 0, hubSprite = null, hubTab = 'leagues';
@@ -891,11 +1063,11 @@
     plateEls = { o: root.querySelector('.b-plate.o'), p: root.querySelector('.b-plate.p') };
     let armedAt = 0;
     runBtn.onclick = () => {
-      if (!V || V.phase === 'results') return;
+      if (!V || V.b.over || V.granted || V.phase === 'end' || V.phase === 'results') return; // the fight is already decided
       const label = V.mode === 'friend' ? 'End battle' : 'Give up';
       if (Date.now() - armedAt > 3000) {
         armedAt = Date.now(); runBtn.textContent = V.mode === 'tower' ? 'Tap again (keep half the bag)' : `Tap again to ${label.toLowerCase()}`; runBtn.classList.add('armed');
-        setTimeout(() => { if (V) runBtn.textContent = V.mode === 'friend' ? 'End battle' : 'Give up'; runBtn.classList.remove('armed'); }, 3000); return;
+        setTimeout(() => { if (V) runBtn.textContent = V.mode === 'friend' ? 'End battle' : 'Give up'; runBtn.classList.remove('armed'); armedAt = 0; }, 3000); return;
       }
       sfx('miss');
       const wasTower = V.mode === 'tower', bag = wasTower ? towerRun() && towerRun().pot : 0;
@@ -920,9 +1092,9 @@
     if (!V) { fightEl.hidden = true; hubEl.hidden = false; renderHub(); }
     if (params.league != null && params.index != null) startBattle(params.league, params.index);
   }
-  function hide() { if (V) forfeit(); }
-  function forfeit() { // leave mid-battle: no reward, restore shell. A Tower run ends (half the bag is kept).
-    if (V && V.mode === 'tower' && !V.done) towerEnd('lost');
+  function hide() { if (V) forfeit(true); } // leaving the screen some other way only pauses a Tower floor
+  function forfeit(pause) { // leave mid-battle: no reward, restore shell. Giving up on a Tower floor ends the run (half the bag).
+    if (V && V.mode === 'tower' && !V.granted && !pause) towerEnd('lost'); // (a decided floor was already paid by grant())
     V = null; resEl.hidden = true; passEl.hidden = true; fightEl.hidden = true; hubEl.hidden = false;
     PS.ui.chrome(true); PS.ui.hold(false);
   }
@@ -1017,7 +1189,7 @@
       const lockName = L.unlock ? (D.LEAGUES.find(x => x.id === L.unlock) || {}).name : '';
       h += `<section class="panel b-lg ${open ? '' : 'locked'}" data-li="${li}"><header><div><div class="px-title b-lname">${L.name}</div>
           <div class="b-lsub ${p.cleared ? 'done' : ''}">${p.cleared ? 'Cleared' : open ? `${n} of 3 beaten` : 'Locked'}</div></div>
-          <div class="b-rw"><span><canvas class="px" data-coin="1"></canvas>${L.coins} a win</span><span>Clear: <canvas class="px" data-coin="1"></canvas>${L.coins * 3} + <canvas class="px egg" data-egg="${L.egg}"></canvas></span></div></header>
+          <div class="b-rw"><span><canvas class="px" data-coin="1"></canvas>${Math.round(prize('league', { L, index: 0 }, true).coins)} a win</span><span>Clear: <canvas class="px" data-coin="1"></canvas>${leagueClearCoins(L)} + <canvas class="px egg" data-egg="${eggKind(L.egg)}"></canvas></span></div></header>
         <div class="b-opps">${L.opponents.map((o, i) => {
           const can = open && (i === 0 || p.beaten[i - 1] || p.beaten[i]);
           const cls = p.beaten[i] ? 'beaten' : can && i === nextI ? 'next' : '';
@@ -1050,17 +1222,15 @@
   function preview(L, i) {
     const s = partner(); if (!s) return;
     const npc = leagueNPC(L.id, i), bs = ST.battleStats(npc), p = ST.leagueProgress(L.id);
-    const mine = ST.battleStats(s).level;
-    const gap = bs.level - mine;
-    const warn = gap >= 12 ? '<p style="color:#b43a44"><b>This looks very tough.</b> Train more first?</p>' : gap >= 5 ? '<p style="color:#a8653a">A tough fight for your Sprout.</p>' : '';
-    const coins = Math.round(L.coins * (1 + i * 0.25));
+    const coins = Math.round(prize('league', { L, index: i }, true).coins);
     PS.ui.modal({
       eyebrow: `${L.name} · ${i + 1} of 3`, title: npc.name, sprite: npc, pose: { eyes: 'brave', mouth: 'grin', arms: 'up' },
       html: `<p style="text-align:center;margin-top:-4px">${esc(ST.formInfo(npc).name)} · Lv ${bs.level}</p>
         <div class="chips-list" style="justify-content:center">${bs.els.map(chip).join('')}</div>
+        ${oddsHtml(s, { kind: 'league', id: L.id, i })}
         <p><b>Moves:</b> ${ST.movesOf(npc).map(id => D.MOVES[id].name).join(', ')}</p>
-        <p>${matchupHint(s, npc)}</p>${warn}
-        <p>Win: <b>${coins} coins</b>${!p.cleared && p.beaten.filter(Boolean).length === 2 && !p.beaten[i] ? ` + league prize <b>${L.coins * 3} coins</b> and a <b>${D.EGGS[L.egg].name}</b>` : ''}.</p>
+        <p>${matchupHint(s, npc)}</p>
+        <p>Win: <b>${coins} coins</b>${!p.cleared && p.beaten.filter(Boolean).length === 2 && !p.beaten[i] ? ` + league prize <b>${leagueClearCoins(L)} coins</b> and ${aOrAn(eggName(eggKind(L.egg)))} <b>${eggName(eggKind(L.egg))}</b>` : ''}.</p>
         ${snackRow()}`,
       buttons: [{ label: `Battle with ${s.name}!`, kind: 'go', onClick: () => { setTimeout(() => startBattle(L.id, i), 0); } }, { label: 'Not yet' }],
       mount(card) { paintIcons(card); bindSnacks(card); },
@@ -1069,14 +1239,15 @@
 
   // ---------------- snacks (pre-battle picker) ----------------
   const snackHeal = id => SNACK_HEAL[id] || TUNE.snackHeal;
+  // The chosen snack, only while there is one left. Never swaps to a different fruit behind the player's back: if the
+  // chosen fruit runs out it's "No snack" (and the choice comes back once they have that fruit again).
   function currentSnack() {
     const F = PS.S.fruits || {};
-    if (snackSel === undefined) { // first time this session: remembered choice, else an ordinary fruit if there is one
+    if (snackSel === undefined) { // first time this session: the remembered choice; never chosen yet: a Heart Apple if there is one
       const pref = extra().snack;
-      snackSel = pref === null ? null : pref && F[pref] ? pref : F.apple ? 'apple' : Object.keys(F).find(k => F[k] > 0 && D.FRUITS[k] && k !== 'goldfruit') || null;
+      snackSel = pref === null ? null : pref && D.FRUITS[pref] ? pref : 'apple';
     }
-    if (snackSel && !F[snackSel]) snackSel = Object.keys(F).find(k => F[k] > 0 && D.FRUITS[k] && k !== 'goldfruit') || null;
-    return snackSel;
+    return snackSel && F[snackSel] > 0 && D.FRUITS[snackSel] ? snackSel : null;
   }
   function snackRow() {
     const F = PS.S.fruits || {}, list = Object.keys(F).filter(k => F[k] > 0 && D.FRUITS[k]);
@@ -1134,24 +1305,24 @@
     return step === 2 ? `The Alpha ${A.name} ${v}! It looks tough!` : step === 1 ? `A big wild ${A.name} ${v}!` : `A little wild ${A.name} ${v}!`;
   }
   function wildPrize(id, step) {
-    const r = wildRec(id), L = wildLv(id, step), bits = [`<b>${WILD.coins(L)} coins</b>`];
+    const r = wildRec(id), L = wildLv(id, step), bits = [`<b>${Math.round(prize('wild', { wild: { id, step } }, true).coins)} coins</b>`];
     if (!r.some(Boolean)) bits.push(ST.canCatch() ? `the <b>${D.ANIMALS[id].name}</b> joins your pouch` : `bonus coins (your pouch is full, so it can't join)`);
-    if (step === 2 && !r[2]) bits.push(`an <b>Alpha bonus</b> of ${WILD.coins(L) * 2} coins`);
+    if (step === 2 && !r[2]) bits.push(`an <b>Alpha bonus</b> of ${alphaBonus(L)} coins`);
     return 'Win: ' + bits.join(' + ') + '.';
   }
   function previewWild(id) {
     const s = partner(); if (!s) return;
     const A = D.ANIMALS[id], r = wildRec(id); let step = wildNext(id);
     const html = () => {
-      const f = makeWild(id, step), mine = ST.battleStats(s).level, gap = f.lv - mine;
+      const f = makeWild(id, step);
       const good = ST.movesOf(s).map(m => D.MOVES[m]).filter(m => m.pow > 0 && typeMult(m.el, f.els) > 1).map(m => m.name);
       const threat = f.moves.map(m => D.MOVES[m]).filter(m => m.pow > 0 && typeMult(m.el, ST.elementsOf(s)) > 1).map(m => m.name);
       return `<p style="text-align:center;margin-top:-4px">${esc(A.blurb)}</p>
         <div class="chips-list" style="justify-content:center">${chip(A.el || 'normal')}</div>
         <div class="b-steps">${WILD.steps.map((S, i) => { const ok = i === 0 || r[i - 1] > 0; return `<button class="b-stp ${i === step ? 'on' : ''}" type="button" data-step="${i}" ${ok ? '' : 'disabled'}>${S.name}<small>${ok ? `Lv ${wildLv(id, i)}${r[i] ? ' · ★' : ''}` : `Beat ${WILD.steps[i - 1].name}`}</small></button>`; }).join('')}</div>
+        ${oddsHtml(s, { kind: 'wild', id, step })}
         <p><b>Moves:</b> ${f.moves.map(m => D.MOVES[m].name).join(', ')}</p>
         ${good.length ? `<p><b>${good.join(', ')}</b> ${good.length > 1 ? 'are' : 'is'} super effective.</p>` : ''}${threat.length ? `<p>Watch out for <b>${threat.join(', ')}</b>.</p>` : ''}
-        ${gap >= 12 ? '<p style="color:#b43a44"><b>This looks very tough.</b> Train more first?</p>' : gap >= 5 ? '<p style="color:#a8653a">A tough fight for your Sprout.</p>' : ''}
         <p>${wildPrize(id, step)}</p>`;
     };
     PS.ui.modal({
@@ -1190,11 +1361,8 @@
   }
   function previewBoss(B) {
     const s = partner(); if (!s) return;
-    const r = bossRec(B.id), mine = ST.battleStats(s).level, f = makeBoss(B.id);
-    const gap = B.rec - mine;
-    const warn = gap >= 15 ? `<div class="b-danger"><b>Legends are really strong!</b> ${esc(B.name)} is best for Lv ${B.rec}+. ${esc(s.name)} is Lv ${mine}. Train more first?</div>`
-      : gap > 0 ? `<p style="color:#a8653a">A very tough fight. Best for Lv ${B.rec}+.</p>` : '';
-    const prize = !r.wins ? (B.egg ? `a <b>${D.EGGS[B.egg].name}</b> + <b>${B.coins} coins</b>` : `the <b>${B.name}</b> joins you (${D.RARES[B.id] ? 'a rare creature for your Sprouts' : 'a friend'}) + <b>${B.coins} coins</b>`) : `<b>${B.coins} coins</b>`;
+    const r = bossRec(B.id), f = makeBoss(B.id), coins = Math.round(prize('boss', { boss: B }, true).coins);
+    const win = !r.wins ? (B.egg ? `${aOrAn(eggName(B.egg))} <b>${eggName(B.egg)}</b> + <b>${coins} coins</b>` : `the <b>${B.name}</b> joins you (${D.RARES[B.id] ? 'a rare creature for your Sprouts' : 'a friend'}) + <b>${coins} coins</b>`) : `<b>${coins} coins</b>`;
     const threat = B.moves.concat(B.sup.move).map(id => D.MOVES[id]).filter(m => m.pow > 0 && typeMult(m.el, ST.elementsOf(s)) > 1).map(m => m.name);
     const good = ST.movesOf(s).map(id => D.MOVES[id]).filter(m => m.pow > 0 && typeMult(m.el, B.els) > 1).map(m => m.name);
     PS.ui.modal({
@@ -1202,11 +1370,12 @@
       html: `<p style="text-align:center;margin-top:-4px">${esc(B.blurb)}</p>
         <div class="b-mini"><span>HP ${f.max}</span><span>Best for Lv ${B.rec}+</span>${r.tries ? `<span>Won ${r.wins} of ${r.tries}</span>` : ''}</div>
         <div class="chips-list" style="justify-content:center">${B.els.map(chip).join('')}</div>
+        ${oddsHtml(s, { kind: 'boss', id: B.id })}
         <p><b>Giant attack:</b> every ${B.calm + 2}${B.calm + 2 === 3 ? 'rd' : 'th'} turn it charges up, then uses <b>${B.sup.name}</b>. When you see the warning, pick a move with a yellow <b>BLOCK</b> tag (Guard, Heal or Boost) or eat your snack!</p>
         ${B.revive ? `<p><b>Rebirth:</b> the first time it faints, it comes back with ${Math.round(B.revive * 100)}% HP.</p>` : ''}
         <p><b>Moves:</b> ${B.moves.map(id => D.MOVES[id].name).join(', ')}</p>
         ${good.length ? `<p><b>${good.join(', ')}</b> ${good.length > 1 ? 'are' : 'is'} super effective.</p>` : ''}${threat.length ? `<p>Watch out: <b>${threat.join(', ')}</b> is strong against ${esc(s.name)}.</p>` : ''}
-        ${warn}<p>Win: ${prize}.</p>${snackRow()}`,
+        <p>Win: ${win}.</p>${snackRow()}`,
       buttons: [{ label: `Challenge with ${s.name}!`, kind: 'go', onClick: () => { setTimeout(() => startBoss(B.id), 0); } }, { label: 'Not yet' }],
       mount(card) { paintIcons(card); bindSnacks(card); },
     });
@@ -1240,9 +1409,14 @@
       return h;
     }
     if (run && rs) {
-      h += `<div class="b-runbox"><canvas class="px b-runsp" width="32" height="32"></canvas><div><b>Floor ${run.floor} next</b>
-        <small>${esc(rs.name)} · HP ${Math.round(run.hp * 100)}% · Prize bag: ${run.pot} coins${run.snack && !run.snackUsed ? ` · Snack: ${esc(D.FRUITS[run.snack] ? D.FRUITS[run.snack].name : run.snack)}` : ''}</small></div></div>
-        <div class="b-btns"><button class="btn wide go b-tcont" type="button">Climb to Floor ${run.floor}!</button><button class="btn wide b-tstop" type="button">Stop and take ${run.pot} coins</button></div>`;
+      const info = `${esc(rs.name)} · HP ${Math.round(run.hp * 100)}% · Prize bag: ${run.pot} coins${run.snack && !run.snackUsed && snackFor(run.snack) ? ` · Snack: ${esc(D.FRUITS[run.snack].name)}` : ' · No snack'}`;
+      h += towerPaused(run)
+        ? `<div class="b-runbox paused"><canvas class="px b-runsp" width="32" height="32"></canvas><div><b>Floor ${run.floor}: battle paused</b>
+          <small>${info}</small><small>Finish this floor first. Then you can stop and take the bag.</small></div></div>
+          <div class="b-btns"><button class="btn wide go b-tcont" type="button">Back to Floor ${run.floor}!</button></div>`
+        : `<div class="b-runbox"><canvas class="px b-runsp" width="32" height="32"></canvas><div><b>Floor ${run.floor} next</b>
+          <small>${info}</small></div></div>
+          <div class="b-btns"><button class="btn wide go b-tcont" type="button">Climb to Floor ${run.floor}!</button><button class="btn wide b-tstop" type="button">Stop and take ${run.pot} coins</button></div>`;
     } else {
       h += `<div class="b-btns"><button class="btn wide go b-tstart" type="button">Start climbing!</button></div>`;
     }
@@ -1253,7 +1427,7 @@
   function bindTower() {
     const art = hubEl.querySelector('canvas[data-icon="towerart"]'); if (art) { const c = towerPic(); art.width = c.width; art.height = c.height; PS.ui.paint(art, c); }
     const run = towerRun(), rs = run ? ST.get(run.sid) : null;
-    if (run && !rs) { towerEnd('stop'); PS.ui.toast('Your tower climber left, so the prize bag was paid out.'); renderHub(); return; }
+    if (run && !rs) { const pay = towerEnd(towerPaused(run) ? 'lost' : 'stop'); PS.ui.toast(`Your tower climber left, so the climb ended.${pay ? ` You got ${pay} coins.` : ''}`); renderHub(); return; }
     const sp = hubEl.querySelector('.b-runsp'); if (sp && rs) PS.ui.drawSproutTo(sp, rs, { eyes: 'brave' });
     const st = hubEl.querySelector('.b-tstart');
     if (st) st.onclick = () => { sfx('pop'); previewTower(); };
@@ -1285,6 +1459,12 @@
     if (pay) ST.addCoins(pay, 'tower');
     return pay;
   }
+  // run.fighting = the floor being fought right now: set when a floor starts, deleted when it is won (losing ends the run).
+  // The climber's HP is saved to run.hp after every round (and run.snackUsed when the snack is eaten). If fighting is still
+  // set while no Tower battle is on, the game was closed mid-floor (iOS may do that on its own): the climb is paused there,
+  // nothing is lost, and the only way on is to fight that floor again from the saved HP (the opponent starts fresh).
+  // The bag can't be taken until that floor is finished, so closing the app never beats the half-the-bag rule.
+  const towerPaused = run => !!(run && run.fighting && !(V && V.mode === 'tower'));
 
   // ---------------- Friends hub ----------------
   function friendsHtml() {
@@ -1360,14 +1540,14 @@
     hubEl.hidden = true; fightEl.hidden = false; resEl.hidden = true; passEl.hidden = true;
     const b = cfg.b;
     V = Object.assign({
-      phase: 'intro', t: 0, fast: false, queue: [], step: null, done: false,
+      phase: 'intro', t: 0, fast: false, queue: [], step: null, done: false, granted: false, res: null, spec: null,
       disp: snap(b), hpShown: { p: b.p.hp, o: b.o.hp }, parts: [], pops: [], rings: [], beams: [], amb: [], clouds: [], crowd: [],
-      a: { p: fresh(), o: fresh() }, log: { full: '', shown: 0 }, lastMove: null, quake: 0, quakeA: 0, flashT: 0, flashC: '#ffffff', banner: null, bolt: null, boltT: 3 + Math.random() * 4,
+      a: { p: fresh(), o: fresh() }, log: { full: '', shown: 0, drawn: -1, drawnFull: null }, lastMove: null, quake: 0, quakeA: 0, flashT: 0, flashA: 0.7, flashC: '#ffffff', banner: null, bolt: null, boltT: 3 + Math.random() * 4,
     }, cfg);
     V.a.p.enter = 1; V.a.o.enter = 1; V.seed = Math.floor(Math.random() * 1e9);
     for (let i = 0; i < 4; i++) V.clouds.push({ x: Math.random() * 140 - 20, y: 2 + Math.random() * 16, k: i % 3, v: 1.5 + Math.random() * 2 });
     fightEl.classList.toggle('boss', !!V.boss);
-    resize(); bgKey = '';
+    resize(); bgKey = -1;
     makeCrowd();
     renderPlates(true); renderMoves(); setInfo(null); renderSnack();
     runBtn.textContent = V.mode === 'friend' ? 'End battle' : 'Give up'; runBtn.classList.remove('armed'); runBtn.hidden = false;
@@ -1375,43 +1555,45 @@
     sfx('go');
     resize(true); render(); // draw the new scene now, so the previous battle's last frame never flashes up
   }
+  // Every battle is built by foeBattle() from a spec, the same way the pre-battle estimates build theirs.
   function startBattle(leagueId, index) {
     const s = partner(); if (!s) return;
     const li = D.LEAGUES.findIndex(l => l.id === leagueId), L = D.LEAGUES[li];
-    const npc = leagueNPC(leagueId, index);
-    const b = newBattle(s, npc, { npcMult: TUNE.npcMult[li], smart: TUNE.aiSmart[li] });
+    const npc = leagueNPC(leagueId, index), spec = { kind: 'league', id: leagueId, i: index };
+    const b = foeBattle(s, Object.assign({ npc }, spec));
     b.p.snack = snackFor(currentSnack());
-    launch({ mode: 'league', b, L, li, index, s, npc, area: LEAGUE_AREA[leagueId] || npc.area || 'meadow',
+    launch({ mode: 'league', b, L, li, index, s, npc, spec, area: LEAGUE_AREA[leagueId] || npc.area || 'meadow',
       intro: [{ kind: 'intro', text: `${npc.name} of the ${L.name} wants to battle!`, dur: 1.4 }, { kind: 'go', text: `Go, ${s.name}!`, dur: 0.9 }] });
   }
   function startBoss(id) {
     const s = partner(), B = BOSS[id]; if (!s || !B || !bossUnlocked(B)) return;
-    const b = newBattle(s, null, { boss: id });
+    const spec = { kind: 'boss', id }, b = foeBattle(s, spec);
     b.p.snack = snackFor(currentSnack());
     const X = extra(); X.bosses[id] = Object.assign(bossRec(id), { tries: bossRec(id).tries + 1 }); PS.save();
-    launch({ mode: 'boss', b, s, boss: B, area: B.area,
+    launch({ mode: 'boss', b, s, boss: B, spec, area: B.area,
       intro: [{ kind: 'bossin', text: `A wild legend appears: ${B.name}, ${B.title}!`, dur: 2.2 }, { kind: 'go', text: `Be brave, ${s.name}!`, dur: 0.9 }] });
   }
   function startWild(id, step) {
     const s = partner(), A = D.ANIMALS[id]; if (!s || !A) return;
-    const b = newBattle(s, null, { wild: { id, step } });
+    const spec = { kind: 'wild', id, step }, b = foeBattle(s, spec);
     b.p.snack = snackFor(currentSnack());
-    launch({ mode: 'wild', b, s, wild: { id, step }, area: D.AREAS[A.area] ? A.area : 'meadow',
+    launch({ mode: 'wild', b, s, wild: { id, step }, spec, area: D.AREAS[A.area] ? A.area : 'meadow',
       intro: [{ kind: 'wildin', text: wildIntro(id, step), dur: 1.6 }, { kind: 'go', text: `Go, ${s.name}!`, dur: 0.8 }] });
   }
   function startTowerFloor() {
     const run = towerRun(); if (!run) return;
     const s = ST.get(run.sid); if (!s) { towerEnd('stop'); renderHub(); return; }
-    const f = run.floor, npc = towerNPC(run.seed, f);
-    const b = newBattle(s, npc, { npcMult: TOWER.mult(f), smart: TOWER.smart(f) });
-    b.p.hp = Math.max(1, Math.round(b.p.max * clamp(run.hp, 0.05, 1)));
+    const f = run.floor, npc = towerNPC(run.seed, f), spec = { kind: 'tower', seed: run.seed, floor: f, hp: run.hp };
+    const b = foeBattle(s, Object.assign({ npc }, spec)); // starts from run.hp (after a pause: the HP saved in the last round)
     if (run.snack && !run.snackUsed) b.p.snack = snackFor(run.snack);
+    const resumed = run.fighting === f;
+    run.fighting = f; PS.save(); // deleted when this floor is won; still set after a restart = the climb is paused here (towerPaused)
     const star = f % 5 === 0;
-    launch({ mode: 'tower', b, s, npc, floor: f, run, area: 'tower',
-      intro: [{ kind: 'floor', text: star ? `Floor ${f}: a star challenger, ${npc.name}!` : `Floor ${f}: ${npc.name} is waiting!`, dur: 1.5 }, { kind: 'go', text: `Go, ${s.name}!`, dur: 0.8 }] });
+    launch({ mode: 'tower', b, s, npc, floor: f, run, spec, area: 'tower',
+      intro: [{ kind: 'floor', text: resumed ? `Floor ${f}: back to the battle with ${npc.name}!` : star ? `Floor ${f}: a star challenger, ${npc.name}!` : `Floor ${f}: ${npc.name} is waiting!`, dur: 1.5 }, { kind: 'go', text: `Go, ${s.name}!`, dur: 0.8 }] });
   }
   function startFriend(sA, sB, nameA, nameB, own) {
-    const b = newBattle(sA, sB, { smart: 0 });
+    const b = newBattle(sA, sB, { smart: 0, friend: true });
     if (b.o.name === b.p.name) b.o.name = b.o.name + ' 2';
     const area = D.AREAS[sA.area] ? sA.area : 'meadow';
     launch({ mode: 'friend', b, s: sA, sB, own, area, fr: { names: { p: nameA, o: nameB }, turn: 'p', picks: {} },
@@ -1435,7 +1617,7 @@
     cv.width = Math.ceil(cssW * dpr); cv.height = Math.ceil(cssH * dpr);
     cv.style.width = cv.width / dpr + 'px'; cv.style.height = cv.height / dpr + 'px'; // 1 canvas pixel = 1 device pixel (no resampling)
     WW = Math.ceil(cv.width / SC); WH = Math.ceil(cv.height / SC);
-    lo.width = WW; lo.height = WH; bgC.width = WW; bgC.height = WH; bgKey = '';
+    lo.width = WW; lo.height = WH; bgC.width = WW; bgC.height = WH; bgKey = -1;
     if (V) makeCrowd();
   }
   // fighter feet positions (world px)
@@ -1450,22 +1632,30 @@
   const topOf = side => { const s = spot(side); return { x: s.x, y: s.y - Math.round(fighterH(side) * 0.62) }; };
 
   // ---------------- plates & moves ----------------
+  const STAGE_KEYS = ['atk', 'def', 'spd', 'eva', 'acc'];
   function renderPlates(full) {
-    for (const side of ['p', 'o']) {
+    for (const side of SIDES) {
       const f = V.b[side], d = V.disp[side], el = plateEls[side];
       if (full || !el.firstChild) {
         const boss = side === 'o' && V.boss;
         el.className = 'b-plate ' + side + (boss ? ' boss' : '');
-        el.innerHTML = `${V.mode === 'friend' ? `<div class="b-own">${esc(V.fr.names[side])}'s</div>` : ''}<div class="b-prow"><b>${esc(f.name)}${boss ? ` <small class="b-sub">${esc(V.boss.title)}</small>` : ''}</b><span class="b-lv">${boss ? 'Legend · ' : V.mode === 'tower' && side === 'o' ? `Floor ${V.floor} · ` : ''}Lv ${f.lv}</span></div>
+        // element icons next to the name, so kids can see the types at a glance
+        const els = f.els.map(e => `<canvas class="px" data-el="${e}" role="img" aria-label="${elLabel(e)}"></canvas>`).join('');
+        el.innerHTML = `${V.mode === 'friend' ? `<div class="b-own">${esc(V.fr.names[side])}'s</div>` : ''}<div class="b-prow"><b>${esc(f.name)}${boss ? ` <small class="b-sub">${esc(V.boss.title)}</small>` : ''}</b><span class="b-pels">${els}</span><span class="b-lv">${boss ? 'Legend · ' : V.mode === 'tower' && side === 'o' ? `Floor ${V.floor} · ` : ''}Lv ${f.lv}</span></div>
           <div class="b-hp"><em>HP</em><div class="b-hpbar"><i></i></div></div>
           <div class="b-prow2"><span class="b-hpn"></span><span class="b-tags"></span></div>`;
-        el._bar = el.querySelector('.b-hpbar i'); el._n = el.querySelector('.b-hpn'); el._tags = el.querySelector('.b-tags'); el._last = '';
+        paintIcons(el);
+        el._bar = el.querySelector('.b-hpbar i'); el._n = el.querySelector('.b-hpn'); el._tags = el.querySelector('.b-tags'); el._last = ''; el._hs = null;
       }
       let tags = '';
       if (d.charging) tags += '<span class="b-tag charge">Charging!</span>';
+      if (V.disp.tired) tags += '<span class="b-tag tired">Tired</span>';
       if (d.status) tags += `<span class="b-tag ${d.status}">${STATUS_SHORT[d.status]}</span>`;
       if (d.stun) tags += '<span class="b-tag stun">Stunned</span>';
-      for (const k of ['atk', 'def', 'spd', 'eva', 'acc']) { const n = d.st[k]; if (n) tags += `<span class="b-tag ${n > 0 ? 'up' : 'down'}">${STAT_SHORT[k]}${n > 0 ? '&#9650;' : '&#9660;'}${Math.abs(n)}</span>`; }
+      for (const k of STAGE_KEYS) {
+        const n = k === 'atk' && d.status === 'burn' ? clamp(d.st.atk - 1, -3, 3) : d.st[k]; // a burn makes attacks weaker: show it
+        if (n) tags += `<span class="b-tag ${n > 0 ? 'up' : 'down'}">${STAT_SHORT[k]}${n > 0 ? '&#9650;' : '&#9660;'}${Math.abs(n)}</span>`;
+      }
       if (tags !== el._last) { el._tags.innerHTML = tags; el._last = tags; }
     }
     const warn = !!(V.boss && V.disp.o.charging && V.phase !== 'end' && V.phase !== 'results');
@@ -1478,11 +1668,12 @@
     } else { runBtn.style.top = ''; warnEl.style.top = ''; }
     updateBars();
   }
-  function updateBars() {
-    for (const side of ['p', 'o']) {
+  function updateBars() { // runs every frame: only touches the DOM when the shown HP really changes
+    for (const side of SIDES) {
       const f = V.b[side], el = plateEls[side]; if (!el._bar) continue;
-      const k = clamp(V.hpShown[side] / f.max, 0, 1), w = (k * 100).toFixed(1) + '%';
-      if (el._bar.style.width !== w) { el._bar.style.width = w; el._bar.className = k > 0.5 ? '' : k > 0.2 ? 'mid' : 'low'; }
+      const hs = Math.round(V.hpShown[side] * 4); if (el._hs === hs) continue; el._hs = hs;
+      const k = clamp(V.hpShown[side] / f.max, 0, 1);
+      el._bar.style.width = (k * 100).toFixed(1) + '%'; el._bar.className = k > 0.5 ? '' : k > 0.2 ? 'mid' : 'low';
       const t = `${Math.max(0, Math.round(V.hpShown[side]))} / ${f.max}`; if (el._n.textContent !== t) el._n.textContent = t;
     }
   }
@@ -1530,11 +1721,11 @@
     }
     const m = D.MOVES[id], fx = m.fx, bits = [];
     if (m.pow > 0) bits.push(`Power ${m.pow}${fx.hits ? ` × ${fx.hits} hits` : ''}`);
-    if (m.pow > 0 || fx.debuff || fx.status) bits.push(SURE.has(id) ? 'Never misses' : `Accuracy ${Math.round(m.acc * 100)}%`);
+    if (m.pow > 0 || fx.debuff || fx.status) bits.push(SURE.has(id) ? 'Never misses' : `Aim ${Math.round(m.acc * 100)}%`);
     if (fx.first) bits.push('Goes first');
     if (fx.heal && V && V.b[chooser()].heals) bits.push('Heals less each time');
     if (V && V.boss && isBrace(id)) bits.push('Blocks giant attacks');
-    infoEl.innerHTML = `<b>${m.name}</b> (${elLabel(m.el)}): ${esc(m.desc)} <span>${bits.join(' · ')}</span>`;
+    infoEl.innerHTML = `<b>${m.name}</b> (${elLabel(m.el)}): ${esc(kidWords(m.desc))} <span>${bits.join(' · ')}</span>`;
     infoEl.classList.toggle('long', infoEl.textContent.length > 92);
   }
 
@@ -1560,6 +1751,9 @@
       if (f.s && !f.npc && PS.S.sprouts.includes(f.s)) ST.useFruit(e.fruit);
       if (V.mode === 'tower' && e.who === 'p' && towerRun()) { towerRun().snackUsed = true; PS.save(); }
     }
+    // the outcome is known now: no more giving up, and the prize is paid right away (the animation plays after)
+    if (V.b.over) { runBtn.hidden = true; grant(); }
+    else if (V.mode === 'tower') { const run = towerRun(); if (run && run.fighting === V.floor) { run.hp = V.b.p.hp / V.b.p.max; PS.save(); } } // (a paused climb resumes from here)
     V.phase = 'play'; movesEl.classList.add('wait'); setInfo(null); renderSnack();
     queue(ev.map(e => ({ kind: 'ev', ev: e, text: e.text, dur: evDur(e) })));
   }
@@ -1573,6 +1767,8 @@
       case 'charge': return 1.7;
       case 'revive': return 1.8;
       case 'snack': return 0.9;
+      case 'hang': return 1.5;
+      case 'note': return e.tired || e.draw ? 1.3 : 0.7;
       default: return 0.7;
     }
   }
@@ -1646,7 +1842,8 @@
           pop(p.x, p.y - 12, `-${e.n}`, e.braced ? '#9fd8ff' : '#ff9a3a', e.braced ? 30 : 42, e.braced ? 'BLOCKED!' : 'OUCH!');
           sfx(e.braced ? 'chime' : 'thud'); safe(() => PX.buzz(e.braced ? 20 : 60));
         } else {
-          burst(p, e.el, e.of > 1 ? 6 : 12, e.crit ? 60 : 44); ring(p.x, p.y, e.crit ? '#fbf236' : '#ffffff', e.crit ? 16 : 11);
+          burst(p, e.el, e.of > 1 ? 3 : 6, e.crit ? 60 : 44); hitFx(p, e.el, e.crit || e.tm > 1, e.by === 'p' ? 1 : -1, e.of > 1);
+          ring(p.x, p.y, e.crit ? '#fbf236' : '#ffffff', e.crit ? 16 : 11);
           if (e.crit) { quake(0.25, 2); flash('#ffffff', 0.12); } else if (e.tm > 1) quake(0.15, 1);
           pop(p.x, p.y - 12, `-${e.n}`, e.crit ? '#fbf236' : e.tm > 1 ? '#ffb347' : '#ffffff', e.crit ? 34 : e.tm > 1 ? 30 : 26, e.crit ? 'CRIT' : e.tm > 1 ? 'SUPER' : '');
           sfx(e.crit ? 'snap' : 'thud'); if (who === 'p' || V.mode === 'friend') safe(() => PX.buzz(e.crit ? 25 : 12));
@@ -1697,57 +1894,200 @@
       }
       case 'cure': case 'cleanse': { rise(top(who), fxs('spark', '#ffffff'), 8); sfx('chime'); break; }
       case 'faint': { A.fainting = 0.001; A.charge = 0; A.pose = { eyes: 'closed', mouth: 'o' }; A.poseT = 99; sfx('thud'); if (who === 'o' && V.boss) { quake(0.9, 3); burst(top('o'), V.boss.els[0], 26, 60); } break; }
-      case 'note': break;
+      case 'hang': { // a tie against the computer: the player's Sprout wobbles back up with 1 HP
+        A.fainting = 0; A.hop = 1; A.shake = 0.3; A.emote = '!'; A.emoteT = 1.2; A.pose = { eyes: 'brave', mouth: 'grin', arms: 'up' }; A.poseT = 1.3;
+        rise(top(who), fxs('heart'), 5); pop(top(who).x, top(who).y - 12, '1 HP', '#fbf236', 28, 'HANG ON!'); sfx('chime');
+        break;
+      }
+      case 'note':
+        if (e.tired) { for (const s of SIDES) { rise(top(s), icons().sweat, 4); V.a[s].shake = 0.2; } banner('TIRED!', 'Both lose HP every turn now', '#9fd8ff', 1.6); sfx('whoosh'); }
+        else if (e.draw) banner('DRAW!', '', '#9fd8ff', 1.6);
+        break;
     }
   }
 
   function endBattle() {
-    const won = V.b.winner === 'p';
+    const won = V.b.winner === 'p', draw = !V.b.winner;
     V.phase = 'end'; V.won = won; runBtn.hidden = true; snackBtn.hidden = true; warnEl.hidden = true;
-    const W = V.a[won ? 'p' : 'o'];
-    W.win = true; W.emote = 'heart'; W.emoteT = 99;
+    if (!draw) { const W = V.a[V.b.winner]; W.win = true; W.emote = 'heart'; W.emoteT = 99; }
     for (const c of V.crowd) c.cheer = true;
     let text = won ? `${V.b.p.name} won the battle!` : `${V.b.p.name} lost the battle...`;
-    if (V.mode === 'friend') text = `${V.fr.names[V.b.winner]}'s ${V.b[V.b.winner].name} wins!`;
+    if (V.mode === 'friend') text = draw ? "It's a draw! Good game!" : `${V.fr.names[V.b.winner]}'s ${V.b[V.b.winner].name} wins!`;
     else if (V.mode === 'boss' && won) text = `${V.b.p.name} beat the ${V.boss.name}!`;
     else if (V.mode === 'wild' && won) text = `${V.b.p.name} beat the ${V.b.o.name}!`;
-    if (won || V.mode === 'friend') banner(V.mode === 'friend' ? 'WINNER!' : 'VICTORY!', '', '#fbf236', 1.8);
-    queue([{ kind: won ? 'victory' : 'defeat', text, dur: 1.8 }]);
+    if (!draw && (won || V.mode === 'friend')) banner(V.mode === 'friend' ? 'WINNER!' : 'VICTORY!', '', '#fbf236', 1.8);
+    queue([{ kind: won || V.mode === 'friend' ? 'victory' : 'defeat', text, dur: 1.8 }]);
     sfx(won || V.mode === 'friend' ? 'level' : 'miss');
   }
 
   function showResults() {
     if (V.done) return; V.done = true; V.phase = 'results';
-    if (V.mode === 'wild') resultsWild(); else if (V.mode === 'boss') resultsBoss(); else if (V.mode === 'tower') resultsTower(); else if (V.mode === 'friend') resultsFriend(); else resultsLeague();
+    if (!V.granted) grant(); // (normally already paid, the moment the battle was decided)
+    const res = V.res || { rows: '', pay: null };
+    if (V.mode === 'wild') resultsWild(res); else if (V.mode === 'boss') resultsBoss(res); else if (V.mode === 'tower') resultsTower(res); else if (V.mode === 'friend') resultsFriend(res); else resultsLeague(res);
     paintIcons(resEl);
     resEl.hidden = false;
     PS.ui.chrome(true); PS.ui.hold(false);
+    if (!V.won && V.mode !== 'friend' && V.mode !== 'tower') suggestSprout();
   }
-  const upsHtml = res => Object.entries((res && res.ups) || {}).map(([k, n]) => `<span style="background:${D.STAT_META[k].color}">${D.STAT_META[k].label} +${n} Lv</span>`).join('');
+  // Pays the battle's prize exactly once (V.granted), the moment the outcome is known. The rows it builds are shown later
+  // by the results card, so the card always shows what was really paid.
+  function grant() {
+    if (!V || V.granted || !V.b.over) return;
+    V.granted = true;
+    try { V.res = GRANT[V.mode](V.b.winner === 'p'); } catch (e) { console.error(e); V.res = null; }
+    PS.save();
+  }
+  const rowHtml = (icon, label, val, cls) => `<div class="b-rrow${cls ? ' ' + cls : ''}">${icon}${label}${val == null ? '' : `<b>${val}</b>`}</div>`;
+  const COIN = '<canvas class="px" data-coin="1"></canvas>', BIGCOIN = '<canvas class="px" data-coin="big"></canvas>', PLUS = '<canvas class="px" data-icon="plus"></canvas>';
+  const xpText = pay => (pay.xp || !pay.maxed ? `+${pay.xp}` : 'Max level!');
+  const xpRow = pay => rowHtml(PLUS, `Training XP${pay.happy ? ' <span class="b-happy">Happy bonus!</span>' : ''}`, xpText(pay));
+  const eggRow = (kind, egg, lead) => `<div class="b-rrow gold"><canvas class="px egg" data-egg="${kind}"></canvas><span>${lead} It's waiting in the ${areaName(egg.area)}.</span></div>`;
+  const GRANT = {
+    league(won) {
+      const { L, index, s } = V, pz = prize('league', V, won), pay = payout(s, pz.coins, pz.xp, 'battle', won), p = ST.leagueProgress(L.id);
+      let rows = rowHtml(COIN, 'Coins', `+${pay.coins}`) + xpRow(pay);
+      if (won) {
+        p.beaten[index] = true;
+        if (!p.cleared && p.beaten.every(Boolean)) {
+          p.cleared = true;
+          const bonus = ST.addCoins(leagueClearCoins(L), 'league'), kind = eggKind(L.egg), egg = ST.addEgg(kind, L.name);
+          PS.S.bestTier = Math.max(PS.S.bestTier || 0, Math.min(3, Math.ceil((D.LEAGUES.indexOf(L) + 1) / 2)));
+          rows += rowHtml(COIN, `${L.name} cleared!`, `+${bonus}`, 'gold') + eggRow(kind, egg, `New ${eggName(kind)}!`);
+        }
+      }
+      PS.S.progress.leagues[L.id] = p;
+      return { pay, rows };
+    },
+    boss(won) {
+      const { boss: B, s } = V, X = extra(), r = bossRec(B.id), first = won && !r.wins;
+      if (won) { r.wins++; if (!r.best || V.b.turn < r.best) r.best = V.b.turn; }
+      X.bosses[B.id] = r;
+      const pz = prize('boss', V, won), pay = payout(s, pz.coins, pz.xp, 'legend', won);
+      let rows = '';
+      if (first) {
+        if (B.egg) { const kind = eggKind(B.egg), egg = ST.addEgg(kind, `${B.name} Legend`); rows += eggRow(kind, egg, `${aOrAn(eggName(kind)) === 'an' ? 'An' : 'A'} ${eggName(kind)}!`); }
+        else { PS.S.pouch.push(B.id); PS.S.seen['rare:' + B.id] = true; PS.emit('pouch'); rows += `<div class="b-rrow gold"><canvas class="px crit" data-critter="${B.id}"></canvas><span>The ${B.name} joined you! It's in your pouch. Give it to a Sprout in the Garden.</span></div>`; }
+      }
+      rows += rowHtml(COIN, 'Coins', `+${pay.coins}`) + xpRow(pay);
+      return { pay, rows, first };
+    },
+    wild(won) {
+      const { s } = V, { id, step } = V.wild, A = D.ANIMALS[id], L = wildLv(id, step), X = extra();
+      const rec = wildRec(id), firstAny = won && !rec.some(Boolean), firstStep = won && !rec[step];
+      if (won) rec[step]++;
+      X.wild.animals[id] = rec;
+      const pz = prize('wild', V, won), pay = payout(s, pz.coins, pz.xp, 'wild', won);
+      let rows = '';
+      if (firstAny) {
+        if (ST.addToPouch(id)) rows += `<div class="b-rrow gold"><canvas class="px" data-critter="${id}" data-box="24" style="width:48px;height:48px"></canvas><span>The ${esc(A.name)} joined you! It's in your pouch. Give it to a Sprout in the Garden.</span></div>`;
+        else { const c = ST.addCoins(pouchFullCoins(L), 'wild'); rows += `<div class="b-rrow gold">${BIGCOIN}<span>Your pouch is full, so the ${esc(A.name)} left you coins instead.</span><b>+${c}</b></div>`; }
+      }
+      if (firstStep && step === 2) rows += rowHtml('<canvas class="px" data-icon="staron"></canvas>', 'Alpha bonus!', `+${ST.addCoins(alphaBonus(L), 'wild')}`, 'gold');
+      const area = A.area;
+      if (won && !X.wild.areas[area] && wildList(area).every(k => wildRec(k)[2] > 0)) {
+        X.wild.areas[area] = true;
+        const egg = ST.addEgg(area, `Wild ${areaName(area)}`);
+        rows += `<div class="b-rrow gold"><canvas class="px egg" data-egg="${area}"></canvas><span>You beat every Alpha in the ${areaName(area)}! ${aOrAn(eggName(area)) === 'an' ? 'An' : 'A'} ${eggName(area)} is waiting in the ${areaName(egg.area)}.</span></div>`;
+      }
+      rows += rowHtml(COIN, 'Coins', `+${pay.coins}`) + xpRow(pay);
+      return { pay, rows, firstStep };
+    },
+    tower(won) {
+      const { s, floor: f } = V, T = extra().tower, run = towerRun(), pz = prize('tower', V, won), pay = payout(s, 0, pz.xp, 'tower', won);
+      if (won && run) {
+        delete run.fighting;
+        run.pot += pz.coins;
+        const record = f > (T.best || 0); if (record) T.best = f;
+        const hpNext = Math.min(1, V.b.p.hp / V.b.p.max + TOWER.heal);
+        run.hp = hpNext; run.floor = f + 1;
+        let rows = rowHtml(COIN, 'Into the prize bag', `+${pz.coins}`);
+        const t = treatFor(f); if (t) rows += giveTreat(t, f, run);
+        rows += rowHtml(BIGCOIN, 'Prize bag', run.pot, 'blue') + xpRow(pay);
+        return { pay, rows, record, hpNext, pot: run.pot };
+      }
+      const pot = run ? run.pot : 0, paid = towerEnd('lost');
+      return { pay, rows: rowHtml(BIGCOIN, 'You keep half the bag', `+${paid}`, 'gold') + xpRow(pay), pot };
+    },
+    friend() {
+      const { b, fr, s } = V, win = b.winner, F = extra().friend;
+      if (F.day !== today()) { F.day = today(); F.paid = 0; }
+      F.played = (F.played || 0) + 1;
+      if ((F.paid || 0) >= FRIEND.perDay) return { rows: '<div class="b-rrow">No more coins today, but that was fun!</div>' };
+      F.paid = (F.paid || 0) + 1;
+      const pz = prize('friend', V, win === null ? 'draw' : win === 'p'), pay = payout(s, pz.coins, pz.xp, 'friend', win === 'p', false);
+      return { pay, rows: rowHtml(COIN, `Coins for ${esc(fr.names.p)}`, `+${pay.coins}`) + rowHtml(PLUS, `A little XP for ${esc(b.p.name)}`, xpText(pay)) };
+    },
+  };
+
+  // ---------------- after a loss: why, one tip, and maybe a better Sprout ----------------
+  // an animal that teaches an attack of this element (the first one in the data, e.g. water -> Duck)
+  const teacherCache = {};
+  function teacherOf(el) {
+    if (!(el in teacherCache)) teacherCache[el] = Object.keys(D.ANIMALS).find(k => D.ANIMALS[k].el === el && D.ANIMALS[k].moves.some(m => D.MOVES[m] && D.MOVES[m].el === el && D.MOVES[m].pow > 0)) || null;
+    return teacherCache[el];
+  }
+  function typeTip(foeEl) {
+    const beat = Object.keys(D.ELEMENTS).filter(k => D.ELEMENTS[k].strong.includes(foeEl)), who = beat.map(teacherOf).find(Boolean);
+    return beat.length ? `${beat.map(elLabel).join(' and ')} moves beat ${elLabel(foeEl)}.${who ? ` Bond with ${aOrAn(D.ANIMALS[who].name)} ${D.ANIMALS[who].name} to learn one!` : ''}` : '';
+  }
+  // One short reason from what really happened in this battle, and one training tip.
+  function lossWhy() {
+    const b = V.b, P = b.p, O = b.o, me = esc(P.name), foe = esc(O.boss || O.wild ? 'The ' + O.name : O.name), gap = O.lv - P.lv;
+    const lvTip = 'Race, play in the Garden and win easier battles to level up, then come back!';
+    if (O.boss && P.bigHits) return { why: `${foe}'s giant attack hit ${me} hard.`, tip: 'When it charges up, pick a move with the yellow BLOCK tag!' };
+    if (gap >= 10) return { why: `${foe} is ${gap} levels higher than ${me}.`, tip: lvTip };
+    if (O.dealtStrong > 0 && O.dealtStrong >= O.dealt * 0.4) return { why: `${foe}'s ${elLabel(O.strongEl)} moves hit ${me} hard.`, tip: typeTip(O.els[0]) || lvTip };
+    if (O.healed >= O.max * 0.5) return { why: `${foe} healed a lot.`, tip: 'Use your strongest moves every turn, so its healing can\'t keep up.' };
+    if (P.dealt > 0 && P.dealtWeak >= P.dealt * 0.5) return { why: `${me}'s moves were weak against ${elLabel(O.els[0])}.`, tip: typeTip(O.els[0]) || lvTip };
+    if (gap >= 5) return { why: `${foe} is ${gap} levels higher than ${me}.`, tip: lvTip };
+    if (b.tiredEnd) return { why: `${me} got too tired first.`, tip: 'Heal moves and a snack help in long battles.' };
+    return { why: 'That was close!', tip: P.snack ? 'Try again. Eat your snack when HP gets low!' : 'Try again, and bring a snack to heal once.' };
+  }
+  function lossHtml() {
+    const w = safe(lossWhy, null); if (!w) return '';
+    return `<div class="b-why"><b>${w.why}</b><span><i>Tip:</i> ${w.tip}</span></div><div class="b-alt" hidden></div>`;
+  }
+  // Is one of the player's other Sprouts a clearly better match for this foe? Checked just after the card shows.
+  function suggestSprout() {
+    const v = V, spec = v && v.spec, cur = v && v.s; if (!spec || !cur) return;
+    setTimeout(() => {
+      const box = resEl.querySelector('.b-alt'); if (V !== v || !box || resEl.hidden) return;
+      const mine = matchup(cur, spec).win; let best = null;
+      const others = PS.S.sprouts.filter(x => x !== cur).sort((a, b) => ST.totalLevels(b) - ST.totalLevels(a)).slice(0, 8);
+      for (const s of others) { const e = matchup(s, spec, 24); if (e.win >= Math.max(0.5, mine + 0.25) && (!best || e.win > best.win)) best = { s, win: e.win }; }
+      if (!best) return;
+      const o = oddsOf(best.win), name = esc(best.s.name);
+      box.innerHTML = `<canvas class="px" width="32" height="32"></canvas><div><b>Try ${name}?</b><small>${name} has a better chance: <span class="b-ow ${o.c}">${o.word}</span></small></div>
+        <button class="btn wide go" type="button">Battle with ${name}!</button>`;
+      PS.ui.drawSproutTo(box.querySelector('canvas'), best.s, { eyes: 'brave', mouth: 'grin', arms: 'up' });
+      box.hidden = false;
+      box.querySelector('button').onclick = () => { sfx('pop'); ST.setActive(best.s.id); rematch(v); };
+    }, 60);
+  }
+  // start the same fight again (with whoever is the partner now)
+  function rematch(v) {
+    V = null; resEl.hidden = true;
+    if (v.mode === 'league') startBattle(v.L.id, v.index); else if (v.mode === 'wild') startWild(v.wild.id, v.wild.step); else if (v.mode === 'boss') startBoss(v.boss.id);
+  }
+  const turnsText = n => `${n} turn${n > 1 ? 's' : ''}`;
+  const upsBlock = res => { const u = Object.entries((res.pay && res.pay.ups) || {}).map(([k, n]) => `<span style="background:${D.STAT_META[k].color}">${D.STAT_META[k].label} +${n} Lv</span>`).join(''); return u ? `<div class="b-ups">${u}</div>` : ''; };
+  const winSub = (s, foe) => (V.b.tie ? `${esc(s.name)} hung on with 1 HP and won the tie!` : `${esc(s.name)} beat ${foe} in ${turnsText(V.b.turn)}.`);
   function backToHub(then) { V = null; resEl.hidden = true; passEl.hidden = true; fightEl.hidden = true; hubEl.hidden = false; renderHub(); if (then) then(); }
   function bindRes(map) {
     resEl.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { sfx('pop'); const fn = map[b.dataset.a]; if (fn) fn(); else backToHub(); });
   }
-  function resultsLeague() {
+  function resultsLeague(res) {
     const { L, index, s, won } = V;
-    const res = ST.finishBattle(s, L.id, index, won);
-    const g = L.xp * (won ? 1 : 0.35), xp = Math.round(g * 3.6);
-    let rows = `<div class="b-rrow"><canvas class="px" data-coin="1"></canvas>Coins<b>+${res.coins - (res.bonus || 0)}</b></div>
-      <div class="b-rrow"><canvas class="px" data-icon="plus"></canvas>Training XP<b>+${xp}</b></div>`;
-    if (res.cleared) {
-      rows += `<div class="b-rrow gold"><canvas class="px" data-coin="1"></canvas>${L.name} cleared!<b>+${res.bonus}</b></div>`;
-      if (res.egg) rows += `<div class="b-rrow gold"><canvas class="px egg" data-egg="${res.egg.kind}"></canvas><span>New ${D.EGGS[res.egg.kind].name}! It's waiting in the ${D.AREAS[res.egg.area] ? D.AREAS[res.egg.area].name : 'Garden'}.</span></div>`;
-    }
-    const ups = upsHtml(res);
     const nextOk = won && index < 2;
     const nextL = won && index === 2 ? D.LEAGUES[V.li + 1] : null;
     resEl.innerHTML = `<div class="card">
       <div class="eyebrow">${L.name} · ${esc(V.npc.name)}</div>
       <canvas class="px hero" width="32" height="32"></canvas>
       <h1>${won ? 'Victory!' : 'So close!'}</h1>
-      <p class="sub">${won ? `${esc(s.name)} beat ${esc(V.npc.name)} in ${V.b.turn} turn${V.b.turn > 1 ? 's' : ''}.` : `${esc(V.npc.name)} won this time. Train, evolve or bond with animals, then try again.`}</p>
-      <div class="b-rrows">${rows}</div>
-      ${ups ? `<div class="b-ups">${ups}</div>` : ''}
+      <p class="sub">${won ? winSub(s, esc(V.npc.name)) : `${esc(V.npc.name)} won this time.`}</p>
+      ${won ? '' : lossHtml()}
+      <div class="b-rrows">${res.rows}</div>${upsBlock(res)}
       <div class="modal-btns">
         ${nextOk ? `<button class="btn wide go" data-a="next">Next: ${esc(L.opponents[index + 1].name)}</button>` : ''}
         ${nextL && ST.leagueUnlocked(nextL.id) ? `<button class="btn wide go" data-a="league">Next: ${nextL.name}</button>` : ''}
@@ -1762,66 +2102,29 @@
       league: () => backToHub(() => preview(nextL, 0)),
     });
   }
-  function resultsBoss() {
+  function resultsBoss(res) {
     const { boss: B, s, won } = V;
-    const X = extra(), r = bossRec(B.id), first = won && !r.wins;
-    if (won) { r.wins++; if (!r.best || V.b.turn < r.best) r.best = V.b.turn; }
-    X.bosses[B.id] = r;
-    const coins = ST.addCoins(won ? B.coins : B.coins * D.BATTLE.loseCoinsShare, 'legend');
-    const g = B.xp * (won ? 1 : 0.35), res = ST.gain(s, { power: g * 1.2, stamina: g, run: g * 0.6, fly: g * 0.4, swim: g * 0.4 });
-    s.record.battles = (s.record.battles || 0) + 1; PS.S.totals.battles = (PS.S.totals.battles || 0) + 1;
-    if (won) { s.record.battleWins = (s.record.battleWins || 0) + 1; PS.S.totals.battleWins = (PS.S.totals.battleWins || 0) + 1; }
-    let prize = '';
-    if (first) {
-      if (B.egg) { const egg = ST.addEgg(B.egg, `${B.name} Legend`); prize = `<div class="b-rrow gold"><canvas class="px egg" data-egg="${B.egg}"></canvas><span>A ${D.EGGS[B.egg].name}! It's waiting in the ${D.AREAS[egg.area] ? D.AREAS[egg.area].name : 'Garden'}.</span></div>`; }
-      else { PS.S.pouch.push(B.id); PS.S.seen['rare:' + B.id] = true; PS.emit('pouch'); prize = `<div class="b-rrow gold"><canvas class="px crit" data-critter="${B.id}"></canvas><span>The ${B.name} joined you! It's in your pouch. Give it to a Sprout in the Garden.</span></div>`; }
-    }
-    PS.save();
-    const rows = `${prize}<div class="b-rrow"><canvas class="px" data-coin="1"></canvas>Coins<b>+${coins}</b></div>
-      <div class="b-rrow"><canvas class="px" data-icon="plus"></canvas>Training XP<b>+${Math.round(g * 3.6)}</b></div>`;
-    const ups = upsHtml(res);
     resEl.innerHTML = `<div class="card">
       <div class="eyebrow">Legend Challenge · ${B.name}</div>
       <canvas class="px hero" width="32" height="32"></canvas>
-      <h1>${won ? (first ? 'Legendary!' : 'Victory!') : 'So close!'}</h1>
-      <p class="sub">${won ? `${esc(s.name)} beat the ${B.name} in ${V.b.turn} turns.` : `The ${B.name} is too strong for now. Train more, and remember to BLOCK its ${B.sup.name}!`}</p>
-      <div class="b-rrows">${rows}</div>${ups ? `<div class="b-ups">${ups}</div>` : ''}
+      <h1>${won ? (res.first ? 'Legendary!' : 'Victory!') : 'So close!'}</h1>
+      <p class="sub">${won ? winSub(s, `the ${B.name}`) : `The ${B.name} won this time.`}</p>
+      ${won ? '' : lossHtml()}
+      <div class="b-rrows">${res.rows}</div>${upsBlock(res)}
       <div class="modal-btns">${!won ? '<button class="btn wide primary" data-a="retry">Try again</button>' : ''}<button class="btn wide" data-a="hub">Back to Legends</button></div></div>`;
     const hero = resEl.querySelector('canvas.hero');
     if (won) PS.ui.drawSproutTo(hero, s, { arms: 'up', eyes: 'happy', mouth: 'open' }); else { const c = critterBox(B.id, 32); hero.width = 32; hero.height = 32; PS.ui.paint(hero, c); }
     const id = B.id;
     bindRes({ retry: () => { V = null; resEl.hidden = true; previewBossAgain(id); } });
   }
-  function resultsWild() {
-    const { s, won } = V, { id, step } = V.wild, A = D.ANIMALS[id], L = V.b.o.lv, X = extra();
-    const rec = wildRec(id), firstAny = won && !rec.some(Boolean), firstStep = won && !rec[step];
-    if (won) rec[step]++;
-    X.wild.animals[id] = rec;
-    const coins = ST.addCoins(won ? WILD.coins(L) : WILD.coins(L) * D.BATTLE.loseCoinsShare, 'wild');
-    const g = WILD.xp(L) * (won ? 1 : 0.35), res = ST.gain(s, { power: g * 1.2, stamina: g, run: g * 0.6, fly: g * 0.4, swim: g * 0.4 });
-    s.record.battles = (s.record.battles || 0) + 1; PS.S.totals.battles = (PS.S.totals.battles || 0) + 1;
-    if (won) { s.record.battleWins = (s.record.battleWins || 0) + 1; PS.S.totals.battleWins = (PS.S.totals.battleWins || 0) + 1; }
-    let rows = '';
-    if (firstAny) {
-      if (ST.addToPouch(id)) rows += `<div class="b-rrow gold"><canvas class="px" data-critter="${id}" data-box="24" style="width:48px;height:48px"></canvas><span>The ${esc(A.name)} joined you! It's in your pouch. Give it to a Sprout in the Garden.</span></div>`;
-      else { const c = ST.addCoins(20 + L * 2, 'wild'); rows += `<div class="b-rrow gold"><canvas class="px" data-coin="big"></canvas><span>Your pouch is full, so the ${esc(A.name)} left you coins instead.</span><b>+${c}</b></div>`; }
-    }
-    if (firstStep && step === 2) { const c = ST.addCoins(WILD.coins(L) * 2, 'wild'); rows += `<div class="b-rrow gold"><canvas class="px" data-icon="staron"></canvas>Alpha bonus!<b>+${c}</b></div>`; }
-    const area = A.area;
-    if (won && !X.wild.areas[area] && wildList(area).every(k => wildRec(k)[2] > 0)) {
-      X.wild.areas[area] = true;
-      const egg = ST.addEgg(area, `Wild ${D.AREAS[area].name}`);
-      rows += `<div class="b-rrow gold"><canvas class="px egg" data-egg="${area}"></canvas><span>You beat every Alpha in the ${D.AREAS[area].name}! A ${D.EGGS[area] ? D.EGGS[area].name : 'new egg'} is waiting in the ${D.AREAS[egg.area] ? D.AREAS[egg.area].name : 'Garden'}.</span></div>`;
-    }
-    rows += `<div class="b-rrow"><canvas class="px" data-coin="1"></canvas>Coins<b>+${coins}</b></div><div class="b-rrow"><canvas class="px" data-icon="plus"></canvas>Training XP<b>+${Math.round(g * 3.6)}</b></div>`;
-    PS.save();
+  function resultsWild(res) {
+    const { s, won } = V, { id, step } = V.wild, A = D.ANIMALS[id], area = A.area;
     const list = wildRank(area), nextId = list[(list.indexOf(id) + 1) % list.length];
-    const ups = upsHtml(res);
-    resEl.innerHTML = `<div class="card"><div class="eyebrow">Wild ${D.AREAS[area].name} · ${esc(V.b.o.name)}</div><canvas class="px hero" width="32" height="32"></canvas>
-      <h1>${won ? (step === 2 && firstStep ? 'Alpha beaten!' : 'Victory!') : 'So close!'}</h1>
-      <p class="sub">${won ? `${esc(s.name)} beat the ${esc(V.b.o.name)} in ${V.b.turn} turn${V.b.turn > 1 ? 's' : ''}.` : `The ${esc(V.b.o.name)} won this time. Train a little and try again!`}</p>
-      ${won ? starsHtml(id).replace('b-stars', 'b-stars" style="justify-content:center') : ''}
-      <div class="b-rrows">${rows}</div>${ups ? `<div class="b-ups">${ups}</div>` : ''}
+    resEl.innerHTML = `<div class="card"><div class="eyebrow">Wild ${areaName(area)} · ${esc(V.b.o.name)}</div><canvas class="px hero" width="32" height="32"></canvas>
+      <h1>${won ? (step === 2 && res.firstStep ? 'Alpha beaten!' : 'Victory!') : 'So close!'}</h1>
+      <p class="sub">${won ? winSub(s, `the ${esc(V.b.o.name)}`) : `The ${esc(V.b.o.name)} won this time.`}</p>
+      ${won ? starsHtml(id).replace('b-stars', 'b-stars" style="justify-content:center') : lossHtml()}
+      <div class="b-rrows">${res.rows}</div>${upsBlock(res)}
       <div class="modal-btns">
         ${won && step < 2 ? `<button class="btn wide go" data-a="up">Next: ${WILD.steps[step + 1].name} ${esc(A.name)} (Lv ${wildLv(id, step + 1)})</button>` : ''}
         ${!won ? '<button class="btn wide primary" data-a="retry">Try again</button>' : ''}
@@ -1836,39 +2139,22 @@
     });
   }
   function previewBossAgain(id) { fightEl.hidden = true; hubEl.hidden = false; hubTab = 'legends'; renderHub(); previewBoss(BOSS[id]); }
-  function resultsTower() {
-    const { s, won, floor: f } = V, T = extra().tower, run = towerRun();
-    const g = TOWER.xp(f) * (won ? 1 : 0.35), res = ST.gain(s, { power: g * 1.2, stamina: g, run: g * 0.6, fly: g * 0.4, swim: g * 0.4 });
-    s.record.battles = (s.record.battles || 0) + 1; PS.S.totals.battles = (PS.S.totals.battles || 0) + 1;
-    if (won) { s.record.battleWins = (s.record.battleWins || 0) + 1; PS.S.totals.battleWins = (PS.S.totals.battleWins || 0) + 1; }
-    const ups = upsHtml(res);
-    let rows = '', title, sub, btns;
-    if (won && run) {
-      const coins = TOWER.coins(f), record = f > (T.best || 0);
-      run.pot += coins;
-      if (record) T.best = f;
-      const hpNow = V.b.p.hp / V.b.p.max, hpNext = Math.min(1, hpNow + TOWER.heal);
-      run.hp = hpNext; run.floor = f + 1;
-      rows += `<div class="b-rrow"><canvas class="px" data-coin="1"></canvas>Into the prize bag<b>+${coins}</b></div>`;
-      const t = treatFor(f);
-      if (t) rows += giveTreat(t, f, run);
-      rows += `<div class="b-rrow blue"><canvas class="px" data-coin="big"></canvas>Prize bag<b>${run.pot}</b></div>`;
-      rows += `<div class="b-rrow"><canvas class="px" data-icon="plus"></canvas>Training XP<b>+${Math.round(g * 3.6)}</b></div>`;
-      PS.save();
-      title = record && f > 1 ? 'New record!' : `Floor ${f} cleared!`;
+  function resultsTower(res) {
+    const { s, won, floor: f } = V, T = extra().tower;
+    let title, sub, btns;
+    if (won && res.hpNext != null) {
+      const hp = Math.round(res.hpNext * 100);
+      title = res.record && f > 1 ? 'New record!' : `Floor ${f} cleared!`;
       sub = `${esc(s.name)} heals ${Math.round(TOWER.heal * 100)}% for the next floor.`;
-      btns = `<div class="b-hpline">HP<div class="b-hpbar"><i style="width:${Math.round(hpNext * 100)}%" class="${hpNext > 0.5 ? '' : hpNext > 0.2 ? 'mid' : 'low'}"></i></div>${Math.round(hpNext * 100)}%</div>
-        <div class="modal-btns"><button class="btn wide go" data-a="next">Climb to Floor ${f + 1}!</button><button class="btn wide" data-a="stop">Stop and take ${run.pot} coins</button></div>`;
+      btns = `<div class="b-hpline">HP<div class="b-hpbar"><i style="width:${hp}%" class="${res.hpNext > 0.5 ? '' : res.hpNext > 0.2 ? 'mid' : 'low'}"></i></div>${hp}%</div>
+        <div class="modal-btns"><button class="btn wide go" data-a="next">Climb to Floor ${f + 1}!</button><button class="btn wide" data-a="stop">Stop and take ${res.pot} coins</button></div>`;
     } else {
-      const pot = run ? run.pot : 0, pay = towerEnd('lost');
-      rows += `<div class="b-rrow gold"><canvas class="px" data-coin="big"></canvas>You keep half the bag<b>+${pay}</b></div>`;
-      rows += `<div class="b-rrow"><canvas class="px" data-icon="plus"></canvas>Training XP<b>+${Math.round(g * 3.6)}</b></div>`;
       title = 'Great climb!';
-      sub = `${esc(s.name)} reached Floor ${f}${pot ? ` (the bag had ${pot} coins)` : ''}. Best ever: Floor ${T.best || 0}.`;
+      sub = `${esc(s.name)} reached Floor ${f}${res.pot ? ` (the bag had ${res.pot} coins)` : ''}. Best ever: Floor ${T.best || 0}.`;
       btns = `<div class="modal-btns"><button class="btn wide primary" data-a="again">Climb again</button><button class="btn wide" data-a="hub">Back to the Tower</button></div>`;
     }
     resEl.innerHTML = `<div class="card"><div class="eyebrow">Battle Tower · Floor ${f}</div><canvas class="px hero" width="32" height="32"></canvas>
-      <h1 class="${/\d/.test(title) ? 'num' : ''}">${title}</h1><p class="sub">${sub}</p><div class="b-rrows">${rows}</div>${ups ? `<div class="b-ups">${ups}</div>` : ''}${btns}</div>`;
+      <h1 class="${/\d/.test(title) ? 'num' : ''}">${title}</h1><p class="sub">${sub}</p>${won ? '' : lossHtml()}<div class="b-rrows">${res.rows}</div>${upsBlock(res)}${btns}</div>`;
     PS.ui.drawSproutTo(resEl.querySelector('canvas.hero'), s, won ? { arms: 'up', eyes: 'happy', mouth: 'open' } : { eyes: 'happy', mouth: 'smile' });
     bindRes({
       next: () => { V = null; resEl.hidden = true; startTowerFloor(); },
@@ -1885,28 +2171,17 @@
     }
     const bag = TOWER.coins(f) * 3; run.pot += bag;
     let h = `<div class="b-rrow gold"><canvas class="px" data-coin="big"></canvas>Treat: big coin bag<b>+${bag}</b></div>`;
-    if (t.kind === 'egg' && Math.random() < t.chance) { const egg = ST.addEgg(t.egg, `Battle Tower floor ${f}`); h += `<div class="b-rrow gold"><canvas class="px egg" data-egg="${t.egg}"></canvas><span>Lucky! A ${D.EGGS[t.egg].name}! It's waiting in the ${D.AREAS[egg.area] ? D.AREAS[egg.area].name : 'Garden'}.</span></div>`; }
+    if (t.kind === 'egg' && Math.random() < t.chance) { const egg = ST.addEgg(t.egg, `Battle Tower floor ${f}`); h += eggRow(t.egg, egg, `Lucky! ${aOrAn(eggName(t.egg)) === 'an' ? 'An' : 'A'} ${eggName(t.egg)}!`); }
     return h;
   }
-  function resultsFriend() {
-    const { b, fr, s } = V, win = b.winner, X = extra(), F = X.friend;
-    if (F.day !== today()) { F.day = today(); F.paid = 0; }
-    F.played = (F.played || 0) + 1;
-    let rows = '';
-    if ((F.paid || 0) < FRIEND.perDay) {
-      F.paid = (F.paid || 0) + 1;
-      const coins = ST.addCoins(win === 'p' ? FRIEND.coinsWin : FRIEND.coinsLose, 'friend');
-      const res = ST.gain(s, { power: 3, stamina: 3, run: 2, fly: 1, swim: 1 });
-      rows = `<div class="b-rrow"><canvas class="px" data-coin="1"></canvas>Coins for ${esc(fr.names.p)}<b>+${coins}</b></div><div class="b-rrow"><canvas class="px" data-icon="plus"></canvas>A little XP for ${esc(b.p.name)}<b>+10</b></div>${upsHtml(res) ? `<div class="b-ups">${upsHtml(res)}</div>` : ''}`;
-    } else rows = `<div class="b-rrow">No more coins today, but that was fun!</div>`;
-    PS.save();
-    const W = b[win], wn = fr.names[win];
+  function resultsFriend(res) {
+    const { b, fr } = V, win = b.winner, draw = !win;
     resEl.innerHTML = `<div class="card"><div class="eyebrow">Friend Battle</div>
       <div style="display:flex;justify-content:center;gap:6px"><canvas class="px duo" data-side="p" width="32" height="32"></canvas><canvas class="px duo" data-side="o" width="32" height="32"></canvas></div>
-      <h1>${esc(wn)} wins!</h1><p class="sub">${esc(W.name)} won in ${b.turn} turn${b.turn > 1 ? 's' : ''}. Good game, ${esc(fr.names.p)} and ${esc(fr.names.o)}!</p>
-      <div class="b-rrows">${rows}</div>
+      <h1>${draw ? "It's a draw!" : `${esc(fr.names[win])} wins!`}</h1><p class="sub">${draw ? `Both were knocked out at the same time after ${turnsText(b.turn)}.` : `${esc(b[win].name)} won in ${turnsText(b.turn)}.`} Good game, ${esc(fr.names.p)} and ${esc(fr.names.o)}!</p>
+      <div class="b-rrows">${res.rows}</div>${upsBlock(res)}
       <div class="modal-btns"><button class="btn wide go" data-a="rematch">Rematch!</button><button class="btn wide" data-a="hub">Done</button></div></div>`;
-    resEl.querySelectorAll('canvas.duo').forEach(c => { const side = c.dataset.side, f = b[side]; PS.ui.drawSproutTo(c, f.s || f.look, side === win ? { arms: 'up', eyes: 'happy', mouth: 'open' } : { eyes: 'sad', mouth: 'flat' }); if (side === 'o') c.style.transform = 'scaleX(-1)'; });
+    resEl.querySelectorAll('canvas.duo').forEach(c => { const side = c.dataset.side, f = b[side]; PS.ui.drawSproutTo(c, f.s || f.look, draw || side === win ? { arms: 'up', eyes: 'happy', mouth: 'open' } : { eyes: 'sad', mouth: 'flat' }); if (side === 'o') c.style.transform = 'scaleX(-1)'; });
     const sA = V.s, sB = V.sB, nA = fr.names.p, nB = fr.names.o, own = V.own;
     bindRes({ rematch: () => { V = null; resEl.hidden = true; startFriend(sA, sB, nA, nB, own); } });
   }
@@ -1922,10 +2197,32 @@
   function rise(p, spr, n, down) {
     for (let i = 0; i < n; i++) V.parts.push({ x: p.x + (Math.random() - 0.5) * 22, y: p.y + 6 + Math.random() * 8, vx: 0, vy: down ? 14 + Math.random() * 8 : -(16 + Math.random() * 10), g: 0, life: 0.5 + Math.random() * 0.4, delay: i * 0.04, spr });
   }
+  // A little element-coloured splash where a move lands: leaf petals drift, water droplets arc and fall, fire embers
+  // rise and flicker, stone chips bounce down, sky wind streaks rush past, shadow wisps curl up, light sparkles twinkle,
+  // sweet sprinkles pop out. dir: +1 when the attacker is on the left. small: one hit of a multi-hit move.
+  function hitFx(p, el, strong, dir, small) {
+    const I = icons(), r = Math.random, n = small ? 3 : strong ? 9 : 6;
+    for (let i = 0; i < n; i++) {
+      const a = r() * Math.PI * 2, v = 18 + r() * 26;
+      const q = { x: p.x + (r() - 0.5) * 8, y: p.y + (r() - 0.5) * 8, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: 0, life: 0.45 + r() * 0.3, spr: null };
+      switch (el) {
+        case 'leaf': q.spr = I.petals[i % I.petals.length]; q.vy = -Math.abs(q.vy) * 0.7; q.g = 36; q.spin = 1 + i * 1.9; q.life += 0.35; break;
+        case 'water': q.spr = i % 2 ? I.drop : I.droplet; q.vx *= 0.8; q.vy = -30 - r() * 40; q.g = 260; break;
+        case 'fire': q.spr = I.embers[i % I.embers.length]; q.vx *= 0.5; q.vy = -22 - r() * 30; q.g = -30; q.blink = 1 + i; q.life += 0.2; break;
+        case 'stone': q.spr = I.chips[i % I.chips.length]; q.vy = -40 - r() * 34; q.g = 330; break;
+        case 'sky': q.spr = I.streak; q.x -= dir * 10; q.vx = dir * (80 + r() * 50); q.vy = (r() - 0.5) * 12; q.life = 0.3 + r() * 0.2; break;
+        case 'shadow': q.spr = I.wisps[i % I.wisps.length]; q.vx *= 0.4; q.vy = -12 - r() * 14; q.spin = 1 + i * 2.3; q.life += 0.3; break;
+        case 'light': q.spr = I.twinkle[i % I.twinkle.length]; q.vx *= 0.6; q.vy *= 0.6; q.blink = 1 + i; q.life += 0.15; break;
+        case 'sweet': q.spr = i % 4 === 3 ? fxs('heart') : I.sprinkle[i % I.sprinkle.length]; q.vy = -34 - r() * 30; q.g = 190; break;
+        default: q.spr = I.twinkle[0];
+      }
+      V.parts.push(q);
+    }
+  }
   function pop(x, y, text, color, size, tag) { V.pops.push({ x, y, text, color, size, tag, t: 0, life: 0.95 }); }
   function ring(x, y, color, r, delay) { V.rings.push({ x, y, color, r, t: -(delay || 0), life: 0.32 }); }
-  function quake(t, a) { V.quakeA = V.quake > 0 ? Math.max(V.quakeA, a) : a; V.quake = Math.max(V.quake, t); }
-  function flash(c, t) { V.flashC = c; V.flashT = t; V.flashL = t; }
+  function quake(t, a) { if (calm()) return; V.quakeA = V.quake > 0 ? Math.max(V.quakeA, a) : a; V.quake = Math.max(V.quake, t); }
+  function flash(c, t) { V.flashC = c; V.flashT = t; V.flashL = t; V.flashA = calm() ? 0.15 : 0.7; } // reduced motion: a soft tint, not a bright flash
   function banner(text, sub, color, life) { V.banner = { text, sub, color, t: 0, life: life || 1.4 }; }
   function cheer(chance) { for (const c of V.crowd) if (Math.random() < chance) c.hop = 1; }
 
@@ -1976,16 +2273,17 @@
     // typewriter
     if (V.log.shown < V.log.full.length) V.log.shown = Math.min(V.log.full.length, V.log.shown + dt * 55 * speed * (V.fast ? 3 : 1));
     // hp bars ease toward display snapshot
-    for (const side of ['p', 'o']) {
+    for (const side of SIDES) {
       const target = V.disp[side].hp, cur = V.hpShown[side];
       if (cur !== target) { const d = target - cur, stepv = Math.max(Math.abs(d) * 6 * dt * speed, 30 * dt * speed); V.hpShown[side] = Math.abs(d) <= stepv ? target : cur + Math.sign(d) * stepv; }
     }
     updateBars();
     // anims
-    for (const side of ['p', 'o']) {
+    const ds = dt * speed;
+    for (const side of SIDES) {
       const A = V.a[side];
-      const dec = (k, r) => { if (A[k] > 0) A[k] = Math.max(0, A[k] - dt * r * speed); };
-      dec('lunge', side === 'o' && V.boss ? 1.4 : 2.2); dec('hop', 3); dec('shake', 1); dec('flash', 1); dec('poseT', 1); dec('emoteT', 1); dec('dodge', 2.2); dec('enter', V.boss && side === 'o' ? 1.1 : 1.6); dec('drop', 1.1);
+      dec(A, 'lunge', side === 'o' && V.boss ? 1.4 : 2.2, ds); dec(A, 'hop', 3, ds); dec(A, 'shake', 1, ds); dec(A, 'flash', 1, ds); dec(A, 'poseT', 1, ds); dec(A, 'emoteT', 1, ds);
+      dec(A, 'dodge', 2.2, ds); dec(A, 'enter', V.boss && side === 'o' ? 1.1 : 1.6, ds); dec(A, 'drop', 1.1, ds);
       if (A.fainting) A.fainting = Math.min(1, A.fainting + dt * speed * 1.1);
       if (A.poseT <= 0 && !A.win) A.pose = null;
       if (A.emoteT <= 0) A.emote = null;
@@ -1993,7 +2291,7 @@
     }
     if (V.boss && V.a.o.enter <= 0 && !V.a.o.landed) { V.a.o.landed = true; quake(0.6, 3); sfx('thud'); burst({ x: spot('o').x, y: spot('o').y - 2 }, 'stone', 18, 40); }
     // ambient status fx
-    for (const side of ['p', 'o']) {
+    for (const side of SIDES) {
       const d = V.disp[side], sp = spot(side), w = side === 'o' && V.boss ? 40 : side === 'o' && V.wild ? 24 : 16;
       if (V.a[side].fainting) continue;
       if (d.status === 'poison' && Math.random() < dt * 3) V.parts.push({ x: sp.x + (Math.random() - 0.5) * w, y: sp.y - 8 - Math.random() * 10, vx: 0, vy: -12, g: 0, life: 0.7, spr: icons().bubble });
@@ -2005,13 +2303,13 @@
       }
     }
     for (const p of V.parts) { if (p.delay > 0) { p.delay -= dt; continue; } p.life -= dt; p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.spin) p.x += Math.sin(V.t * 14 + p.spin) * 0.6; }
-    V.parts = V.parts.filter(p => p.life > 0);
+    keep(V.parts, partAlive); // (in place: no new arrays every frame)
     for (const p of V.pops) p.t += dt;
-    V.pops = V.pops.filter(p => p.t < p.life);
+    keep(V.pops, popAlive);
     for (const r of V.rings) r.t += dt * speed;
-    V.rings = V.rings.filter(r => r.t < r.life);
+    keep(V.rings, popAlive);
     for (const bm of V.beams) bm.t += dt * speed;
-    V.beams = V.beams.filter(bm => bm.t < bm.life);
+    keep(V.beams, popAlive);
     if (V.quake > 0) V.quake = Math.max(0, V.quake - dt);
     if (V.flashT > 0) V.flashT = Math.max(0, V.flashT - dt);
     if (V.banner) { V.banner.t += dt; if (V.banner.t > V.banner.life) V.banner = null; }
@@ -2019,14 +2317,13 @@
     for (const c of V.crowd) { if (c.hop > 0) c.hop = Math.max(0, c.hop - dt * 2.4); else if (c.cheer && Math.random() < dt * 2.5) c.hop = 1; else if (!c.cheer && Math.random() < dt * 0.08) c.hop = 1; }
     ambient(dt);
     const T = THEMES[V.area] || THEMES.meadow;
-    if (T.lightning && live()) { V.boltT -= dt; if (V.boltT <= 0) { V.boltT = 4 + Math.random() * 6; V.bolt = { t: 0, x: Math.round(WW * (0.15 + Math.random() * 0.7)), seed: Math.floor(Math.random() * 1e5) }; flash('#dfe8fb', 0.18); setTimeout(() => sfx('thud'), 300); } }
+    if (T.lightning && live()) { V.boltT -= dt; if (V.boltT <= 0) { V.boltT = 4 + Math.random() * 6; V.bolt = { t: 0, x: Math.round(WW * (0.15 + Math.random() * 0.7)), seed: Math.floor(Math.random() * 1e5) }; if (!calm()) flash('#dfe8fb', 0.18); setTimeout(() => sfx('thud'), 300); } }
     if (V.bolt) { V.bolt.t += dt; if (V.bolt.t > 0.35) V.bolt = null; }
   }
   // weather & theme particles (drawn in front)
   function ambient(dt) {
     const T = THEMES[V.area] || THEMES.meadow, k = T.amb, night = safe(() => PS.clock.night(), 0);
-    const add = p => { if (V.amb.length < 90) V.amb.push(p); };
-    const r = Math.random;
+    const add = addAmb, r = Math.random;
     if (k === 'petals' && r() < dt * 1.6) add({ x: -4, y: r() * WH * 0.7, vx: 14 + r() * 10, vy: 5 + r() * 5, sway: r() * 6, life: 12, c: r() < 0.5 ? '#f7b6c8' : '#ffffff', w: 2, h: 1 });
     if ((k === 'fireflies' || (k === 'petals' && night > 0.6)) && r() < dt * 1.4) add({ x: r() * WW, y: HY() + r() * (WH - HY()) * 0.8, vx: (r() - 0.5) * 6, vy: -2 - r() * 3, sway: r() * 6, life: 4, c: '#e2ff96', blink: true, w: 1, h: 1 });
     if (k === 'sprinkles' && r() < dt * 3) add({ x: r() * WW, y: -2, vx: (r() - 0.5) * 4, vy: 16 + r() * 8, life: 14, c: ['#e5535f', '#639bff', '#99e550', '#fbf236', '#ffffff'][Math.floor(r() * 5)], w: r() < 0.5 ? 2 : 1, h: r() < 0.5 ? 1 : 2 });
@@ -2040,8 +2337,10 @@
       p.life -= dt; p.x += (p.vx + (p.sway ? Math.sin(V.t * 2 + p.sway) * 6 : 0)) * dt; p.y += p.vy * dt;
       if (p.rain && p.y > WH * 0.4 + ((p.x * 7) % (WH * 0.6))) { p.life = 0; if (Math.random() < 0.3) V.parts.push({ x: p.x, y: p.y, vx: 0, vy: 0, g: 0, life: 0.12, spr: icons().splash }); }
     }
-    V.amb = V.amb.filter(p => p.life > 0 && p.x > -20 && p.x < WW + 30 && p.y < WH + 6 && p.y > -10);
+    keep(V.amb, ambAlive);
   }
+  function addAmb(p) { if (V.amb.length < 90) V.amb.push(p); }
+  function dec(A, k, r, ds) { if (A[k] > 0) A[k] = Math.max(0, A[k] - ds * r); }
   // element-flavoured projectiles
   function shoot(from, el, giant) {
     const a = from === 'o' && (V.boss || V.wild) ? topOf('o') : { x: spot(from).x + (from === 'p' ? 10 : -10), y: spot(from).y - 16 };
@@ -2318,7 +2617,7 @@
     if (A.win) y -= Math.round(Math.abs(Math.sin(V.t * 7)) * (boss ? 3 : 5));
     if (A.dodge > 0) x -= dir * Math.round(7 * Math.sin(Math.PI * (1 - A.dodge)));
     if (A.shake > 0) x += Math.round(Math.sin(V.t * 70) * 2);
-    if (boss && V.disp.o.charging && !A.fainting && live()) x += Math.round(Math.sin(V.t * 40));
+    if (boss && V.disp.o.charging && !A.fainting && live() && !calm()) x += Math.round(Math.sin(V.t * 40));
     let alpha = 1;
     if (A.fainting) { alpha = 1 - ease(A.fainting); y += Math.round(ease(A.fainting) * (boss ? 14 : 7)); }
     if (alpha <= 0.02) return;
@@ -2374,7 +2673,8 @@
   function render() {
     if (!cssW) return;
     const night = safe(() => PS.clock.night(), 0), T = THEMES[V.area] || THEMES.meadow;
-    const key = [V.area, WW, WH, T.fixed ? 0 : Math.round(night * 30), V.boss ? 1 : 0, V.wild ? V.wild.step : -1].join('|');
+    // (the area only changes in launch(), which resets bgKey)
+    const key = (T.fixed ? 0 : Math.round(night * 30)) + (V.boss ? 40 : 0) + (V.wild ? V.wild.step + 1 : 0) * 100 + WW * 1e3 + WH * 1e6;
     if (key !== bgKey) { bgKey = key; drawBg(night); }
     lx.clearRect(0, 0, WW, WH);
     lx.drawImage(bgC, 0, 0);
@@ -2389,6 +2689,7 @@
     for (const bm of V.beams) drawBeam(bm);
     for (const p of V.parts) {
       if (p.delay > 0 || !p.spr) continue;
+      if (p.blink && ((V.t * 18 + p.blink) | 0) % 3 === 0) continue; // embers flicker, sparkles twinkle
       lx.globalAlpha = clamp(p.life * 3, 0, 1);
       lx.drawImage(p.spr, Math.round(p.x - p.spr.width / 2), Math.round(p.y - p.spr.height / 2));
     }
@@ -2399,8 +2700,8 @@
       lx.globalAlpha = p.alpha || (p.fade ? clamp(p.life / 3, 0, 1) : 1); lx.fillStyle = p.c; lx.fillRect(Math.round(p.x), Math.round(p.y), p.w, p.h);
     }
     lx.globalAlpha = 1;
-    if (V.flashT > 0) { lx.globalAlpha = clamp(V.flashT / (V.flashL || 0.3), 0, 1) * 0.7; lx.fillStyle = V.flashC; lx.fillRect(0, 0, WW, WH); lx.globalAlpha = 1; }
-    if (V.boss && V.disp.o.charging && live()) { lx.globalAlpha = 0.1 + 0.08 * Math.sin(V.t * 8); lx.fillStyle = '#e5535f'; lx.fillRect(0, 0, WW, WH); lx.globalAlpha = 1; }
+    if (V.flashT > 0) { lx.globalAlpha = clamp(V.flashT / (V.flashL || 0.3), 0, 1) * (V.flashA || 0.7); lx.fillStyle = V.flashC; lx.fillRect(0, 0, WW, WH); lx.globalAlpha = 1; }
+    if (V.boss && V.disp.o.charging && live()) { lx.globalAlpha = calm() ? 0.1 : 0.1 + 0.08 * Math.sin(V.t * 8); lx.fillStyle = '#e5535f'; lx.fillRect(0, 0, WW, WH); lx.globalAlpha = 1; } // reduced motion: steady, no pulsing
     // upscale (with screen shake)
     let qx = 0, qy = 0;
     if (V.quake > 0) { const a = Math.max(1, Math.round(V.quakeA * Math.min(1, V.quake * 2))); qx = Math.round((Math.random() * 2 - 1) * a); qy = Math.round((Math.random() * 2 - 1) * a); }
@@ -2433,9 +2734,13 @@
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     // log typewriter
-    const shown = V.log.full.slice(0, Math.floor(V.log.shown));
-    const span = logEl.firstChild; if (span.textContent !== shown) { span.textContent = shown; logEl.classList.toggle('long', V.log.full.length > 62); }
-    logEl.lastChild.hidden = !(V.phase === 'play' || V.phase === 'intro' || V.phase === 'end') || V.log.shown < V.log.full.length;
+    const nShown = Math.floor(V.log.shown);
+    if (nShown !== V.log.drawn || V.log.full !== V.log.drawnFull) {
+      if (V.log.full !== V.log.drawnFull) logEl.classList.toggle('long', V.log.full.length > 62);
+      V.log.drawn = nShown; V.log.drawnFull = V.log.full; logEl.firstChild.textContent = V.log.full.slice(0, nShown);
+    }
+    const noMore = !(V.phase === 'play' || V.phase === 'intro' || V.phase === 'end') || V.log.shown < V.log.full.length;
+    if (logEl.lastChild.hidden !== noMore) logEl.lastChild.hidden = noMore;
   }
   // Readable canvas text: the pixel font only for big words without digits (its 2/8 and 5/S look alike);
   // everything else in rounded Fredoka, a little larger, with a thinner outline so small letters stay open.
@@ -2449,6 +2754,9 @@
 
   function frame(dt) {
     if (V) {
+      // The hand-over screen covers the arena completely, and the results card freezes it (its last frame stays
+      // behind the dimmed card): no need to redraw the full-resolution canvas 60 times a second.
+      if (V.phase === 'pass' || V.phase === 'results') return;
       sizeCheckT -= dt;
       if (sizeDirty || sizeCheckT <= 0) { sizeDirty = false; sizeCheckT = 0.5; resize(); }
       update(dt);

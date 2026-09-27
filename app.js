@@ -25,6 +25,12 @@
       case 'coin': { const c = new G(9, 9); c.ell(4.5, 4.5, 4, 4, ['#fff27a', '#f6c83a', '#c7861c']); c.px([[4, 2], [4, 3], [4, 4], [4, 5], [4, 6]], '#c7861c'); c.px([[3, 2]], '#ffffff'); return c.canvas(); }
       case 'sun': { const c = new G(9, 9); c.ell(4.5, 4.5, 3, 3, '#f6c83a'); c.px([[4, 0], [4, 8], [0, 4], [8, 4], [1, 1], [7, 1], [1, 7], [7, 7]], '#f6c83a'); return c.canvas(); }
       case 'moon': { const c = new G(9, 9); c.ell(4.5, 4.5, 3.8, 3.8, '#c9a2f0'); c.ell(6, 3.5, 3, 3, null); c.outline(); return c.canvas(); }
+      case 'sound': case 'mute': { // a little speaker, with sound waves or a cross
+        const c = new G(13, 11); c.rect(1, 4, 3, 3, '#dfe8fb'); c.poly([[3.5, 4], [7.5, 0.5], [7.5, 10.5], [3.5, 7]], '#dfe8fb'); c.outline();
+        if (kind === 'sound') c.px([[9, 4], [9, 5], [9, 6], [11, 2], [11, 3], [12, 4], [12, 5], [12, 6], [11, 7], [11, 8]], '#222034');
+        else c.px([[9, 3], [10, 4], [11, 5], [12, 6], [9, 7], [10, 6], [12, 4], [11, 3], [11, 7], [12, 8], [9, 8], [12, 2]], '#d24552');
+        return c.canvas();
+      }
     }
     return g.canvas();
   }
@@ -46,7 +52,7 @@
   }
   function refresh() {
     refreshPlayerChip();
-    $('coinText').textContent = PS.S.coins.toLocaleString();
+    $('coinText').textContent = (coinFreeze == null ? PS.S.coins : coinFreeze).toLocaleString();
     const night = PS.clock.isNight(), ms = PS.clock.msToSwitch(), m = Math.floor(ms / 60000), s = Math.floor(ms / 1000) % 60;
     $('clockText').textContent = `${night ? 'Night' : 'Day'} ${m}:${String(s).padStart(2, '0')}`;
     const want = night ? 'moon' : 'sun';
@@ -129,7 +135,24 @@
   }
 
   // ---------------- global reactions ----------------
-  PS.on('coins', e => { refresh(); if (e.n > 0) { const p = $('coinPill'); p.classList.remove('bump'); void p.offsetWidth; p.classList.add('bump'); PX.Sound.play('tick'); } });
+  // freezeCoins(true) holds the HUD coin total (e.g. while a gumball rolls, so the prize isn't spoiled); false shows the real total
+  let coinFreeze = null;
+  function bumpCoins() { const p = $('coinPill'); p.classList.remove('bump'); void p.offsetWidth; p.classList.add('bump'); PX.Sound.play('tick'); }
+  function freezeCoins(on) {
+    if (on) { if (coinFreeze == null) coinFreeze = PS.S.coins; return; }
+    if (coinFreeze == null) return;
+    const was = coinFreeze; coinFreeze = null; refresh(); if (PS.S.coins > was) bumpCoins();
+  }
+  PS.on('coins', e => { refresh(); if (e.n > 0 && coinFreeze == null && chromeOn) bumpCoins(); }); // no tick under a race or battle
+  // saving problems are rare but serious: tell a grown-up once, with the fix
+  let saveWarned = false;
+  function saveWarning(why) {
+    if (saveWarned) return; saveWarned = true;
+    modal({ eyebrow: 'For grown-ups', title: 'Progress isn’t saving', html: `<p>${why} Until it's fixed, new progress may be lost when the game closes.</p><p>Make a backup code now (Backups), then check that the phone has free storage and that website data isn't blocked for this app.</p>`,
+      buttons: [{ label: 'Make a backup code', kind: 'primary', onClick: () => { setTimeout(backupPanel, 0); } }, { label: 'OK' }] });
+  }
+  PS.on('save:failed', () => saveWarning('This device just refused to save the game.'));
+  PS.on('save:ok', () => { saveWarned = false; });
   PS.on('sprout:evolve', e => {
     const s = e.s, fi = state.formInfo(s), mv = fi.moves.map(id => D.MOVES[id].name).join(', ');
     const why = s.stage === 1 ? `Its ${state.natureKind(s) === 'sun' ? 'sunny' : state.natureKind(s) === 'moon' ? 'moonlit' : 'wild'} nature shaped its bud.`
@@ -142,22 +165,30 @@
   PS.on('night', e => { toast(e.isNight ? 'Night has fallen. Night creatures are out.' : 'Good morning! The sun is up.', 3000); refresh(); });
 
   // ---------------- parent gate (keeps kids out of the testing tools and erase buttons) ----------------
-  let parentOk = false;
+  // One right answer opens grown-up actions for 2 minutes, and putting the app away closes them again
+  // (a Home Screen app can stay open for days, so "until reload" would leave them open to the kids).
+  const PARENT_MS = 120000; let parentUntil = 0;
+  document.addEventListener('visibilitychange', () => { if (document.hidden) parentUntil = 0; });
   function parentGate(then) {
-    if (parentOk) { then(); return; }
+    if (Date.now() < parentUntil) { then(); return; }
     const a = 6 + Math.floor(Math.random() * 7), b = 4 + Math.floor(Math.random() * 6);
+    let tries = 0;
     modal({ eyebrow: 'Grown-ups only', title: 'Parent check', html: `<p>What is ${a} × ${b}?</p><input class="field-input" id="pgAns" inputmode="numeric" autocomplete="off" aria-label="Answer">`,
       row: true, buttons: [{ label: 'Cancel' }, { label: 'Continue', kind: 'primary', onClick: () => {
         const v = parseInt(($('pgAns') || {}).value, 10);
-        if (v === a * b) { parentOk = true; setTimeout(then, 0); return; }
+        if (v === a * b) { parentUntil = Date.now() + PARENT_MS; setTimeout(then, 0); return; }
+        if (++tries >= 3) { toast('Ask a grown-up to help with this one.'); return; }
         toast('That is not quite right.'); return true;
       } }] });
   }
 
   // ---------------- testing tools (parent only) ----------------
   function devPanel() {
+    const T = PS.S.totals || {}, mins = Math.round((T.playSec || 0) / 60), n = v => Number(v || 0).toLocaleString();
+    const played = mins >= 60 ? `${Math.floor(mins / 60)} h ${mins % 60} min` : `${mins} min`;
+    const stats = `<p class="bk-ver" style="margin-top:0"><b>Play stats</b> (this player, kept on this device): played ${played} since this was added · ${n(T.races)} races (${n(T.raceWins)} won) · ${n(T.battles)} battles (${n(T.battleWins)} won) · ${n(T.coinsEarned)} coins earned · ${n(T.gumballs)} gumballs · ${n(PS.S.sprouts.length)} Sprouts</p>`;
     parentGate(() => modal({
-      eyebrow: 'Parent tools', title: 'Testing shortcuts', html: '<p>Shortcuts for testing the whole game quickly. They skip the normal grind, so keep them away from the kids.</p><div class="dev-grid"></div>',
+      eyebrow: 'Parent tools', title: 'Testing shortcuts', html: stats + '<p>Shortcuts for testing the whole game quickly. They skip the normal grind, so keep them away from the kids.</p><div class="dev-grid"></div>',
       buttons: [{ label: 'Close' }],
       mount(card, close) {
         const grid = card.querySelector('.dev-grid');
@@ -168,7 +199,14 @@
         add('Toggle day/night', () => PS.clock.toggle());
         add('Get a Meadow egg', () => state.addEgg('meadow', 'Parent tools'));
         add('Get a Golden egg', () => state.addEgg('golden', 'Parent tools'));
-        add('Unlock all races', () => { for (const r of D.RACES) for (let i = 0; i < 3; i++) { const k = r.id + '-' + i; PS.S.progress.races[k] = Object.assign({ runs: 1, best: null }, PS.S.progress.races[k], { wins: Math.max(1, (PS.S.progress.races[k] || {}).wins || 0) }); } PS.save(); toast('All races unlocked'); });
+        add('Get a surprise shop egg', () => { const k = PS.util.pick(D.SHOP_EGGS.filter(id => D.EGGS[id])); state.addEgg(k, 'Parent tools'); });
+        // opens every tier of every series (Master stays unwon, so its first-win egg can still be earned)
+        add('Unlock all races', () => {
+          const rs = PS.scenes.race; let done = false;
+          if (rs && typeof rs.unlockAll === 'function') { try { rs.unlockAll(); done = true; } catch (e) { console.error(e); } }
+          if (!done) for (const r of D.RACES) for (let i = 0; i < 2; i++) { const k = r.id + '-' + i; PS.S.progress.races[k] = Object.assign({ runs: 1, best: null }, PS.S.progress.races[k], { wins: Math.max(1, (PS.S.progress.races[k] || {}).wins || 0) }); }
+          PS.save(); toast('All races unlocked');
+        });
         add('Unlock all leagues', () => { for (const L of D.LEAGUES) PS.S.progress.leagues[L.id] = { beaten: [true, true, true], cleared: true }; PS.save(); toast('All leagues unlocked'); });
         const who = (PS.players.current() || {}).name || 'this player';
         const r = document.createElement('button'); r.className = 'btn danger'; r.style.gridColumn = '1 / -1'; r.textContent = `Erase ${who}'s game`;
@@ -180,12 +218,16 @@
 
   // ---------------- players ----------------
   const E = v => PS.state.esc(v);
+  const MUTE_KEY = 'solunar:muted';
+  function setMuted(on) { PX.Sound.muted = !!on; try { localStorage.setItem(MUTE_KEY, on ? '1' : '0'); } catch (e) { /* this session only */ } if (!on) PX.Sound.play('pop'); }
   // ---------------- backups ----------------
-  function copyText(text, ta) {
-    const done = () => toast('Backup code copied. Paste it somewhere safe, like Notes or an email to yourself.', 3600);
+  function copyText(text, ta, onCopied, msg) {
+    const done = () => { toast(msg || 'Backup code copied. Paste it somewhere safe, like Notes or an email to yourself.', 3600); if (onCopied) onCopied(); };
     const fallback = () => { if (ta) { ta.focus(); ta.select(); } toast('Select the code and copy it.'); };
     try { navigator.clipboard.writeText(text).then(done, fallback); } catch (e) { fallback(); }
   }
+  const ago = ts => { const d = Math.round((new Date(new Date().toDateString()) - new Date(new Date(ts).toDateString())) / 86400000); return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`; };
+  const when = ts => new Date(ts).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   async function shareText(text, name) {
     try {
       const file = new File([text], `solunar-sprouts-${name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.txt`, { type: 'text/plain' });
@@ -195,27 +237,41 @@
     return false;
   }
   function backupPanel() {
-    const cur = PS.players.current(), many = PS.players.list().length > 1;
+    const cur = PS.players.current(), many = PS.players.list().length > 1, last = PS.players.lastBackup(cur.id);
+    const autos = PS.backup.autoBackups().filter(a => a.ok), rescue = PS.backup.rescued();
     modal({ eyebrow: 'Keep progress safe', title: 'Backups',
       html: `<p>A backup code holds a whole saved game. Keep a copy somewhere safe (Notes, Files or an email). If a phone is lost, reset or replaced, paste the code into the game to get everything back.</p>
+        <p class="bk-ver" style="margin-top:0">${last ? `${E(cur.name)} was last backed up ${ago(last)}.` : `${E(cur.name)} hasn't been backed up yet.`}</p>
         <div class="bk-actions"><button class="btn primary" id="bkMe">Back up ${E(cur.name)}</button>${many ? '<button class="btn" id="bkAll">Back up all players</button>' : ''}</div>
         <div id="bkOut" hidden><textarea class="field-input bk-code" id="bkCode" readonly rows="4" aria-label="Backup code"></textarea>
           <div class="bk-actions"><button class="btn primary" id="bkCopy">Copy code</button><button class="btn" id="bkShare">Save or share</button></div></div>
         <div class="label" style="margin-top:16px">Restore from a backup</div>
         <textarea class="field-input bk-code" id="bkIn" rows="3" placeholder="Paste a backup code here" aria-label="Backup code to restore"></textarea>
         <div class="bk-actions"><button class="btn" id="bkNew">Restore as new player</button><button class="btn danger" id="bkReplace">Replace ${E(cur.name)}'s game</button></div>
+        ${autos.length ? `<div class="label" style="margin-top:16px">Automatic backups on this device</div>
+          <p class="bk-ver" style="margin-top:2px">The game keeps ${E(cur.name)}'s game from the last few days it was played, in case something goes wrong.</p>
+          <div class="bk-auto">${autos.map(a => `<div class="bk-row"><span><b>${E(when(a.at))}</b><small>${a.sprouts} Sprout${a.sprouts === 1 ? '' : 's'} · ${Number(a.coins).toLocaleString()} coins</small></span><button class="btn" data-auto="${a.i}">Restore</button></div>`).join('')}</div>` : ''}
+        ${rescue ? `<p class="bk-ver">A copy of a saved game that couldn't be opened was kept from ${E(when(rescue.at))}. <button class="pl-link" id="bkRescue">Copy it</button> to send it for help.</p>` : ''}
         <p class="bk-ver">Version ${E(window.SOLUNAR_VERSION || 'dev')}</p>`,
       buttons: [{ label: 'Done' }],
       mount(card) {
-        let code = '', codeName = cur.name;
-        const show = async which => {
-          try { code = await PS.backup.exportBackup(which); codeName = which === 'all' ? 'all-players' : cur.name; card.querySelector('#bkOut').hidden = false; card.querySelector('#bkCode').value = code; PS.S.lastBackup = Date.now(); PS.save(); }
+        let code = '', codeName = cur.name, which = 'player';
+        const backedUp = () => PS.players.markBackedUp(which === 'all' ? PS.players.list().map(p => p.id) : [cur.id]);
+        const show = async w => {
+          try { which = w; code = await PS.backup.exportBackup(w); codeName = w === 'all' ? 'all-players' : cur.name; card.querySelector('#bkOut').hidden = false; card.querySelector('#bkCode').value = code; }
           catch (e) { toast('Could not make a backup on this device.'); }
         };
         card.querySelector('#bkMe').onclick = () => show('player');
         if (many) card.querySelector('#bkAll').onclick = () => show('all');
-        card.querySelector('#bkCopy').onclick = () => copyText(code, card.querySelector('#bkCode'));
-        card.querySelector('#bkShare').onclick = async () => { if (!(await shareText(code, codeName))) copyText(code, card.querySelector('#bkCode')); };
+        card.querySelector('#bkCode').addEventListener('copy', backedUp); // copied by hand (the fallback when the clipboard is blocked)
+        card.querySelector('#bkCopy').onclick = () => copyText(code, card.querySelector('#bkCode'), backedUp);
+        card.querySelector('#bkShare').onclick = async () => { if (await shareText(code, codeName)) backedUp(); else copyText(code, card.querySelector('#bkCode'), backedUp); };
+        card.querySelectorAll('[data-auto]').forEach(b => b.onclick = () => {
+          const a = autos.find(x => x.i === +b.dataset.auto); if (!a) return;
+          parentGate(() => modal({ title: `Go back to ${E(when(a.at))}?`, html: `<p>${E(cur.name)}'s game will go back to how it was on ${E(when(a.at))}. Anything played since then will be replaced.</p>`, row: true,
+            buttons: [{ label: 'Cancel' }, { label: 'Restore', kind: 'danger', onClick: () => { try { PS.backup.restoreAuto(a.i); toast('Restored.', 2000); setTimeout(() => location.reload(), 600); } catch (e) { toast(e.message, 3600); } } }] }));
+        });
+        const rb = card.querySelector('#bkRescue'); if (rb) rb.onclick = () => copyText(rescue.raw, null, null, 'Copied. Paste it into an email or message to whoever helps with the game.');
         const restore = async mode => {
           const txt = card.querySelector('#bkIn').value.trim();
           if (!txt) { toast('Paste a backup code first.'); return; }
@@ -249,7 +305,7 @@
   }
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { hiddenAt = Date.now(); PS.saveNow(); return; }
-    if (updateReady && hiddenAt && Date.now() - hiddenAt > 20000 && !held && chromeOn) location.reload(); // apply a pending update when the app is reopened
+    if (updateReady && hiddenAt && Date.now() - hiddenAt > 20000 && !held && chromeOn && !open && !queue.length) location.reload(); // apply a pending update when the app is reopened (never under an open panel)
   });
   function askPersistentStorage() { try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) { /* optional */ } }
 
@@ -258,8 +314,9 @@
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
     const sc = PS.scenes[current];
-    if (sc && sc.frame && mounted[current]) { try { sc.frame(dt, t); } catch (e) { console.error(e); } }
+    if (sc && sc.frame && mounted[current] && !PS.ui.menuOpen) { try { sc.frame(dt, t); } catch (e) { console.error(e); } } // the main menu covers the screen: don't draw it twice
     hudT -= dt; if (hudT <= 0) { hudT = 0.5; refresh(); }
+    if (!PS.ui.menuOpen && PS.S.totals) PS.S.totals.playSec = (PS.S.totals.playSec || 0) + dt; // time played (parent tools; stays on the device)
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').style.opacity = 0; }
     requestAnimationFrame(frame);
   }
@@ -268,7 +325,7 @@
   function boot() {
     document.querySelectorAll('#nav button').forEach(b => { paint(b.querySelector('canvas'), icon(b.dataset.go)); b.onclick = () => { PX.Sound.unlock(); PX.Sound.play('tick'); go(b.dataset.go); }; });
     paint($('coinIcon'), icon('coin'));
-    document.addEventListener('pointerdown', () => PX.Sound.unlock(), { once: true });
+    document.addEventListener('pointerdown', () => PX.Sound.unlock()); // every tap: iOS can stop the audio after a call or a trip to another app
     $('coinPill').addEventListener('click', () => toast(`You have ${PS.S.coins.toLocaleString()} coins. Earn more in races and battles.`));
     $('clockPill').addEventListener('click', () => toast('Day and night switch every 15 minutes. Some creatures only come out at night.', 3200));
     refresh();
@@ -276,13 +333,27 @@
     requestAnimationFrame(frame);
     registerServiceWorker();
     document.addEventListener('pointerdown', askPersistentStorage, { once: true });
+    // sound: a device-wide on/off (iPads have no mute switch), and the audio sleeps while the app is put away
+    try { PX.Sound.muted = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) { /* default on */ }
+    document.addEventListener('visibilitychange', () => { try { if (document.hidden) { if (PX.Sound.suspend) PX.Sound.suspend(); } else if (PX.Sound.resume) PX.Sound.resume(); } catch (e) { /* optional */ } });
+    // can this device save at all? (blocked website data, a full phone…)
+    try { localStorage.setItem('solunar:probe', '1'); localStorage.removeItem('solunar:probe'); } catch (e) { saveWarning('This device is blocking the game from saving.'); }
+    // a save that had to be repaired or brought back from an automatic backup: tell a grown-up what happened
+    const ln = PS.loadNote;
+    if (ln) {
+      const who = E(PS.players.isTesting() ? 'This' : ((PS.players.current() || {}).name || 'This player') + '’s');
+      const html = ln.kind === 'repaired' ? `<p>${who} saved game had a small problem, so the game fixed it. Everything else is safe.</p>`
+        : ln.kind === 'snapshot' ? `<p>${who} saved game couldn't be opened, so the game brought back its automatic backup from ${E(when(ln.at))}.</p>`
+          : `<p>${who} saved game couldn't be opened and there was no automatic backup yet, so a new game started. If you have a backup code, restore it in Backups.</p>`;
+      modal({ eyebrow: 'For grown-ups', title: 'We looked after a saved game', html: html + '<p>A copy of the old save was kept. You can find it in Backups.</p>',
+        buttons: [{ label: 'Open Backups', onClick: () => { setTimeout(backupPanel, 0); } }, { label: 'OK', kind: 'primary' }] });
+      PS.clearLoadNote();
+    }
     const welcome = () => {
       if (PS.S.seen.welcome) return;
       PS.S.seen.welcome = true; PS.save();
       modal({ eyebrow: 'Welcome', title: 'Solunar Sprouts', sprite: PX.cloneLook(PX.DEFAULT_LOOK), html:
-        '<p>Raise Sprouts: little seedling creatures that grow into whatever you shape them to be.</p>' +
-        '<ol><li>Hatch eggs and care for your Sprouts in the Garden.</li><li>Catch animals and give them to Sprouts to change their stats, bodies and moves.</li>' +
-        '<li>Swim across the water to visit the Beach, Moonlit Grove and Candy Isle.</li><li>Win races and battles for coins and new eggs.</li></ol>',
+        '<p>Raise Sprouts: little seedling creatures that grow into whatever you shape them to be.</p><p><b>Tap your egg to hatch it!</b></p>',
         buttons: [{ label: 'Start', kind: 'primary' }] });
     };
     PS.ui.welcome = welcome;
@@ -293,5 +364,5 @@
     $('playerChip').onclick = () => { PX.Sound.play('tick'); PS.ui.mainMenu(); };
   }
 
-  PS.ui = { boot, go, toast, modal, closeModal, pickSprout, chrome, hold, refresh, devPanel, playersPanel: () => PS.ui.mainMenu(), backupPanel, parentGate, icon, paint, drawSproutTo, get current() { return current; } };
+  PS.ui = { boot, go, toast, modal, closeModal, pickSprout, chrome, hold, refresh, devPanel, playersPanel: () => PS.ui.mainMenu(), backupPanel, parentGate, icon, paint, drawSproutTo, freezeCoins, setMuted, isMuted: () => !!PX.Sound.muted, get current() { return current; }, get modalOpen() { return !!open || queue.length > 0; } };
 })();

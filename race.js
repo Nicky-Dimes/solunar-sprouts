@@ -1,5 +1,5 @@
 // race.js — Solunar Sprouts Race screen: race hub (series x 3 tiers, Daily Cup, Time Trials), the race itself, and results.
-// Scene contract: PS.scenes.race = { mount(root), show(params), hide(), frame(dt, t) }.
+// Scene contract: PS.scenes.race = { mount(root), show(params), hide(), frame(dt, t) } + unlockAll() for the parent tools.
 // The race engine evolves prototypes/3-race.html: stacked lanes, camera follows the player, run/swim/climb/fly
 // segments (a climb is always followed by a downhill glide), stamina + tired state, and the Cheer Ring timing tap.
 //
@@ -35,7 +35,8 @@
     stamBase: 50, stamPer: 8,                               // max stamina = stamBase + stamPer * staminaRating
     drain: { run: 2.9, swim: 4.4, climb: 5.2, fly: 1.0 },   // stamina per second
     tired: { mul: 0.55, regen: 9, until: 0.3 },             // tired speed mult; regen/s; recover at 30 % of max
-    ring: { every: [3.5, 5], first: 2.2, r0: 28, target: 13, shrink: 13, endR: 6, perfect: 1.6, good: 4.5 },
+    // Cheer Ring: taps before the Good window are ignored; a late tap is a MISS (stumble); no tap = no boost, no stumble.
+    ring: { every: [3.5, 5], first: 2.2, r0: 28, target: 13, shrink: 13, endR: 6, perfect: 1.6, good: 4.5, goodBeg: 5 },
     perfect: { mul: 1.45, t: 2.8, stam: 12 },
     good: { mul: 1.25, t: 2.0, stam: 6 },
     miss: { mul: 0.45, t: 0.5 },
@@ -47,6 +48,11 @@
   };
   const T = TUNING;
   const mulOf = rating => clamp(T.speedLo + T.speedK * rating, T.speedMin, T.speedMax);
+  const mulRating = m => (m - T.speedLo) / T.speedK; // the rating that gives speed multiplier m
+  // Good window half-width (ring px): a little wider on Beginner courses (not the Daily Cup)
+  const goodOf = (tier, mode) => (tier === 0 && mode !== 'cup' ? T.ring.goodBeg : T.ring.good);
+  // a tap when the ring's radius is r: 'early' (ignored) | 'perfect' | 'good' | 'late' (MISS)
+  function judge(r, good) { const d = r - T.ring.target; return d > good ? 'early' : d < -good ? 'late' : Math.abs(d) <= T.ring.perfect ? 'perfect' : 'good'; }
 
   // =====================================================================
   // EXTRA SERIES (not in data.js). seed keeps their courses stable even if data.js gains races.
@@ -128,9 +134,11 @@
   const CUP_XP = [10, 16, 22, 32];          // by bestTier (like a tier's xp)
   const CUP_EGG_CHANCE = [0.15, 0.05, 0.05, 0.05];
   // =====================================================================
-  // TIME TRIAL medals: [bronze, silver, gold] first-time coins per tier
+  // TIME TRIAL medals: [bronze, silver, gold] first-time coins per tier (x the series' prize multiplier), and XP once per
+  // medal: MEDAL_XP x the tier's race XP, split like race XP (so gold is about half a race win's XP)
   // =====================================================================
   const MEDAL_COINS = [[5, 10, 20], [10, 20, 40], [20, 40, 80]];
+  const MEDAL_XP = [0.3, 0.4, 0.5];
   const MEDAL_NAMES = ['Bronze', 'Silver', 'Gold'];
   const GHOST_DT = 0.25;
 
@@ -181,6 +189,7 @@
   }
   const seriesMult = R => (R.extra ? R.mult : 1 + D.RACES.indexOf(R) * 0.15);
   const prizeOf = (R, tier) => Math.round(D.RACE_TIERS[tier].coins * seriesMult(R));
+  const medalCoins = (R, tier, k) => Math.round(MEDAL_COINS[tier][k] * seriesMult(R));
   const eggKindOf = (R, tier) => (R.extra ? R.eggs[tier] : (tier === 2 && R.id === 'grand' ? 'golden' : (D.AREAS[R.area] ? R.area : 'meadow')));
   function trialRec(R, tier) { const x = xsRead(), t = x && x.trials && x.trials[R.id + '-' + tier]; return t && typeof t === 'object' ? t : { best: null, m: 0 }; }
   function dayKey(ms) { const d = new Date(ms || Date.now()); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
@@ -525,7 +534,7 @@
     const bodies = ['clay', 'plum', 'sky', 'rose', 'leaf', 'slate', 'sun', 'berry', 'night', 'cocoa', 'teal', 'coral'];
     return names.map((name, i) => {
       const base = TR[0] + (TR[1] - TR[0]) * (i / 2);
-      const rt = () => +(base * (0.8 + sr() * 0.4)).toFixed(2);
+      const rt = () => +Math.min(TR[1], base * (0.8 + sr() * 0.4)).toFixed(2); // never stronger than the tier's stated range
       const parts = {}; const specialty = ['wings', 'fins', 'ears', 'horns'][Math.floor(sr() * 4)]; if (tier > 0) parts[specialty] = tier >= 2 ? 1 : 0.5;
       return { name, look: Object.assign(PX.cloneLook(PX.DEFAULT_LOOK), { body: bodies[Math.floor(sr() * bodies.length)], parts: Object.assign({ wings: 0, ears: 0, fins: 0, horns: 0, tail: 0, shell: 0 }, parts), eyes: ['round', 'brave', 'dot'][Math.floor(sr() * 3)] }),
         rating: { run: rt(), swim: rt(), climb: rt(), fly: rt(), stamina: rt() }, cheer: Tr.cheerSkill };
@@ -584,10 +593,40 @@
       return r;
     });
   }
+  // ---------------- rival levels ----------------
+  // Difficulty rises with series order inside a tier: the tier's range is scaled from SERIES_RAMP (Meadow Dash) up to x1
+  // (Grand Prix); the late series scale on with ratingMul. Rivals sit at the bottom / middle / top of that range. Their rolled
+  // ratings only move strength between segments (half the spread, normalised so each runs this course exactly like its
+  // level), and no rating passes the top. So the strongest rival is always exactly the series' top level.
+  const SERIES_RAMP = 0.9;
+  const courses = {}, levelCache = {};
+  const courseOf = (ri, tier) => courses[ri + '-' + tier] || (courses[ri + '-' + tier] = buildCourse(ri, tier));
+  function seriesPos(R) { const n = HUB_ORDER.indexOf(ALL.indexOf(R)), g = HUB_ORDER.indexOf(D.RACES.findIndex(x => x.id === 'grand')); return n < 0 || g <= 0 ? 1 : Math.min(1, n / g); }
+  function rivalLevels(R, tier) {
+    const TR = tierRating(R, tier), k = R.ratingMul ? 1 : SERIES_RAMP + (1 - SERIES_RAMP) * seriesPos(R);
+    return [TR[0] * k, (TR[0] + TR[1]) / 2 * k, TR[1] * k];
+  }
+  // course speed multiplier for per-segment ratings (time-weighted, like a flat rating would give)
+  function courseMul(C, rating) { let t = 0, t0 = 0; for (const s of C.segs) { const b = T.base[s.type]; t += s.len / (b * mulOf(rating[s.type])); t0 += s.len / b; } return t0 / t; }
+  function levelled(C, rolled, lv, top) {
+    const avg = SEGS.reduce((a, k) => a + rolled[k], 0) / 4, out = {};
+    for (const k of SEGS) out[k] = Math.min(top, lv * (1 + (rolled[k] / avg - 1) * 0.5));
+    for (let it = 0; it < 6; it++) { // scale the uncapped segments until this course runs like a flat lv
+      const c = mulOf(lv) / courseMul(C, out); if (Math.abs(c - 1) < 1e-4) break;
+      for (const k of SEGS) if (out[k] < top) out[k] = Math.min(top, mulRating(mulOf(out[k]) * c));
+    }
+    for (const k of SEGS) out[k] = +out[k].toFixed(2);
+    out.stamina = +Math.min(top, lv * (1 + ((rolled.stamina || avg) / avg - 1) * 0.5)).toFixed(2);
+    return out;
+  }
   function rivalRacers(R, tier) {
     if (R.wild) return wildRivals(R, tier);
-    const list = R.extra ? extraRivals(R, tier) : ST.raceRivals(R.id, tier);
-    return list.map(rv => makeRacer({ name: rv.name, look: rv.look, rating: rv.rating, stamR: rv.rating.stamina, cheer: cheerOf(rv.cheer || D.RACE_TIERS[tier].cheerSkill) }));
+    const key = R.id + '-' + tier;
+    if (!levelCache[key]) {
+      const list = R.extra ? extraRivals(R, tier) : ST.raceRivals(R.id, tier), lv = rivalLevels(R, tier), C = courseOf(ALL.indexOf(R), tier);
+      levelCache[key] = list.map((rv, i) => ({ rv, rating: levelled(C, rv.rating, lv[Math.min(i, 2)], lv[2]) }));
+    }
+    return levelCache[key].map(({ rv, rating }) => makeRacer({ name: rv.name, look: rv.look, rating, stamR: rating.stamina, cheer: cheerOf(rv.cheer || D.RACE_TIERS[tier].cheerSkill) }));
   }
   // Headless race. who = {rating, stamR} ; skill = [perfect, good, miss] chance per ring for the player.
   function simRace(who, ri, tier, skill, items) {
@@ -658,16 +697,21 @@
   function cupCourse(info, s) {
     return buildCourse(info.ri, 0, { R: info.R, m: mulOf(avgRating(s, info.R)), seed: info.seed, reverse: info.mod === 'reverse', boxes: info.M.boxes || 3, segMul: info.M.segMul, mods: { [info.mod]: true } });
   }
+  // Rivals are matched to your racer's SPEED on each segment (not its rating, so the cup is just as fair at any level):
+  // a bit slower / even / a bit faster (CUP_F, never faster than the top factor), cheering like Beginner rivals.
+  // Their extra stamina (+0.3 share) offsets how much good cheering helps low-level Sprouts that tire. From sims: an average
+  // young tapper wins about half the cups and a random tapper about a quarter, at any level.
+  const CUP_F = [0.94, 1.0, 1.06], CUP_CHEER = [0.12, 0.3, 0.15];
   function cupRivals(info, s) {
     const r = mulberry(info.seed + 99), pr = playerRatings(s), st = ST.staminaRating(s);
     const names = D.NAMES.slice().sort(() => r() - 0.5).slice(0, 3);
     const bodies = ['clay', 'plum', 'sky', 'rose', 'leaf', 'slate', 'sun', 'berry', 'night', 'cocoa', 'lilac', 'teal'];
-    const f = [0.86, 0.97, 1.07].sort(() => r() - 0.5);
+    const f = CUP_F.slice().sort(() => r() - 0.5);
     return names.map((name, i) => {
-      const rating = {}; for (const k of SEGS) rating[k] = +(pr[k] * f[i] * (0.92 + r() * 0.16)).toFixed(2);
+      const rating = {}; for (const k of SEGS) rating[k] = +mulRating(Math.min(CUP_F[2], f[i] * (0.98 + r() * 0.04)) * mulOf(pr[k])).toFixed(2);
       const look = Object.assign(PX.cloneLook(PX.DEFAULT_LOOK), { body: bodies[Math.floor(r() * bodies.length)], eyes: ['round', 'brave', 'dot'][Math.floor(r() * 3)] });
       const hats = PX.HAT_IDS || []; if (hats.length && r() < 0.5) look.hat = hats[Math.floor(r() * hats.length)];
-      return makeRacer({ name, look, rating, stamR: st * f[i], cheer: cheerOf([0.25, 0.35, 0.08]) });
+      return makeRacer({ name, look, rating, stamR: st * (f[i] + 0.3), cheer: cheerOf(CUP_CHEER) });
     });
   }
 
@@ -835,6 +879,21 @@
   .r-btns.stack{grid-template-columns:1fr;gap:8px}
   .r-results .r-btns{position:sticky;bottom:-14px;z-index:1;background:var(--panel);padding:8px 0 10px;margin:0 0 -10px;box-shadow:0 -10px 10px -8px rgba(60,44,24,.25)}
   .r-ov p{text-wrap:pretty}
+  .r-pause{cursor:pointer}
+  .r-pause .card{display:grid;justify-items:center;text-align:center;padding:20px 18px 22px}
+  .r-pause .r-play{width:120px;height:120px;margin:0 0 8px;animation:rPulse 1.1s ease-in-out infinite}
+  .r-pause h1{margin:2px 0 0}
+  .r-cheers{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:0 0 8px}
+  .r-cstat{display:grid;grid-template-columns:auto auto;justify-content:center;align-items:center;column-gap:3px;background:var(--slot);border-radius:10px;padding:3px 2px 2px;
+    font-family:var(--f-ui);font-weight:600;font-size:12px;line-height:1.1;color:var(--ink-soft)}
+  .r-cstat canvas{width:26px;height:26px}
+  .r-cstat b{font-size:19px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .r-cstat small{grid-column:1 / -1;text-align:center;font-size:12px}
+  .r-tip{display:grid;grid-template-columns:36px 1fr;gap:9px;align-items:center;background:#e6f2ff;border:2px solid #9fc8ef;border-radius:12px;padding:4px 10px 4px 6px;margin:0 0 10px;
+    font-family:var(--f-ui);font-weight:600;font-size:15px;line-height:1.25;color:#23476e;text-align:left}
+  .r-tip canvas{width:36px;height:36px}
+  .r-results .r-row{min-height:38px}
+  @media (prefers-reduced-motion: reduce){.r-pause .r-play{animation:none}}
   `;
   function injectCSS() {
     if (document.getElementById('r-style')) return;
@@ -888,6 +947,13 @@
         g = new G(15, 15); g.poly(PX.starPts(7.5, 8, 7, 3.2, 5), '#fbf236'); g.ell(6, 6.5, 2.2, 2.2, '#fff9c0', 0, (x, y) => g.filled(x, y)); g.outline();
         g.px([[6, 8], [9, 8]], INK); g.px([[5, 9], [10, 9]], '#f7b6c8'); g.px([[7, 0]], '#e5535f'); g.px([[0, 5]], '#639bff'); g.px([[14, 5]], '#6abe30'); break;
       case 'itembox': g = new G(15, 15); g.rect(1, 1, 13, 13, '#ffffff'); g.str(QMARK, 5, 4, { '#': '#9a6ad0' }); g.outline(); break;
+      // ---- pause + results tips ----
+      case 'play': g = new G(24, 24); g.ell(12, 12, 10.6, 10.6, ['#99e550', '#6abe30', '#37946e']); g.poly([[9, 6.5], [18.5, 12], [9, 17.5]], '#ffffff'); g.outline(); g.px([[7, 5], [6, 6]], '#d8ffb0'); break;
+      case 'ringtip': { // the Cheer Ring as it looks in the race: gold ring closing on the green circle
+        const c = document.createElement('canvas'); c.width = c.height = 18; const x = c.getContext('2d');
+        for (const [r, col] of [[8, INK], [6, INK], [7, '#ffcc44'], [4, INK], [2, INK], [3, '#99e550']]) drawCircle(x, 9, 9, r, col);
+        return (ICO[kind] = c);
+      }
       case 'lantern': g = new G(7, 10); g.rect(2, 0, 3, 1, '#595a70'); g.rect(1, 2, 5, 6, '#fff27a'); g.rect(1, 2, 5, 1, '#8f563b'); g.rect(1, 7, 5, 1, '#8f563b'); g.outline(); g.px([[3, 4], [3, 5]], '#ffffff'); break;
       // ---- daily cup twists ----
       case 'mod-lowgrav':
@@ -1019,17 +1085,27 @@
   function sinkAt(V, x) { const s = segAtC(V.C, x); if (s.type !== 'swim') return 0; return Math.round(Math.min(SINK, (x - s.x0) * 0.5, (s.x1 - x) * 0.5)); }
   function disc(g, cx, cy, r, col) { g.fillStyle = col; for (let y = -r; y <= r; y++) { const w = Math.floor(Math.sqrt(r * r - y * y + r * 0.8)); g.fillRect(cx - w, cy + y, w * 2 + 1, 1); } }
 
-  function drawSky(V, th, key, starA) {
-    const { g, W, GY, camX, t } = V;
-    const A0 = g.globalAlpha; // the Grand Prix crossfade draws a second sky at partial alpha: every layer must respect it
-    const n = V.night || 0, skyH = GY + 6, bandH = Math.ceil(skyH / 4), sc = GY < 30 ? 0.6 : clamp(GY / 58, 1, 1.8);
-    for (let i = 0; i < 4; i++) px(g, 0, i * bandH, W, i === 3 ? Math.max(bandH, (V.H || 0) - 3 * bandH) : bandH, th.sky[i]);
+  // the sky's colour bands never move: painted once per theme and size, then one drawImage per frame
+  const skyCache = {}; let skyN = 0;
+  function skyBands(th, key, W, H, GY) {
+    const k = key + ':' + W + 'x' + H + ':' + GY; if (skyCache[k]) return skyCache[k];
+    if (++skyN > 40) { for (const q in skyCache) delete skyCache[q]; skyN = 1; }
+    const c = document.createElement('canvas'); c.width = W; c.height = Math.max(1, H); const g = c.getContext('2d');
+    const bandH = Math.ceil((GY + 6) / 4);
+    for (let i = 0; i < 4; i++) px(g, 0, i * bandH, W, i === 3 ? Math.max(bandH, H - 3 * bandH) : bandH, th.sky[i]);
     for (let i = 1; i < 4; i++) { // soft dithered seams between sky bands
       const y = i * bandH; g.fillStyle = th.sky[i];
       for (let x = 0; x < W; x += 2) g.fillRect(x + (i & 1), y - 1, 1, 1);
       for (let x = 0; x < W; x += 4) g.fillRect(x + 1 + (i & 1) * 2, y - 2, 1, 1);
       g.fillStyle = th.sky[i - 1]; for (let x = 0; x < W; x += 4) g.fillRect(x + 3 - (i & 1) * 2, y, 1, 1);
     }
+    return (skyCache[k] = c);
+  }
+  function drawSky(V, th, key, starA) {
+    const { g, W, GY, camX, t } = V;
+    const A0 = g.globalAlpha; // the Grand Prix crossfade draws a second sky at partial alpha: every layer must respect it
+    const n = V.night || 0, sc = GY < 30 ? 0.6 : clamp(GY / 58, 1, 1.8);
+    g.drawImage(skyBands(th, key, W, Math.max(V.H || 0, Math.ceil((GY + 6) / 4) * 4), GY), 0, 0);
     // light rays under the sea
     if (th.rays) {
       g.fillStyle = '#bff4ff';
@@ -1443,10 +1519,13 @@
             <p class="r-leave-p">You won't earn coins or XP for a race you leave.</p>
             <div class="r-btns"><button class="btn danger r-leave-yes">Leave</button><button class="btn go r-leave-no">Keep racing</button></div>
           </div></div>
+          <div class="overlay r-ov r-pause" hidden><div class="card" role="button" tabindex="0" aria-label="Keep racing">
+            <canvas class="px r-play"></canvas><div class="eyebrow">Paused</div><h1>Tap to keep racing</h1>
+          </div></div>
         </div>
       </div></div>`;
     hubEl = $r('.r-hub'); raceEl = $r('.r-race'); stageEl = $r('.r-stage'); cv = $r('.r-cv'); ctx = cv.getContext('2d');
-    paintTo($r('.r-flag'), icon('flag'));
+    paintTo($r('.r-flag'), icon('flag')); paintTo($r('.r-play'), icon('play'));
     stageEl.addEventListener('pointerdown', e => {
       if (e.target.closest('button, .r-ov')) return;
       e.preventDefault(); PX.Sound.unlock(); tap();
@@ -1454,17 +1533,25 @@
     $r('.r-item').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); PX.Sound.unlock(); useItem(); });
     $r('.r-skip').addEventListener('click', e => { e.stopPropagation(); skipToEnd(); });
     $r('.r-quit').addEventListener('click', () => {
-      if (!race || race.state === 'done' || race.shown) return; PX.Sound.play('pop'); race.paused = true;
+      // once your Sprout has crossed the line the ✕ is hidden: the results (and prizes) are on their way
+      if (!race || race.state === 'done' || race.shown || race.player.finished) return; PX.Sound.play('pop'); race.paused = true;
       $r('.r-leave-p').textContent = race.mode === 'trial' ? 'This run won’t count if you leave.' : 'You won’t earn coins or XP for a race you leave.';
-      $r('.r-leave').hidden = false;
+      $r('.r-pause').hidden = true; $r('.r-leave').hidden = false;
     });
-    $r('.r-leave-no').addEventListener('click', () => { PX.Sound.play('pop'); $r('.r-leave').hidden = true; if (race) race.paused = false; });
+    $r('.r-leave-no').addEventListener('click', () => { PX.Sound.play('pop'); resume(); });
     $r('.r-leave-yes').addEventListener('click', () => { PX.Sound.play('pop'); $r('.r-leave').hidden = true; abortRace(); showHub(); });
+    $r('.r-pause').addEventListener('click', e => { e.stopPropagation(); PX.Sound.unlock(); resume(); });
     window.addEventListener('keydown', e => {
-      if (!visible || !race || race.paused || race.state !== 'run') return;
+      if (!visible || !race) return;
+      if (race.paused) { if (!$r('.r-pause').hidden && (e.code === 'Space' || e.code === 'Enter')) { e.preventDefault(); resume(); } return; }
+      if (race.state !== 'run') return;
       if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); tap(); }
       if (e.code === 'KeyX' || e.code === 'ArrowUp') { e.preventDefault(); useItem(); }
     });
+    // the app went to the background (home button, lock, app switch): pause, and wait for a tap when it comes back
+    const away = () => { if (visible && race && !race.paused && !race.player.finished && (race.state === 'run' || race.state === 'count')) pauseRace(); };
+    document.addEventListener('visibilitychange', () => { if (document.hidden) away(); });
+    window.addEventListener('pagehide', away);
     window.addEventListener('resize', () => { if (visible && race) resize(); if (visible && !race) hubDirty = true; });
     PS.on('sprout:update', () => { if (!race) hubDirty = true; });
     PS.on('reset', () => { hubDirty = true; });
@@ -1480,16 +1567,17 @@
   }
   function hide() {
     visible = false;
-    if (race) {
-      // left mid-race (e.g. another screen took over): settle if the player already crossed the line, otherwise abort.
-      if (!race.settled && race.player.finished) { try { settle(); } catch (e) { console.error(e); } }
-      endRaceUI();
-    }
+    if (race) abortRace(); // left mid-race (e.g. another screen took over): a finished race still pays out
   }
   function frame(dt, t) {
     if (race) {
-      if (!race.paused) update(dt);
-      render(); updateHud();
+      if (!race.paused) {
+        try { update(dt); race.errs = 0; } catch (e) { console.error('race update', e); if (++race.errs > 20) { bailOut(); return; } }
+      }
+      if (!race) return;
+      // nothing moves while paused, and the results card covers the track: draw once instead of 60 times a second
+      if (!(race.paused || race.shown) || race.redraw) { race.redraw = false; render(); }
+      updateHud();
       return;
     }
     const nb = Math.round(nightAmt() * 8);
@@ -1513,15 +1601,30 @@
     if (R.unlock) { const U = byId(R.unlock.race); return `Win ${U ? U.name : R.unlock.race} ${D.RACE_TIERS[R.unlock.tier].name} to unlock`; }
     return 'Locked';
   }
+  // The match label compares projected finish times on this exact course: your racer vs the fastest real rival, both with
+  // no cheering and no items (stamina counts). MATCH_Q[tier] = the time ratios (you / fastest rival) up to which the label
+  // says Easy / Good match / Tough. From sims: at "Good match" an average tapper wins about half the races or more
+  // (cheering well is worth more than the rivals' cheering, most of all in Beginner).
+  const MATCH_Q = [[1.04, 1.11, 1.19], [0.96, 1.03, 1.11], [0.915, 0.975, 1.05]];
+  function soloTime(C, rating, stamR) {
+    const r = makeRacer({ name: '', rating, stamR }), c = { C, t: 0, rng: Math.random, fx: false }, dt = 0.1; // coarse is plenty for a label
+    while (!r.finished && c.t < 300) { c.t += dt; stepRacer(r, dt, c); }
+    return r.finished ? r.time : 300;
+  }
+  const rivalBest = {}; let soloMemo = {}, soloN = 0;
+  function matchQ(s, ri, tier) {
+    const key = ri + '-' + tier, C = courseOf(ri, tier);
+    if (rivalBest[key] == null) rivalBest[key] = Math.min(...rivalRacers(ALL[ri], tier).map(r => soloTime(C, r.rating, (r.stamMax - T.stamBase) / T.stamPer)));
+    const pr = playerRatings(s), st = ST.staminaRating(s), pk = key + ':' + SEGS.map(k => pr[k].toFixed(2)).join() + ',' + st.toFixed(2);
+    if (soloMemo[pk] == null) { if (++soloN > 600) { soloMemo = {}; soloN = 1; } soloMemo[pk] = soloTime(C, pr, st); }
+    return soloMemo[pk] / rivalBest[key];
+  }
   function matchOf(s, ri, tier) {
     if (!s) return null;
-    const R = ALL[ri], TR = R.wild ? wildLevel(R, tier) : tierRating(R, tier);
-    const p = avgRating(s, R);
-    const mid = (TR[0] + TR[1]) / 2, top = TR[1];
-    const ratio = mulOf(p) / mulOf(mid), vsTop = mulOf(p) / mulOf(top);
-    if (vsTop >= 1.12) return { t: 'Easy', c: '#2b8243' };
-    if (ratio >= 1.0) return { t: 'Good match', c: '#5a9a2e' };
-    if (ratio >= 0.9) return { t: 'Tough', c: '#c7861c' };
+    const q = matchQ(s, ri, tier), M = MATCH_Q[tier] || MATCH_Q[2];
+    if (q <= M[0]) return { t: 'Easy', c: '#2b8243' };
+    if (q <= M[1]) return { t: 'Good match', c: '#5a9a2e' };
+    if (q <= M[2]) return { t: 'Tough', c: '#c7861c' };
     return { t: 'Very tough', c: '#c0443f' };
   }
   function showHub() {
@@ -1775,6 +1878,7 @@
     cv.style.width = (devW / dpr) + 'px'; cv.style.height = (devH / dpr) + 'px';
     snapCanvas(r);
     if (V) { V.GY = GY; V.CH = CLIMB_H; V.W = WW; V.H = LH; }
+    if (race) race.redraw = true; // the canvases were cleared: draw again even while paused
     return true;
   }
   let V = null; // world view for the race
@@ -1816,26 +1920,63 @@
     NL = o.lanes.length;
     const unlockedBefore = allUnlocked();
     race = { mode: o.mode, ri: o.ri, tier: o.tier, R: o.R, Tr: D.RACE_TIERS[o.tier], C: o.C, sprout: o.s, lanes: o.lanes, racers: o.lanes.filter(r => !r.isGhost), player: o.pl, t: 0,
-      state: 'count', countT: 3.6, ring: null, ringsSeen: 0, pops: [], parts: [], finishT: 0, doneT: 0, shown: false, goFlash: 0,
-      paused: false, settled: false, summary: null, unlockedBefore, lastSeg: 'run',
+      state: 'count', countT: 3.6, ring: null, ringsSeen: 0, pops: [], parts: [], finishT: 0, doneT: 0, shown: false, goFlash: 0, pflash: 0,
+      paused: false, settled: false, summary: null, unlockedBefore, lastSeg: 'run', errs: 0, redraw: true,
       title: o.title, sub: o.sub, items: !!o.items, mods: o.mods || {}, info: o.info || null, honey: [], ghost: o.ghost || null, ghostData: o.ghostData || null, rec: [], mirror: !!(o.mods && o.mods.reverse), itemKey: '' };
-    PS.ui.hold(true); PS.ui.chrome(false);
-    hubEl.hidden = true; raceEl.hidden = false;
-    $r('.r-results').hidden = true; $r('.r-leave').hidden = true; $r('.r-skip').hidden = true; $r('.r-hint').hidden = true; $r('.r-ihint').hidden = true;
-    $r('.r-item').hidden = !race.items;
-    stageEl.classList.toggle('mirror', race.mirror);
-    $r('.r-quit').style.visibility = '';
-    V = null; sizeKey = '';
-    resize();
-    V = { g: bg, W: WW, H: LH, GY, CH: CLIMB_H, C: race.C, camX: 0, t: 0, night: race.mods.night ? 1 : nightAmt(), focus: PSX };
-    buildHud();
+    try {
+      PS.ui.hold(true); PS.ui.chrome(false);
+      hubEl.hidden = true; raceEl.hidden = false;
+      $r('.r-results').hidden = true; $r('.r-leave').hidden = true; $r('.r-pause').hidden = true; $r('.r-skip').hidden = true; $r('.r-hint').hidden = true; $r('.r-ihint').hidden = true;
+      $r('.r-item').hidden = !race.items;
+      stageEl.classList.toggle('mirror', race.mirror);
+      $r('.r-quit').style.visibility = '';
+      V = null; sizeKey = '';
+      resize();
+      V = { g: bg, W: WW, H: LH, GY, CH: CLIMB_H, C: race.C, camX: 0, t: 0, night: race.mods.night ? 1 : nightAmt(), focus: PSX };
+      buildHud();
+    } catch (e) { console.error('race start', e); endRaceUI(); showHub(); PS.ui.toast('Oops! That race could not start.'); }
   }
   function allUnlocked() { const o = {}; ALL.forEach(R => D.RACE_TIERS.forEach((Tr, ti) => { o[R.id + '-' + ti] = unlocked(R, ti); })); return o; }
-  function abortRace() { endRaceUI(); }
+  // Parent tools: open every tier of every series (the 5 originals, the extra series and the Wild races) by marking Beginner
+  // and Pro as won (runs and wins at least 1) in the same save fields a real win writes. Best times are kept and Master is
+  // left unwon, so its first-win egg / animal friend can still be earned. Returns how many tiers were newly opened.
+  function unlockAll() {
+    const X = xs(), races = PS.S.progress.races || (PS.S.progress.races = {}), before = allUnlocked();
+    for (const R of ALL) for (let tier = 0; tier < 2; tier++) {
+      const k = R.id + '-' + tier, box = R.extra ? X.series : races, p = Object.assign(blankProg(), box[k]);
+      box[k] = Object.assign(p, { runs: Math.max(1, +p.runs || 0), wins: Math.max(1, +p.wins || 0) });
+    }
+    const after = allUnlocked(); hubDirty = true; PS.save();
+    return Object.keys(after).filter(k => after[k] && !before[k]).length;
+  }
+  // leaving: a race that's already decided (your Sprout crossed the line, or you skipped to the results) still pays out
+  function abortRace() {
+    if (race && !race.settled && (race.player.finished || race.state === 'done')) { try { settle(); } catch (e) { console.error(e); } }
+    endRaceUI();
+  }
   function endRaceUI() {
     race = null; V = null; NL = 4;
-    if (raceEl) { raceEl.hidden = true; $r('.r-results').hidden = true; $r('.r-leave').hidden = true; $r('.r-ihint').hidden = true; }
+    if (raceEl) { raceEl.hidden = true; $r('.r-results').hidden = true; $r('.r-leave').hidden = true; $r('.r-pause').hidden = true; $r('.r-ihint').hidden = true; }
     PS.ui.chrome(true); PS.ui.hold(false);
+  }
+  // never leave a kid stuck (e.g. the results card failed to build): keep what was earned and go back to the races
+  function bailOut() {
+    const r = race; if (!r) return;
+    try { if (!r.settled && (r.player.finished || r.state === 'done')) settle(); } catch (e) { console.error(e); }
+    endRaceUI(); try { showHub(); } catch (e) { console.error(e); }
+    PS.ui.toast(!r.settled ? 'Race stopped.' : r.mode !== 'trial' && r.place === 0 ? 'You won! Your prizes are saved.' : 'Race over! Your prizes are saved.');
+  }
+  // the app went to the background: stop everything until the kid taps "keep racing"
+  function pauseRace() {
+    race.paused = true; race.ring = null; race.redraw = true;
+    $r('.r-leave').hidden = true; $r('.r-pause').hidden = false; $r('.r-ihint').hidden = true;
+  }
+  function resume() {
+    if (!race) return;
+    $r('.r-pause').hidden = true; $r('.r-leave').hidden = true;
+    race.paused = false; race.ring = null; // never drop back into a half-closed ring: the next one starts fresh a moment later
+    const p = race.player;
+    if (race.state === 'run' && !p.finished) { p.nextBoost = Math.max(p.nextBoost, 1.2); race.goFlash = 0.7; PX.Sound.play('go'); }
   }
 
   // ---------- update ----------
@@ -1897,11 +2038,13 @@
     $r('.r-ihint').hidden = true;
     const x = xs(); x.hint.item = (x.hint.item || 0) + 1; PS.save();
   }
+  // kind: 'perfect' | 'good' | 'miss' (a late tap: stumble) | 'none' (no tap: no boost, but no stumble and the shield stays)
   function resolveRing(kind) {
     const p = race.player; race.ring = null; race.ringsSeen++;
     p.nextBoost = rnd(T.ring.every[0], T.ring.every[1]) - (T.ring.r0 - T.ring.target) / T.ring.shrink;
+    if (kind === 'none') { p.cheers.miss++; pop('miss', '#d8d0e6', 18, 0.7); if (race.ringsSeen >= 3) hideHint(); return; }
     applyCheer(p, kind, { fx: true });
-    if (kind === 'perfect') { pop('PERFECT!', '#fbf236', 28); PX.Sound.play('chime'); PX.buzz(12); }
+    if (kind === 'perfect') { pop('PERFECT!', '#fbf236', 28); PX.Sound.play('chime'); PX.buzz(12); perfectFx(p); }
     else if (kind === 'good') { pop('GOOD', '#99e550', 24); PX.Sound.play('pop'); }
     else { pop('MISS', '#f07a84', 22); PX.Sound.play('miss'); }
     if (kind !== 'miss' || race.ringsSeen >= 3) hideHint();
@@ -1912,8 +2055,33 @@
   }
   function tap() {
     if (!race || race.paused || race.state !== 'run' || !race.ring) return;
-    const d = Math.abs(race.ring.r - T.ring.target);
-    resolveRing(d <= T.ring.perfect ? 'perfect' : d <= T.ring.good ? 'good' : 'miss');
+    const k = judge(race.ring.r, race.ring.good);
+    if (k === 'early') { race.ring.wob = 0.2; return; } // too soon: ignored (the ring just wiggles), tap again when it glows
+    resolveRing(k === 'late' ? 'miss' : k);
+  }
+  // ---------- small juice (cached sprites; only near the camera, a few per second) ----------
+  const DUST = { meadow: '#eadfbf', beach: '#fff3d6', moonlit: '#9fd8ff', candy: '#ffe0f0', coral: '#f4e2b0', cloud: '#ffffff', jungle: '#cdbf95', volcano: '#9a8a90', snowy: '#ffffff', starlight: '#fff27a' };
+  const puffFrames = col => ICO['dust' + col] || (ICO['dust' + col] = [['.cc.', 'cccc'], ['c..c', '.cc.'], ['c...', '...c']].map(rows => PX.fromStrings(rows, { c: col }).canvas()));
+  const rippleFrames = col => ICO['rip' + col] || (ICO['rip' + col] = [['.ccc.', 'c...c', '.ccc.'], ['..ccccc..', 'c.......c', '..ccccc..'], ['...c.c.c.c...', 'c...........c', '...c.c.c.c...']].map(rows => PX.fromStrings(rows, { c: col }).canvas()));
+  function juice(dt) {
+    const camX = race.player.x - PSX;
+    for (const r of race.racers) {
+      if (r.finished || r.x < camX - 24 || r.x > camX + WW + 24) continue;
+      if ((r.fxT = (r.fxT || 0) - dt) > 0) continue;
+      const s = segAtC(race.C, r.x), th = themeAt(race.C, r.x);
+      if (s.type === 'run' && !s.after && r.x > 0) { // dust puffs behind the feet (faster when boosted, slower when tired)
+        r.fxT = r.tired ? 0.5 : r.boostT > 0 || r.itemT > 0 ? 0.12 : 0.24;
+        race.parts.push({ lane: r.lane, x: r.x - 5, y: GY - 1, vx: -rnd(3, 9), vy: -rnd(2, 6), g: 0, life: 0.36, life0: 0.36, frames: puffFrames(DUST[th] || DUST.meadow) });
+      } else if (s.type === 'swim' && sinkAt(V, r.x) > 2) { // ripples spreading on the water
+        r.fxT = 0.45;
+        race.parts.push({ lane: r.lane, x: r.x - 2, y: GY, vx: 0, vy: 0, g: 0, life: 0.5, life0: 0.5, frames: rippleFrames(TH[th].water[0]) });
+      } else r.fxT = 0.15;
+    }
+  }
+  function perfectFx(p) { // PERFECT: sparkles burst out of the Cheer Ring, plus a quick white flash (render)
+    const cy = race.mods.giant ? -24 : -12;
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; race.parts.push({ lane: p.lane, x: p.x + Math.cos(a) * 13, y: cy + Math.sin(a) * 13, vx: Math.cos(a) * 44, vy: Math.sin(a) * 44, g: 0, life: 0.4, spr: PX.fx(i % 2 ? 'bigspark' : 'spark', i % 3 ? '#fff27a' : '#ffffff'), rel: true }); }
+    race.pflash = 0.3;
   }
   const DBG = { autoCheer: false, skill: null, autoItem: false };
   function updateGhost(dt) {
@@ -1927,9 +2095,11 @@
   function update(dt) {
     if (!race) return;
     for (const p of race.pops) p.t += dt; race.pops = race.pops.filter(p => p.t < p.life);
-    for (const p of race.parts) { p.life -= dt; p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.flut) { p.vx = Math.sin(p.life * 6 + p.ph) * p.flut; p.vy = Math.min(p.vy, 14); } }
-    race.parts = race.parts.filter(p => p.life > 0);
+    let n = 0; // move particles and drop the dead ones in place (no new array every frame)
+    for (const p of race.parts) { p.life -= dt; p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.flut) { p.vx = Math.sin(p.life * 6 + p.ph) * p.flut; p.vy = Math.min(p.vy, 14); } if (p.life > 0) race.parts[n++] = p; }
+    race.parts.length = n;
     if (race.goFlash > 0) race.goFlash -= dt;
+    if (race.pflash > 0) race.pflash -= dt;
     if (race.state === 'count') {
       const prev = Math.ceil(race.countT); race.countT -= dt; const now = Math.ceil(race.countT);
       for (const r of race.lanes) r.animT += dt;
@@ -1949,19 +2119,19 @@
       while (!p.finished && race.rec.length * GHOST_DT <= race.t) race.rec.push(Math.round(p.x));
     }
     for (const r of race.racers) if (r.starT > 0 && Math.random() < 0.6) race.parts.push({ lane: r.lane, x: r.x - rnd(4, 10), y: -rnd(2, 24), vx: rnd(-20, -6), vy: rnd(-6, 6), g: 0, life: 0.4, spr: PX.fx('spark', RAINBOW[Math.floor(Math.random() * 6)]), rel: true });
+    juice(dt);
     if (DBG.autoItem && p.item) useItem();
     if (race.state === 'run' && !p.finished) {
-      if (!race.ring) { p.nextBoost -= dt; if (p.nextBoost <= 0) race.ring = { r: T.ring.r0 }; }
+      if (!race.ring) { p.nextBoost -= dt; if (p.nextBoost <= 0) race.ring = { r: T.ring.r0, good: goodOf(race.tier, race.mode), wob: 0, cueT: -1 }; }
       else {
-        race.ring.r -= T.ring.shrink * dt;
-        const d = Math.abs(race.ring.r - T.ring.target);
-        if (DBG.skill) { // debug: simulated tapper
-          if (!race.ring.plan) { const u = Math.random(), k = DBG.skill; race.ring.plan = u < k[0] ? 'perfect' : u < k[0] + k[1] ? 'good' : u < k[0] + k[1] + k[2] ? 'miss' : 'none'; }
-          const pl = race.ring.plan;
-          if ((pl === 'perfect' && d <= T.ring.perfect * 0.6) || (pl === 'good' && race.ring.r < T.ring.target - T.ring.perfect - 1 && d <= T.ring.good)) tap();
-          else if (pl === 'miss' && race.ring.r < T.ring.target + T.ring.good + 3) tap();
+        const rg = race.ring; rg.r -= T.ring.shrink * dt; if (rg.wob > 0) rg.wob -= dt;
+        const k = judge(rg.r, rg.good), d = Math.abs(rg.r - T.ring.target);
+        if (k === 'perfect' || k === 'good') rg.cueT = rg.cueT < 0 ? 0 : rg.cueT + dt; // time since the "TAP!" window opened (render)
+        if (DBG.skill) { // debug: simulated tapper (plans one of perfect / good / miss (late) / none per ring)
+          if (!rg.plan) { const u = Math.random(), s = DBG.skill; rg.plan = u < s[0] ? 'perfect' : u < s[0] + s[1] ? 'good' : u < s[0] + s[1] + s[2] ? 'miss' : 'none'; }
+          if ((rg.plan === 'perfect' && d <= T.ring.perfect * 0.6) || (rg.plan === 'good' && k === 'good' && rg.r < T.ring.target) || (rg.plan === 'miss' && k === 'late')) tap();
         } else if (DBG.autoCheer && d <= T.ring.perfect * 0.6) tap();
-        if (race.ring && race.ring.r < T.ring.endR) resolveRing('miss');
+        if (race.ring && race.ring.r < T.ring.endR) resolveRing('none'); // no tap: no boost, no stumble
       }
     } else if (race.ring && p.finished) race.ring = null;
     // skip button once the player's place can't change (never in a time trial)
@@ -1970,13 +2140,17 @@
     if (race.state === 'run' && race.finishT && (race.racers.every(r => r.finished) || race.t - race.finishT > 2.2)) endRace();
     if (race.state === 'done') {
       race.doneT += dt;
-      if (race.doneT > (race.mode === 'trial' ? 1.6 : 1.2) && !race.shown) { race.shown = true; showResults(); }
+      if (race.doneT > (race.mode === 'trial' ? 1.6 : 1.2) && !race.shown) {
+        race.shown = true;
+        try { showResults(); } catch (e) { console.error('race results', e); bailOut(); } // never trap a kid on a broken card
+      }
     }
   }
   function onFinish(r) {
     const place = standings().filter(x => x.finished).indexOf(r);
     if (r === race.player) {
       race.finishT = race.t; race.ring = null;
+      $r('.r-quit').style.visibility = 'hidden'; // crossed the line: no leaving now, the results and prizes are coming
       const win = race.mode === 'trial' ? (!race.ghost || race.ghost.none || !race.ghost.finished) : place === 0;
       PX.Sound.play(win ? 'level' : 'coo');
       if (win) setEmote(r, 'heart', 2.5);
@@ -1992,7 +2166,7 @@
   function endRace() {
     for (const r of race.racers) if (!r.finished) r.projTime = project(r);
     race.state = 'done'; race.doneT = 0; race.ring = null;
-    $r('.r-skip').hidden = true; $r('.r-hint').hidden = true; $r('.r-ihint').hidden = true;
+    $r('.r-skip').hidden = true; $r('.r-hint').hidden = true; $r('.r-ihint').hidden = true; $r('.r-quit').style.visibility = 'hidden';
   }
   function skipToEnd() {
     if (!race || race.state !== 'run' || race.mode === 'trial') return;
@@ -2060,20 +2234,28 @@
       Object.assign(tr, { best: +time.toFixed(2), g, dt: GHOST_DT, len: race.C.LEN, sid: s.id });
     }
     const mt = medalTimes(race.ri, race.tier), got = medalOf(mt, time), had = Math.min(3, tr.m || 0), newMedals = [];
-    let coins = 0;
-    for (let k = had; k < got; k++) { coins += MEDAL_COINS[race.tier][k]; newMedals.push(k); }
+    let coins = 0, xp = 0;
+    for (let k = had; k < got; k++) { coins += medalCoins(race.R, race.tier, k); xp += D.RACE_TIERS[race.tier].xp * MEDAL_XP[k]; newMedals.push(k); }
     tr.m = Math.max(had, got);
     X.trials[key] = tr;
     if (coins) ST.addCoins(coins, 'trial');
+    const gives = {}; let res = { ups: {}, evolved: null };
+    if (xp) {
+      const mix = race.R.mix, tot = Object.values(mix).reduce((a, b) => a + b, 0);
+      for (const [seg, w] of Object.entries(mix)) { const st = D.RACE_STAT[seg]; gives[st] = (gives[st] || 0) + xp * (w / tot) * 2.5; }
+      gives.stamina = (gives.stamina || 0) + xp * 0.5;
+      res = ST.gain(s, gives);
+    }
     PS.save();
-    return { time, prevBest, newBest, mt, got, have: tr.m, newMedals, coins };
+    return { time, prevBest, newBest, mt, got, have: tr.m, newMedals, coins, gives, ups: res.ups, evolved: res.evolved };
   }
   function settle() {
     if (!race || race.settled) return race && race.summary;
     race.settled = true;
     if (race.mode === 'trial') { race.summary = finishTrial(race.sprout, race.player.time); return race.summary; }
     const order = race.racers.slice().sort((a, b) => finalTime(a) - finalTime(b));
-    const place = order.indexOf(race.player), time = finalTime(race.player);
+    // a skipped race only has an estimated time for you: it never becomes your Best time (0 = no time)
+    const place = order.indexOf(race.player), time = race.player.finished ? race.player.time : 0;
     race.order = order; race.place = place;
     if (race.mode === 'cup') race.summary = finishCup(race.sprout, place);
     else if (race.R.extra) race.summary = finishExtra(race.sprout, race.R, race.tier, place, time);
@@ -2092,6 +2274,37 @@
     const f = sum.friend; if (!f) return '';
     return `<div class="r-eggbox"><canvas class="px r-friendcv"></canvas><div><b>${f.added ? `The ${esc(f.name)} wants to be friends!` : `The ${esc(f.name)} says well done!`}</b><span>${f.added ? 'It hopped into your pouch. Find it in the Garden.' : `Your pouch is full, so it gave you ${f.coins} coins instead.`}</span></div></div>`;
   }
+  // ---------- what happened, in kid terms: cheer counts (the same bubbles your Sprout shows) + ONE tip with a picture ----------
+  const SEG_TIP = { run: ['hare', 'Slow running: give it a bunny!'], swim: ['koi', 'Slow in the water: give it a fish!'], climb: ['ram', 'Slow climbing: give it a ram!'], fly: ['sparrow', 'Slow gliding: give it a bird!'] };
+  function cheerStatsHtml(p) {
+    const c = p.cheers;
+    return `<div class="r-cheers">${[['sparkle', c.perfect, 'Perfect'], ['heart', c.good, 'Good'], ['?', c.miss, 'Miss'], ['swirl', p.tiredCount, 'Tired']]
+      .map(([e, n, l]) => `<span class="r-cstat" aria-label="${n} ${l}"><canvas class="px" data-emo="${esc(e)}"></canvas><b>${n}</b><small>${l}</small></span>`).join('')}</div>`;
+  }
+  // the one thing that would help most: missed rings, getting tired, or (after a loss) the segment where the fastest rival
+  // gained most on you. rivals: null when their speed says nothing about your stats (Daily Cup, time trial)
+  function tipFor(p, rivals, won) {
+    const c = p.cheers, n = c.perfect + c.good + c.miss;
+    if (n >= 3 && c.miss >= Math.max(2, n * 0.4)) return { ic: 'ringtip', text: 'Tap when the ring touches the circle!' };
+    if (p.tiredCount >= 2) return { fruit: 'heartyroot', text: 'Train Stamina: feed Hearty Roots!' };
+    if (won) return null;
+    if (rivals && rivals.length) {
+      const top = rivals.reduce((a, b) => (finalTime(b) < finalTime(a) ? b : a)), share = {}; let all = 0, seg = null, most = 0.015;
+      for (const s of race.C.segs) { const q = s.len / T.base[s.type]; all += q; share[s.type] = (share[s.type] || 0) + q; }
+      for (const k of SEGS) { const loss = (share[k] || 0) / all * (1 - p.mul[k] / top.mul[k]); if (loss > most) { most = loss; seg = k; } }
+      if (seg) return { critter: SEG_TIP[seg][0], text: SEG_TIP[seg][1] };
+    }
+    if (n >= 3 && c.perfect < c.good) return { ic: 'ringtip', text: 'Tap right ON the circle for a PERFECT boost!' };
+    return null;
+  }
+  const tipHtml = tp => (tp ? `<div class="r-tip"><canvas class="px r-tipcv"></canvas><span>${esc(tp.text)}</span></div>` : '');
+  function paintCheerIcons(ov, tp) {
+    ov.querySelectorAll('canvas[data-emo]').forEach(c => { try { paintTo(c, PX.emote(c.dataset.emo), 13, 13); } catch (e) { /* optional */ } });
+    const tc = ov.querySelector('.r-tipcv'); if (!tc || !tp) return;
+    if (tp.critter) { const cr = safeCritter(tp.critter); if (cr) paint2x(tc, cr); }
+    else if (tp.fruit) { let f = null; try { f = PX.fruit(tp.fruit); } catch (e) { /* optional */ } if (f) paintTo(tc, f, 18, 18); }
+    else paintTo(tc, icon(tp.ic), 18, 18);
+  }
   function showResults() {
     const sum = settle();
     if (race.mode === 'trial') return showTrialResults(sum);
@@ -2100,8 +2313,8 @@
     const xpChips = xpChipsHtml(sum);
     const after = allUnlocked(), newly = Object.keys(after).filter(k => after[k] && !race.unlockedBefore[k]);
     const newNames = newly.map(k => { const i = k.lastIndexOf('-'), RR = byId(k.slice(0, i)); return RR ? `${RR.name} ${D.RACE_TIERS[+k.slice(i + 1)].name}` : k; });
-    let tip = place === 0 ? '' : place === 3 && race.tier > 0 ? 'Rivals here are strong. Train in the Garden or try an easier tier.' : 'Tap right as the ring meets the circle for a PERFECT boost.';
-    let rew;
+    const tp = tipFor(p, cup ? null : race.racers.filter(r => r !== p), place === 0);
+    let tip = '', rew;
     if (cup) {
       if (sum.coins > 0 || xpChips) rew = `<div class="r-rew"><div class="r-coins"><canvas class="px r-coincv"></canvas>+${sum.coins} coins</div>${xpChips ? `<div class="r-xp">${xpChips}</div>` : ''}</div>`;
       else rew = `<p class="r-note">${sum.prev === 0 ? 'You already won today’s cup. This one was just for fun!' : `Your best today is still ${ORD[sum.prev]}. Win to earn more!`}</p>`;
@@ -2117,10 +2330,13 @@
       ${eggBoxHtml(sum, cup ? 'A lucky egg from the Daily Cup! It’s in the Garden.' : '')}
       ${friendBoxHtml(sum)}
       ${newNames.length ? `<p class="r-note">Unlocked: <b>${newNames.map(esc).join(', ')}</b></p>` : ''}
+      ${tipHtml(tp)}
+      ${cheerStatsHtml(p)}
       ${tip ? `<p class="r-note">${tip}</p>` : ''}
       <div class="r-btns stack"><button class="btn go wide r-again">${cup ? 'Race the cup again' : 'Race again'}</button><button class="btn wide r-back">Back to races</button></div>
     </div>`;
     ov.querySelectorAll('canvas[data-i]').forEach(c => { const i = +c.dataset.i; if (order[i].animal) { const cr = safeCritter(order[i].animal); if (cr) paint2x(c, cr); return; } spriteBox(c, order[i].look, i === 0 ? { eyes: 'happy', mouth: 'open', arms: 'up' } : i === 3 ? { eyes: 'sad', mouth: 'flat' } : {}, 36); c.style.height = c.height + 'px'; });
+    paintCheerIcons(ov, tp);
     const cc = ov.querySelector('.r-coincv'); if (cc) paintTo(cc, icon('coin'), 11, 11);
     const fc = ov.querySelector('.r-friendcv'); if (fc && sum.friend) { const cr = safeCritter(sum.friend.id); if (cr) paint2x(fc, cr); }
     const ec = ov.querySelector('.r-eggcv'); if (ec) { const e = safeItem('egg', sum.egg.kind) || safeItem('egg', sum.egg.area); if (e) paintTo(ec, e, 20, 24); }
@@ -2136,6 +2352,7 @@
     if (sum.prevBest) { const d = sum.time - sum.prevBest; delta = d < 0 ? `<p class="r-delta good">${(-d).toFixed(1)}s faster than your ghost!</p>` : `<p class="r-delta bad">${d.toFixed(1)}s behind your ghost. ${d < 1.5 ? 'So close!' : 'Keep trying!'}</p>`; }
     else delta = '<p class="r-delta good">Next time, your ghost will race you!</p>';
     const cells = [0, 1, 2].map(k => `<div class="r-mcell${k < sum.have ? ' got' : ''}${sum.newMedals.includes(k) ? ' new' : ''}"><canvas class="px" data-medal="${k < sum.have ? k : 'x'}"></canvas>${MEDAL_NAMES[k]}<b>${sum.mt[k].toFixed(1)}s</b></div>`).join('');
+    const xpChips = xpChipsHtml(sum), tp = tipFor(race.player, null, false), next = sum.have < 3 ? medalCoins(R, race.tier, sum.have) : 0;
     const ov = $r('.r-results');
     ov.innerHTML = `<div class="card">
       <div class="eyebrow">Time Trial · ${esc(R.name)} · ${Tr.name}</div>
@@ -2143,11 +2360,14 @@
       <div class="r-bigtime">${sum.time.toFixed(1)}s</div>
       ${delta}
       <div class="r-mrow">${cells}</div>
-      ${sum.coins ? `<div class="r-rew"><div class="r-coins"><canvas class="px r-coincv"></canvas>+${sum.coins} coins</div></div>` : ''}
-      ${sum.have < 3 ? `<p class="r-note">Beat <b>${sum.mt[sum.have].toFixed(1)}s</b> for ${sum.have === 0 ? 'a' : 'the'} ${MEDAL_NAMES[sum.have]} medal. PERFECT cheers help a lot!</p>` : '<p class="r-note">You have every medal here. Can you beat your ghost again?</p>'}
+      ${sum.coins || xpChips ? `<div class="r-rew">${sum.coins ? `<div class="r-coins"><canvas class="px r-coincv"></canvas>+${sum.coins} coins</div>` : ''}${xpChips ? `<div class="r-xp">${xpChips}</div>` : ''}</div>` : ''}
+      ${sum.have < 3 ? `<p class="r-note">Beat <b>${sum.mt[sum.have].toFixed(1)}s</b> for ${sum.have === 0 ? 'a' : 'the'} ${MEDAL_NAMES[sum.have]} medal (+${next} coins)!</p>` : '<p class="r-note">You have every medal here. Can you beat your ghost again?</p>'}
+      ${tipHtml(tp)}
+      ${cheerStatsHtml(race.player)}
       <div class="r-btns stack"><button class="btn go wide r-again">Try again</button><button class="btn wide r-back">Back to time trials</button></div>
     </div>`;
     ov.querySelectorAll('canvas[data-medal]').forEach(c => paintTo(c, icon('medal' + c.dataset.medal), 11, 14));
+    paintCheerIcons(ov, tp);
     const cc = ov.querySelector('.r-coincv'); if (cc) paintTo(cc, icon('coin'), 11, 11);
     const ri = race.ri, tier = race.tier;
     ov.querySelector('.r-back').onclick = () => { PX.Sound.play('pop'); endRaceUI(); hubTab = 'trial'; showHub(); };
@@ -2291,10 +2511,11 @@
     let spr, blit;
     if (r.animal) { const av = animalView(r, fy, y0 || 0, t); spr = av.spr; fy = av.y; blit = (c, x, y) => blitAnimal(c, x, y, av.k); }
     else { spr = sprig(r.look, P); blit = (c, x, y) => blitSpr(c, x, y, big); }
-    if (r.itemT > 0 && r.starT <= 0) { // speed lines
+    if ((r.itemT > 0 || r.boostT > 0) && r.starT <= 0) { // speed lines: orange for a carrot, gold after a PERFECT cheer, green after GOOD
+      const col = r.itemT > 0 ? '#ffb35c' : r.boostMul >= T.perfect.mul ? '#fff27a' : '#b6f06a';
       for (let k = 0; k < 3; k++) {
         const ln = 6 + ((Math.floor(t * 20) + k * 2) % 5), x0 = sx - 9 * big - ln - k * 2, y = fy - (5 + k * 6) * big;
-        px(lx, x0, y + 1, ln, 1, 'rgba(34,32,52,0.35)'); px(lx, x0, y, ln, 1, k === 1 ? '#ffffff' : '#ffb35c');
+        px(lx, x0, y + 1, ln, 1, 'rgba(34,32,52,0.35)'); px(lx, x0, y, ln, 1, k === 1 ? '#ffffff' : col);
       }
     }
     if (r.starT > 0) { // rainbow glow outline
@@ -2375,8 +2596,9 @@
       }
       lx.drawImage(fgC, 0, y0);
       for (const p of race.parts) if (p.lane === i) {
+        const spr = p.frames ? p.frames[Math.min(p.frames.length - 1, ((1 - p.life / p.life0) * p.frames.length) | 0)] : p.spr; // puffs / ripples age through frames
         const px_ = Math.round(p.x) - camX, py = p.rel ? y0 + y + Math.round(p.y) : y0 + Math.round(p.y);
-        lx.drawImage(p.spr, px_ - (p.spr.width >> 1), py);
+        lx.drawImage(spr, px_ - (spr.width >> 1), py);
       }
       if (race.mods.rain) drawRain(y0, t, camX);
       if (race.mods.night) drawDark(r, y0, camX, sx, y);
@@ -2388,12 +2610,22 @@
       const my = y0 + (LH >> 1) - 2;
       if (!r.none) { if (sx > WW + 4) arrow(WW - 5, my, 1, r.color); else if (sx < -6) arrow(4, my, -1, r.color); }
     }
-    if (race.ring) {
-      const r = race.player, y0 = r.lane * LH, { y } = feetY(r), big = race.mods.giant ? 2 : 1;
-      const cx = PSX, cy = y0 + y - 12 * big, rr = Math.round(race.ring.r), d = Math.abs(race.ring.r - T.ring.target);
-      drawCircle(lx, cx, cy, T.ring.target, d <= T.ring.perfect ? '#fbf236' : '#ffffff', d > T.ring.perfect);
-      drawCircle(lx, cx, cy, rr + 1, INK); drawCircle(lx, cx, cy, rr - 1, INK);
-      drawCircle(lx, cx, cy, rr, d <= T.ring.good ? '#fff27a' : '#ffcc44');
+    if (race.ring || race.pflash > 0) {
+      const rg = race.ring, r = race.player, y0 = r.lane * LH, { y } = feetY(r), big = race.mods.giant ? 2 : 1, cy = y0 + y - 12 * big;
+      if (rg) {
+        const cx = PSX + (rg.wob > 0 ? ((rg.wob * 30) | 0) % 2 * 2 - 1 : 0), rr = Math.round(rg.r), k = judge(rg.r, rg.good);
+        if (k === 'early' || k === 'late') { // closing in (dotted target) / too late (grey ring)
+          drawCircle(lx, cx, cy, T.ring.target, '#ffffff', true);
+          drawCircle(lx, cx, cy, rr + 1, INK); drawCircle(lx, cx, cy, rr - 1, INK); drawCircle(lx, cx, cy, rr, k === 'late' ? '#a0a6ba' : '#ffcc44');
+        } else { // TAP NOW: the target turns solid and the ring glows and pulses (plus "TAP!" in the text layer)
+          const hot = k === 'perfect', glow = hot ? '#ffffff' : '#fff27a', pulse = ((rg.cueT * 10) | 0) % 2;
+          lx.globalAlpha = 0.5; drawCircle(lx, cx, cy, rr + 2 + pulse, glow); drawCircle(lx, cx, cy, rr - 2 - pulse, glow); lx.globalAlpha = 1;
+          drawCircle(lx, cx, cy, rr + 1, INK); drawCircle(lx, cx, cy, rr - 1, INK);
+          drawCircle(lx, cx, cy, T.ring.target, hot ? '#ffffff' : '#99e550');
+          drawCircle(lx, cx, cy, rr, glow);
+        }
+      }
+      if (race.pflash > 0) { const q = 1 - race.pflash / 0.3; drawCircle(lx, PSX, cy, Math.round(T.ring.target + q * 12), '#ffffff', q > 0.5); } // PERFECT flash
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, cv.width, cv.height);
@@ -2425,6 +2657,12 @@
       if (p.side) bigText(p.text, cssW * 0.7, laneTop + 12 * S + 14 - k * 8, p.size, p.color);
       else bigText(p.text, mx(PSX * S), Math.max(laneTop + 52, pY - k * 26), p.size, p.color); // stays below the lane's name tag
       ctx.globalAlpha = 1;
+    }
+    const rg = race.ring, rk = rg && judge(rg.r, rg.good);
+    if (rk === 'perfect' || rk === 'good') { // big "TAP!" over the ring while it's in the window (pops in, then pulses): no reading needed
+      const ringTop = race.player.lane * LH + feetY(race.player).y - 12 * big - Math.round(rg.r) - 3;
+      const size = Math.round(30 + 14 * Math.max(0, 1 - rg.cueT / 0.12) + (((rg.cueT * 10) | 0) % 2) * 3);
+      bigText('TAP!', mx(PSX * S), Math.max(laneTop + 50, ringTop * S), size, rk === 'perfect' ? '#ffffff' : '#fff27a');
     }
     const laneMid = (race.player.lane * LH + LH / 2) * S;
     if (race.state === 'count') {
@@ -2481,12 +2719,14 @@
   }
 
   PS.scenes = PS.scenes || {};
-  PS.scenes.race = { mount, show, hide, frame };
+  // unlockAll(): parent tools "Unlock all races" (see the comment on the function)
+  PS.scenes.race = { mount, show, hide, frame, unlockAll };
 
   // debug / balance hook
   window.__race = {
     TUNING, DBG, ITEMS, MODS, EXTRA_RACES, ALL, buildCourse, simRace, simMany, flat, mulOf, tap, startRace, startTrial, startCup, skipToEnd, useItem,
-    medalTimes, dailyInfo, dayKey, extraRivals, extra: () => xsRead(),
+    medalTimes, dailyInfo, dayKey, extraRivals, extra: () => xsRead(), judge, goodOf, unlockAll, matchOf, rivalRacers,
+    pause: () => { if (race) pauseRace(); }, resume, settle: () => race && settle(),
     get race() { return race; },
     giveItem(kind) { if (race && ITEMS[kind]) race.player.item = kind; },
     ff: sec => { for (let i = 0; i < sec * 60 && race; i++) update(1 / 60); },

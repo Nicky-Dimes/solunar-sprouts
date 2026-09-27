@@ -18,6 +18,8 @@ body{height:100%;margin:0;color:var(--ink);font-family:var(--f-ui);font-weight:5
   background-image:radial-gradient(var(--dots) 22%, transparent 24%);background-size:22px 22px;
   overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 #app{position:relative;height:100%;max-width:460px;margin:0 auto;overflow:hidden;touch-action:none;background:var(--ground)}
+/* tall screens (an iPad held upright) get a wider game instead of a phone-sized strip; phones and landscape stay as they were */
+@media (min-width:600px) and (min-height:900px){#app{max-width:min(680px,62vh)}}
 canvas.px{image-rendering:pixelated;image-rendering:crisp-edges}
 button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
 

@@ -8,7 +8,8 @@
 #hud .player-chip span{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 #hud .player-chip:active{transform:translateY(2px);border-bottom-width:2px}
 .hud-pills{display:flex;gap:6px}
-.pill-stat{display:flex;align-items:center;gap:6px;background:var(--slot);border:2px solid var(--line);border-radius:12px;padding:4px 10px 4px 8px;font-size:15px;color:var(--ink)}
+.pill-stat{display:flex;align-items:center;gap:6px;background:var(--slot);border:2px solid var(--line);border-radius:12px;padding:4px 10px 4px 8px;font-size:15px;color:var(--ink);white-space:nowrap;flex:0 0 auto}
+#hud .player-chip{flex:0 1 auto}
 .pill-stat canvas{width:18px;height:18px}
 #coinPill.bump{animation:bump .35s}
 @keyframes bump{40%{transform:scale(1.15)}}
@@ -62,3 +63,8 @@
 .bk-actions .btn{flex:1 1 140px}
 .bk-code{font:500 12px ui-monospace,Menlo,monospace;word-break:break-all;resize:none}
 .bk-ver{font-size:13px;color:var(--ink-soft);margin-top:14px}
+.bk-auto{display:grid;gap:6px;margin-top:6px}
+.bk-row{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--field);border:2px solid var(--line);border-radius:12px;padding:6px 8px 6px 12px}
+.bk-row b{display:block;font-size:15px}
+.bk-row small{display:block;font-size:13px;color:var(--ink-soft)}
+.bk-row .btn{padding:6px 12px;font-size:15px}

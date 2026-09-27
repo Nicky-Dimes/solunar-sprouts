@@ -13,7 +13,7 @@
 .sp-wrap{padding:12px 12px 28px;max-width:460px;margin:0 auto;display:grid;gap:12px}
 .sp-head{padding:12px 14px;display:flex;align-items:center;gap:10px}
 .sp-head h1{margin:0;font-size:26px;color:var(--ink)}
-.sp-head .sp-sub{font-size:13px;color:var(--ink-soft);margin-top:2px}
+.sp-head .sp-sub{font-size:14px;color:var(--ink-soft);margin-top:2px}
 .sp-head .sp-count{margin-left:auto;font-family:var(--f-ui);font-weight:700;font-size:16px;background:var(--slot);border:2px solid var(--line);border-radius:12px;padding:3px 10px}
 .sp-lbl{font-family:var(--f-ui);font-weight:600;font-size:14px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);margin:4px 4px -4px;display:flex;align-items:center;gap:8px}
 .sp-lbl .n{background:var(--slot);border:2px solid var(--line);border-radius:10px;padding:0 7px;letter-spacing:0;color:var(--ink)}
@@ -26,7 +26,7 @@
 .sp-pic{height:76px;border-radius:14px;background:var(--slot);display:flex;align-items:flex-end;justify-content:center;overflow:hidden}
 .sp-pic canvas{display:block;margin-bottom:4px}
 .sp-row b{display:block;font-family:var(--f-px);font-weight:700;font-size:20px;line-height:1.1}
-.sp-row small{display:block;font-size:13px;line-height:1.35;color:var(--ink-soft)}
+.sp-row small{display:block;font-size:14px;line-height:1.35;color:var(--ink-soft)}
 .sp-row .sp-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 .sp-lv{display:grid;justify-items:center;gap:2px}
 .sp-lv .num{font-size:22px;line-height:1}
@@ -37,7 +37,7 @@
 .sp-egg{display:grid;grid-template-columns:56px 1fr auto;align-items:center;gap:12px;background:var(--panel);border:2px dashed var(--edge);border-radius:18px;padding:8px 12px 8px 8px}
 .sp-egg .sp-pic{height:62px}
 .sp-egg b{display:block;font-family:var(--f-px);font-weight:700;font-size:17px}
-.sp-egg small{display:block;font-size:13px;color:var(--ink-soft);line-height:1.35}
+.sp-egg small{display:block;font-size:14px;color:var(--ink-soft);line-height:1.35}
 .sp-empty{padding:18px;text-align:center}
 .sp-empty p{margin:6px 0 12px;line-height:1.45}
 .sp-acct{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
@@ -63,8 +63,14 @@
 .sp-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
 .sp-acts .btn{font-size:15px}
 .sp-acts .btn[disabled]{opacity:.7;cursor:default}
-.sp-mood{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;text-align:left}
+.sp-mood{width:100%;text-align:left}
 .sp-mood small{font-family:var(--f-ui);font-size:13.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);display:flex;justify-content:space-between}
+.sp-happy{margin:5px 0 0;font-size:14px;line-height:1.3;color:var(--ink-soft)}
+.sp-happy.on{color:#a2334a;font-weight:600}
+.sp-shiny{display:inline-flex;align-items:center;gap:3px;border-radius:8px;padding:0 8px;font-family:var(--f-ui);font-weight:700;font-size:14px;line-height:20px;white-space:nowrap;color:#5e2f86;
+  background:linear-gradient(100deg,#fff4c2 0%,#ffd6ef 30%,#d4f1ff 60%,#fff4c2 100%);background-size:250% 100%;border:1px solid #d9a0e8;animation:sp-shine 2.6s ease-in-out infinite alternate}
+@keyframes sp-shine{from{background-position:0% 50%}to{background-position:100% 50%}}
+@media (prefers-reduced-motion: reduce){.sp-shiny{animation:none}}
 
 .sp-sec{padding:14px}
 .sp-fold-h{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:8px;width:100%;cursor:pointer;min-height:36px}
@@ -72,8 +78,8 @@
 .sp-chev{flex:0 0 auto;width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:var(--slot);border:2px solid var(--line);font-size:14px;color:var(--ink-soft);transition:transform .15s}
 .sp-fold.open .sp-chev{transform:rotate(180deg)}
 .sp-fold-sum{margin-top:8px;cursor:pointer}
-.sp-more{display:block;margin-top:8px;font-size:13px;font-weight:700;color:var(--accent,#c0612a)}
-.sp-fold-less{all:unset;cursor:pointer;display:block;margin:12px auto 0;padding:6px 14px;font-size:13px;font-weight:700;color:var(--ink-soft)}
+.sp-more{display:block;margin-top:8px;font-size:14px;font-weight:700;color:var(--accent,#c0612a)}
+.sp-fold-less{all:unset;cursor:pointer;display:block;margin:12px auto 0;padding:6px 14px;font-size:14px;font-weight:700;color:var(--ink-soft)}
 .sp-fold-line{margin:0;font-size:14px;color:var(--ink-soft);font-weight:600;line-height:1.4}
 .sp-fold-line b{color:var(--ink)}
 .sp-mchips{display:flex;flex-wrap:wrap;gap:6px}
@@ -82,17 +88,17 @@
 .sp-bicons{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .sp-bico{position:relative;width:40px;height:40px;border-radius:10px;background:var(--field);border:2px solid var(--line);display:grid;place-items:center}
 .sp-bico canvas{width:36px;height:36px;image-rendering:pixelated;image-rendering:crisp-edges}
-.sp-bico i{position:absolute;right:-6px;bottom:-6px;font-style:normal;font:700 13px/16px var(--f-ui);background:var(--sun);border:2px solid var(--sun-edge);border-radius:8px;padding:0 4px;color:#4a3210}
+.sp-bico i{position:absolute;right:-6px;bottom:-6px;font-style:normal;font:700 14px/17px var(--f-ui);background:var(--sun);border:2px solid var(--sun-edge);border-radius:8px;padding:0 4px;color:#4a3210}
 .sp-bmore{font-family:var(--f-ui);font-weight:700;font-size:15px;color:var(--ink-soft);padding:0 4px}
 .sp-sec h2{margin:0;font-family:var(--f-px);font-weight:700;font-size:20px;color:var(--ink);display:flex;align-items:center;gap:8px}
 .sp-sec h2 .sp-aside{margin-left:auto;font-family:var(--f-ui);font-weight:600;font-size:14px;color:var(--ink-soft)}
-.sp-sec .sp-note{margin:4px 0 10px;font-size:13px;line-height:1.4;color:var(--ink-soft)}
+.sp-sec .sp-note{margin:4px 0 10px;font-size:14px;line-height:1.4;color:var(--ink-soft)}
 .sp-stats{display:grid;gap:4px}
 .sp-els{display:flex;gap:5px;justify-content:center;margin-top:-6px}
 .sp-stat{display:grid;grid-template-columns:70px 50px 1fr;align-items:center;gap:8px}
 .sp-stat .nm{font-family:var(--f-ui);font-weight:700;font-size:16px}
 .sp-stat .lv{font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
-.sp-stat .xp{grid-column:3;font-size:13px;color:var(--ink-soft);margin-top:-7px;text-align:right;font-variant-numeric:tabular-nums}
+.sp-stat .xp{grid-column:3;font-size:14px;color:var(--ink-soft);margin-top:-7px;text-align:right;font-variant-numeric:tabular-nums}
 .sp-stat .bar{height:12px}
 
 .sp-nat{position:relative;height:18px;border-radius:9px;border:2px solid var(--line);
@@ -111,7 +117,7 @@
 .sp-evo .st.next .pic{border-style:dashed}
 .sp-evo .st.next .pic canvas{opacity:.55;filter:saturate(.7)}
 .sp-evo .st b{font-family:var(--f-ui);font-weight:700;font-size:14.5px;line-height:1.1}
-.sp-evo .st small{font-size:13px;color:var(--ink-soft);line-height:1.2}
+.sp-evo .st small{font-size:14px;color:var(--ink-soft);line-height:1.2}
 .sp-evo .arr{align-self:center;font-family:var(--f-px);font-weight:700;color:var(--edge);text-align:center;padding-bottom:30px}
 .sp-evo-bar{margin-top:12px;font-size:14px}
 .sp-evo-bar .row{display:flex;justify-content:space-between;margin-bottom:5px}
@@ -120,7 +126,7 @@
 .sp-flower{display:grid;justify-items:center;gap:2px;padding:7px 4px 6px;border-radius:12px;background:var(--field);border:2px solid var(--line);text-align:center}
 .sp-flower canvas{width:30px;height:30px}
 .sp-flower b{font-family:var(--f-ui);font-weight:600;font-size:14.5px;line-height:1.1}
-.sp-flower small{font-size:13px;color:var(--ink-soft)}
+.sp-flower small{font-size:14px;color:var(--ink-soft)}
 .sp-flower.pick{border-color:var(--sun-edge);background:var(--panel);box-shadow:inset 0 -3px 0 var(--sun)}
 .sp-flower.pick small{color:#8a5a10;font-weight:600}
 
@@ -129,34 +135,34 @@
 .sp-move>i{grid-row:span 2;align-self:stretch;border-radius:4px}
 .sp-move b{font-family:var(--f-ui);font-weight:700;font-size:16px}
 .sp-move small{grid-column:2/-1;font-size:13.5px;line-height:1.3;color:var(--ink-soft)}
-.sp-move .pw{font-size:13px;font-weight:600;color:var(--ink-soft);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.sp-move .pw{font-size:14px;font-weight:600;color:var(--ink-soft);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .sp-move.active{background:var(--panel);border-color:var(--sun-edge);border-bottom-width:4px}
 .sp-move.locked{opacity:.55;background:var(--slot)}
 .sp-move.compact{grid-template-columns:6px 1fr auto;padding:5px 10px 5px 6px;border-radius:11px}
 .sp-move.compact>i{grid-row:auto}
 .sp-move.compact b{font-size:14px;display:flex;align-items:center;gap:6px}
 .sp-move.compact.battle{border-color:var(--sun-edge)}
-.sp-inb{font-family:var(--f-ui);font-weight:600;font-size:10.5px;background:var(--sun);color:#4a3210;border-radius:6px;padding:0 5px;line-height:16px}
+.sp-inb{font-family:var(--f-ui);font-weight:600;font-size:13px;background:var(--sun);color:#4a3210;border-radius:6px;padding:0 5px;line-height:16px}
 .sp-grp{margin-top:14px}
 .sp-grp h3{margin:0 0 6px;font-family:var(--f-ui);font-weight:600;font-size:14.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);display:flex;align-items:center;gap:6px}
 .sp-grp h3 canvas{width:22px;height:22px}
 .sp-grp .sp-moves{margin-top:0;gap:6px}
-.sp-lock{font-size:13px;font-weight:600;color:#8a5a10;background:#fff1c9;border-radius:6px;padding:0 6px;white-space:nowrap}
+.sp-lock{font-size:14px;font-weight:600;color:#8a5a10;background:#fff1c9;border-radius:6px;padding:0 6px;white-space:nowrap}
 
 .sp-bonds{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin-top:10px}
 .sp-bond{position:relative;display:grid;justify-items:center;gap:2px;background:var(--field);border:2px solid var(--line);border-radius:14px;padding:8px 4px 7px;text-align:center}
 .sp-bond.rare{border-color:#d9a0e8;background:#fbf0ff}
 .sp-bond b{font-family:var(--f-ui);font-weight:600;font-size:14.5px;line-height:1.1}
-.sp-bond small{font-size:13px;color:var(--ink-soft)}
+.sp-bond small{font-size:14px;color:var(--ink-soft)}
 .sp-bond .cnt{position:absolute;top:-7px;right:-5px;min-width:24px;height:22px;padding:0 5px;display:grid;place-items:center;border-radius:11px;background:var(--sun);border:2px solid var(--sun-edge);font-family:var(--f-ui);font-weight:700;font-size:14px;color:#4a3210}
 .sp-pips{display:flex;gap:3px}
 .sp-pips i{width:8px;height:8px;border-radius:2px;background:var(--slot);border:1px solid var(--edge)}
 .sp-pips i.on{background:var(--accent);border-color:var(--accent-edge)}
 
 .sp-parts{display:grid;gap:8px;margin-top:10px}
-.sp-part{display:grid;grid-template-columns:110px 1fr 52px;gap:8px;align-items:center;font-size:14px}
+.sp-part{display:grid;grid-template-columns:110px 1fr 66px;gap:8px;align-items:center;font-size:14px}
 .sp-part b{font-weight:600}
-.sp-part small{font-size:13px;color:var(--ink-soft);text-align:right}
+.sp-part small{font-size:14px;color:var(--ink-soft);text-align:right}
 
 .sp-bstats{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:10px}
 .sp-bstat{display:grid;justify-items:center;background:var(--field);border:2px solid var(--line);border-radius:12px;padding:6px 2px}
@@ -168,7 +174,7 @@
 .sp-recs{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
 .sp-rec{background:var(--field);border:2px solid var(--line);border-radius:12px;padding:8px 10px}
 .sp-rec .num{font-size:20px}
-.sp-rec small{display:block;font-size:13px;color:var(--ink-soft)}
+.sp-rec small{display:block;font-size:14px;color:var(--ink-soft)}
 .sp-muted{font-size:14px;color:var(--ink-soft);margin:8px 0 0;line-height:1.4}
 
 /* style: paint, stickers, closet */
@@ -219,8 +225,16 @@
 .sp-sell-btn[disabled]{opacity:.55;cursor:default}
 .sp-sell-btn[disabled]:active{transform:none}
 .sp-sell p{margin:0;font-size:14px;color:var(--ink-soft)}
-.sp-sell-price{display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--f-px);font-weight:600;font-size:18px;margin:0 0 8px;color:var(--ink)}
-.sp-sell-price canvas{width:18px;height:18px}
+.m-body .sp-sell-price{display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--f-px);font-weight:600;font-size:20px;margin:0 0 8px;color:var(--ink)}
+.m-body .sp-sell-price canvas{width:18px;height:18px}
+.m-body p.sp-sell-say{text-align:center;font-size:16px}
+/* the sell pop-ups: "Keep" is the big, easy choice; selling is small and needs a second yes */
+.modal-btns .btn.sp-keep{font-size:21px;padding:15px 12px}
+.modal-btns .btn.sp-sell-go{font-size:15px;padding:9px 12px;background:transparent;border:2px dashed var(--edge);border-bottom-width:2px;color:var(--ink-soft)}
+.modal-btns .btn.sp-sell-go:active{transform:translateY(1px);border-bottom-width:2px;margin-bottom:0}
+.modal-btns .btn.sp-sell-yes{font-size:15px;padding:9px 12px}
+.modal-btns .btn.sp-sell-yes[disabled]{opacity:.45;cursor:default}
+.modal-btns .btn.sp-sell-yes[disabled]:active{transform:none;border-bottom-width:5px;margin-bottom:0}
 `;
   function injectCSS() { if (document.getElementById('sp-css')) return; const st = document.createElement('style'); st.id = 'sp-css'; st.textContent = CSS; document.head.appendChild(st); }
 
@@ -294,7 +308,7 @@
         <div class="sp-pic"><canvas data-anim="${s.id}"></canvas></div>
         <div><b>${esc(s.name)}${partner ? '<span class="sp-tag">Partner</span>' : ''}</b>
           <small>${esc(fi.name)} \u00b7 ${esc(areaName(s.area))}</small>${s.home ? `<small>Resting in the ${esc(state.homeName(s.area))}</small>` : ''}
-          <div class="sp-chips">${state.elementsOf(s).map(elChip).join('')}${skinBadge(s)}</div></div>
+          <div class="sp-chips">${state.elementsOf(s).map(elChip).join('')}${skinBadge(s)}${shinyBadge(s)}</div></div>
         <div class="sp-lv"><span class="num">${tl}</span><span>Level</span></div>
       </button>`;
     }).join('');
@@ -407,7 +421,7 @@
     const tiles = e.map(([id, n]) => {
       const c = creature(id), t = state.tierOf(id, n);
       return `<div class="sp-bond ${c.rare ? 'rare' : ''}"><span class="cnt">\u00d7${n}</span><canvas data-sp="critter:${id}" data-scale="2"></canvas><b>${esc(c.name)}</b>
-        <div class="sp-pips" title="${t} of 3 moves">${[0, 1, 2].map(i => `<i class="${i < t ? 'on' : ''}"></i>`).join('')}</div><small>${c.rare ? 'Rare' : t < 3 ? `Next move at ${[1, 3, 6][t]}` : 'All moves'}</small></div>`;
+        <div class="sp-pips" title="${t} of 3 moves">${[0, 1, 2].map(i => `<i class="${i < t ? 'on' : ''}"></i>`).join('')}</div><small>${c.rare ? 'Rare' : t < 3 ? `Next move at ${[1, 3, 6][t]}` : 'All moves'}</small></div>`;
     }).join('');
     const icons = e.slice(0, 8).map(([id, n]) => `<span class="sp-bico" title="${esc(creature(id).name)}"><canvas data-sp="critter:${id}" data-scale="0"></canvas>${n > 1 ? `<i>\u00d7${n}</i>` : ''}</span>`).join('') + (e.length > 8 ? `<span class="sp-bmore">+${e.length - 8}</span>` : '');
     return foldSec('bonds', 'Bonded animals', `${e.reduce((a, x) => a + x[1], 0)}`, `<div class="sp-bicons">${icons}</div>`, `<div class="sp-bonds">${tiles}</div>`);
@@ -426,8 +440,8 @@
     const segs = [['run', 'Run'], ['swim', 'Swim'], ['climb', 'Climb'], ['fly', 'Fly']];
     const races = segs.map(([k, l]) => { const r = state.raceRating(s, k); return `<div class="sp-race"><span class="nm">${l}</span><div class="bar"><i style="width:${clamp(r / 15 * 100, 3, 100)}%;background:${D.STAT_META[D.RACE_STAT[k]].color}"></i></div><span class="num">${r.toFixed(1)}</span></div>`; }).join('')
       + (state.staminaRating ? (() => { const r = state.staminaRating(s); return `<div class="sp-race"><span class="nm">Stamina</span><div class="bar"><i style="width:${clamp(r / 15 * 100, 3, 100)}%;background:${D.STAT_META.stamina.color}"></i></div><span class="num">${r.toFixed(1)}</span></div>`; })() : '');
-    const bstats = `<div class="sp-bstats">${cell(b.hp, 'HP')}${cell(b.atk, 'Atk')}${cell(b.def, 'Def')}${cell(b.spd, 'Spd')}${cell(Math.round(b.eva * 100) + '%', 'Eva')}</div>`;
-    return foldSec('bstats', 'Battle stats', '', bstats, `${bstats}<p class="sp-muted">Stamina gives HP and Defense, Power gives Attack, Run gives Speed, Fly gives Evasion, Swim adds Defense.</p>`)
+    const bstats = `<div class="sp-bstats">${cell(b.hp, 'HP')}${cell(b.atk, 'Atk')}${cell(b.def, 'Def')}${cell(b.spd, 'Spd')}${cell(Math.round(b.eva * 100) + '%', 'Dodge')}</div>`;
+    return foldSec('bstats', 'Battle stats', '', bstats, `${bstats}<p class="sp-muted">Stamina gives HP and Defense, Power gives Attack, Run gives Speed, Fly gives Dodge, Swim adds Defense.</p>`)
       + foldSec('races', 'Race ratings', '', `<p class="sp-fold-line">${segs.map(([k, l]) => `${l} <b>${state.raceRating(s, k).toFixed(1)}</b>`).join(' \u00b7 ')}</p>`, `<p class="sp-note">How fast it moves on each kind of course section. Higher is faster.</p>${races}`);
   }
   function recordsHTML(s) {
@@ -440,8 +454,12 @@
   }
   // ---------- style: paint tins, pattern stickers, closet ----------
   const skinOf = s => { const k = s.look && s.look.skin; return k && D.SKINS[k] ? k : null; };
-  const skinBadge = s => { const k = skinOf(s); return k ? `<span class="sp-skin"><canvas data-sp="skin:${k}"></canvas>${esc(D.SKINS[k].name)} skin</span>` : ''; };
-  const plainNow = s => !s.look || !s.look.pattern || s.look.pattern === 'plain' || !D.PATTERNS[s.look.pattern];
+  const skinBadge = s => { const k = skinOf(s); return k ? `<span class="sp-skin"><canvas data-sp="skin:${k}"></canvas>${esc(D.SKINS[k].name || k)} skin</span>` : ''; };
+  // a rare shimmering Shiny (state.js sets look.shiny at hatch)
+  const shinyBadge = s => (s.look && s.look.shiny === true ? '<span class="sp-shiny" title="A rare Shiny Sprout">✦ Shiny</span>' : '');
+  // plain as it looks: a Sprout with Star spots shows a star unless it was made plain (look.noSpots)
+  const plainNow = s => { const L = s.look || {}; return (!L.pattern || L.pattern === 'plain' || !D.PATTERNS[L.pattern]) && !((s.parts || {}).spots && !L.noSpots); };
+  const patternShown = s => { try { const p = state.lookOf(s).pattern; return D.PATTERNS[p] ? p : null; } catch (e) { return null; } };
   function styleHTML(s) {
     const it = state.items(), L = s.look || {}, skin = skinOf(s);
     const paints = Object.keys(D.COLORS).filter(id => (it.paints || {})[id] > 0);
@@ -455,8 +473,9 @@
     const hatTiles = hats.map(id => { const on = L[D.HATS[id].slot] === id; return tile(`data-hat="${id}" aria-pressed="${on}"`, 'hat', id, D.HATS[id].name, on ? 'Wearing' : 'Tap to wear', on); }).join('');
     const none = !paints.length && !pats.length && !hats.length;
     const cta = `<div class="sp-gbcta"><canvas data-sp="gumball:${none ? 0 : 6}" data-scale="5"></canvas>
-      <p>${none ? 'Win paint, stickers and hats from the Gumball machine in the Shop.' : 'Want more? The Gumball machine in the Shop has more paint, stickers and hats.'}</p>
-      <button class="btn ${none ? 'primary' : ''}" data-gumball-go>Go to the Gumball machine</button></div>`;
+      <p>${none ? 'Buy the paint and stickers you like in the Shop. Hats come from the Gumball machine.' : 'Want more? Buy paint and stickers in the Shop, or win hats from the Gumball machine.'}</p>
+      <button class="btn primary" data-closet-go>Buy paint &amp; stickers</button>
+      <button class="btn" data-gumball-go>Go to the Gumball machine</button></div>`;
     const row = (label, tiles, empty) => `<div class="sp-srow"><div class="sp-lbl">${label}</div>${tiles ? `<div class="sp-tiles">${tiles}</div>` : `<p class="sp-none">${empty}</p>`}</div>`;
     return `<section class="panel sp-sec" id="sp-style"><h2>Style ${skin ? `<span class="sp-aside">${skinBadge(s)}</span>` : ''}</h2>
       <div class="sp-style-top"><div class="sp-mirror"><canvas data-mirror></canvas></div>
@@ -503,14 +522,17 @@
     const name = D.PATTERNS[id]; if (!name) return;
     if (id === 'plain') {
       if (plainNow(s)) { PX.Sound.play('tick'); PS.ui.toast(`${s.name} is already plain.`); return; }
+      const cur = D.PATTERNS[patternShown(s)] || 'old';
       PS.ui.modal({
         eyebrow: 'Stickers', title: `Make ${esc(s.name)} plain?`,
-        html: `${BA}<p class="sp-m-left">It's free! The ${esc(D.PATTERNS[s.look.pattern])} pattern comes off. To get it back you'll need another ${esc(D.PATTERNS[s.look.pattern])} sticker.</p>`,
+        html: `${BA}<p class="sp-m-left">It's free! The ${esc(cur)} pattern comes off. To get it back you'll need another ${esc(cur)} sticker.</p>`,
         row: true, buttons: [{ label: 'Not now' }, { label: 'Go plain', kind: 'primary', onClick: () => doStyle(s.id, x => state.usePattern(x, 'plain'), `${s.name} is plain now.`) }],
-        mount: card => beforeAfter(card, s, lookWith(s, { pattern: 'plain' })),
+        mount: card => beforeAfter(card, s, lookWith(s, { pattern: 'plain', noSpots: true })),
       });
       return;
     }
+    // the pattern it already wears: nothing to do, and no sticker gets used up
+    if (s.look && s.look.pattern === id && !s.look.noSpots) { PX.Sound.play('tick'); PS.ui.toast(`${s.name} already has ${name}!`); return; }
     const n = (state.items().patterns || {})[id] || 0; if (!n) return;
     const tint = D.PATTERN_COLORS.slice(2).find(c => c !== s.look.patternColor) || '#fff27a'; // the real colour is picked at random
     PS.ui.modal({
@@ -532,15 +554,32 @@
     PX.Sound.play(off ? 'pop' : 'coo'); PX.buzz(8);
     if (!off) cheer();
   }
+  // Selling is for good, so it takes two yeses. "Keep" is the big first button both times; the second "sell" button sits where
+  // "Keep" was and wakes up after a moment, so a double tap or a mashed button keeps the Sprout.
   function confirmSell(s) {
     if (!state.canSell(s)) { PX.Sound.play('miss'); PS.ui.toast('You need at least one Sprout.'); return; }
-    const price = state.sellPrice(s), id = s.id;
+    const price = state.sellPrice(s), id = s.id, name = s.name;
     PS.ui.modal({
-      eyebrow: 'Sell', title: `Sell ${esc(s.name)} for ${fmt(price)} coins?`, sprite: s, pose: {},
+      eyebrow: 'Sell', title: `Sell ${esc(name)}?`, sprite: s, pose: {},
       html: `<p class="sp-sell-price"><canvas data-sp="icon:coin"></canvas><span class="num">${fmt(price)}</span></p>
-        <p>${esc(s.name)} will leave your garden for good. This can't be undone.</p>`,
-      row: true, buttons: [{ label: `Keep ${s.name}`, kind: 'primary' }, { label: 'Sell', kind: 'danger', onClick: () => doSell(id) }],
+        <p class="sp-sell-say">${esc(name)} would leave your garden for good.</p>`,
+      buttons: [{ label: `Keep ${name}`, kind: 'primary sp-keep' }, { label: `Sell for ${fmt(price)} coins`, kind: 'sp-sell-go', onClick: () => sureSell(id) }],
       mount: card => hydrate(card),
+    });
+  }
+  function sureSell(id) {
+    const s = state.get(id); if (!s || !state.canSell(s)) return;
+    const price = state.sellPrice(s), name = s.name;
+    PS.ui.modal({
+      eyebrow: 'Sell for good', title: 'Are you sure?', sprite: s, pose: { eyes: 'sad' },
+      html: `<p class="sp-sell-say"><b>${esc(name)}</b> will leave your garden for good.</p>
+        <p class="sp-sell-price"><canvas data-sp="icon:coin"></canvas><span class="num">${fmt(price)}</span></p>`,
+      buttons: [{ label: `Yes, sell ${name}`, kind: 'danger sp-sell-yes', onClick: () => doSell(id) }, { label: `Keep ${name}`, kind: 'primary sp-keep' }],
+      mount: card => {
+        hydrate(card);
+        const yes = card.querySelector('.sp-sell-yes'); if (!yes) return;
+        yes.disabled = true; setTimeout(() => { yes.disabled = false; }, 900);
+      },
     });
   }
   function doSell(id) {
@@ -558,17 +597,19 @@
     if (smooth && sc.scrollTo) sc.scrollTo({ top, behavior: 'smooth' }); else sc.scrollTop = top;
   }
 
+  // XP multiplier for a very happy Sprout (state.happyBonus: 1.1 at happy >= 75); 1 = no bonus
+  const happyX = s => { try { const v = typeof state.happyBonus === 'function' ? +state.happyBonus(s) : 1; return v > 0 ? v : 1; } catch (e) { return 1; } };
   function detailHTML(s) {
-    const fi = state.formInfo(s), partner = s.id === PS.S.activeId;
+    const fi = state.formInfo(s), partner = s.id === PS.S.activeId, hb = happyX(s);
     return `<div class="sp-scroll"><div class="sp-wrap">
       <div class="sp-top"><button class="btn sp-back" data-back>\u2039 All Sprouts</button></div>
       <section class="panel sp-hero">
         <div class="sp-stagebox ${esc(s.area)}"><span class="sp-where">${esc(areaName(s.area))}${s.home ? ` \u00b7 resting in the ${esc(state.homeName(s.area))}` : ''}</span><canvas data-hero title="Pet"></canvas></div>
         <div class="sp-namebox"><input class="sp-name-in" maxlength="12" value="${esc(s.name)}" aria-label="Name" enterkeyhint="done" autocomplete="off" spellcheck="false"></div>
-        <div class="sp-form"><b>${esc(fi.name)}</b> \u00b7 Stage ${fi.stage + 1} of 3</div><div class="sp-els">${state.elementsOf(s).map(elChip).join('')}${skinBadge(s)}</div>
+        <div class="sp-form"><b>${esc(fi.name)}</b> \u00b7 Stage ${fi.stage + 1} of 3</div><div class="sp-els">${state.elementsOf(s).map(elChip).join('')}${skinBadge(s)}${shinyBadge(s)}</div>
         <div class="sp-mood">
-          <div><small><span>Happiness</span><span>${Math.round(s.happy || 0)}</span></small><div class="bar"><i style="width:${clamp(s.happy || 0, 0, 100)}%;background:var(--berry)"></i></div></div>
-          <div><small><span>Energy</span><span>${Math.round(s.energy || 0)}</span></small><div class="bar"><i style="width:${clamp(s.energy || 0, 0, 100)}%;background:var(--sun-edge)"></i></div></div>
+          <small><span>Happiness</span><span>${Math.round(s.happy || 0)}</span></small><div class="bar"><i style="width:${clamp(s.happy || 0, 0, 100)}%;background:var(--berry)"></i></div>
+          <p class="sp-happy ${hb > 1 ? 'on' : ''}">${hb > 1 ? `\u2665 Very happy: +${Math.round((hb - 1) * 100)}% XP` : 'Pet it and feed it to make it very happy.'}</p>
         </div>
         <div class="sp-acts">
           <button class="btn ${partner ? '' : 'primary'}" data-partner ${partner ? 'disabled' : ''}>${partner ? '\u2605 Your partner' : 'Set as partner'}</button>
@@ -626,6 +667,7 @@
     }
     if (q('[data-go-garden]')) { PS.ui.go('garden'); return; }
     if (q('[data-gumball-go]')) { PX.Sound.play('pop'); PS.ui.go('shop', { tab: 'gumball' }); return; }
+    if (q('[data-closet-go]')) { PX.Sound.play('pop'); PS.ui.go('shop', { tab: 'gumball', section: 'closet' }); return; }
     if (q('[data-dev]')) { PS.ui.devPanel(); return; }
     if (q('[data-players]')) { PS.ui.playersPanel(); return; }
     if (q('[data-backup]')) { PS.ui.backupPanel(); return; }

@@ -41,6 +41,13 @@
     tangerine: ['#ffd488', '#ff9a22', '#c45c0c'],
     bubblegum: ['#ffd4f2', '#ff86d2', '#c4489a'],
     aqua: ['#ccfcff', '#5ee2f2', '#2896b8'],
+    // newer colours, each picked to stay clearly apart from the ones above (checked side by side)
+    sand: ['#f8ecc4', '#dcc690', '#a08a58'],
+    forest: ['#86c46a', '#3e8948', '#21523a'],
+    periwinkle: ['#d8dcff', '#9ca6f6', '#5e66c4'],
+    orchid: ['#f6b4e8', '#d44cb4', '#8a2478'],
+    blush: ['#fff0ec', '#f8c6c0', '#d08c96'],
+    raspberry: ['#e87aa8', '#b0386e', '#6a1e48'],
   };
   const BELLY = '#fbf3dc';
 
@@ -258,6 +265,8 @@
   };
   function cloneLook(l) { return JSON.parse(JSON.stringify(l || DEFAULT_LOOK)); }
   const BUD_RAMP = { sun: RAMPS.sun, moon: ['#b8a8ff', '#7a5ad8', '#43308e'], wild: RAMPS.leaf };
+  // PX.RIM (default on): a little more volume on Sprout bodies. Toggle with PX.RIM = false (clears the sprite cache).
+  let RIM = true;
 
   // blend two #rrggbb colours (k=0 -> a, k=1 -> b)
   function mixHex(a, b, k) {
@@ -284,6 +293,16 @@
   const PUMPKIN = ['#ffc47a', '#f7922e', '#c8581c'], GHOST = ['#ffffff', '#efeaff', '#c9bdf0'], WRAP = ['#fffaf0', '#ece0c4', '#c4ae88'];
   const CORN = [['#ffffff', '#fff4e2', '#dccab0'], ['#ffc27a', '#ff9a22', '#d0660c'], ['#fff3a0', '#ffd23a', '#d8a018']];
   const VAMP = [['#6e5a96', '#4a3a6c', '#2e2448'], ['#fbf8ff', '#ebe4f6', '#c4b8d8']], WITCH = [['#c89af0', '#8e56c8', '#5a2e8a'], ['#d8f6a8', '#a2dc6a', '#62a848']];
+  // ---- special-egg skins (eclipse, galaxy, frost, blossom, pearl) ----
+  const ECL = { sun: ['#fff2a0', '#fcc43e', '#ec982c'], dusk: ['#fbb442', '#f5922e', '#e27a26'], seam: '#fff4c8', night: ['#5a66cc', '#3a3f9c', '#262a6a'] };
+  const ECL_STARS = [[6.5, -3.5, '#ffffff'], [5.5, 3.5, '#fff27a'], [4.5, 5.5, '#ffffff']];
+  const eclSide = (dx, dy) => Math.hypot(dx + 4, dy + 0.5) - 8.3; // < 0: sunny side; >= 0: the night crescent on the right
+  const GAL = ['#5c4cb8', '#3a2e88', '#231a56'], NEB = ['#b86ad8', '#8a44b8', '#5a2a86'];
+  const GAL_TWINKLE = [[-4.5, -4.5], [5.5, 3.5]];
+  const FROST = ['#dcf2ff', '#aad6f4', '#6f9fd8'];
+  const FROST_FLAKES = [[5.5, -2.5], [-5.5, 2.5], [5.5, 4.5]];
+  const BLOS = ['#ffdcea', '#f7aecb', '#d97ca6'], BLOS_AT = [[4.5, -4.5], [-4.5, -5.5], [6.5, 3.5], [-6.5, 3.5]], BLOS_ORB = [[-3.2, -2.4], [3.6, 3.4]];
+  const PEARL = [['#fff8fc', '#f9e2ee', '#d4b8d8'], ['#f8fbff', '#e2e8fb', '#b8c2e4'], ['#f8fffc', '#dff3ec', '#b4d2cc'], ['#fffbf4', '#fae8d8', '#d8c0b4']];
   // f(x, y, tone, dx, dy, toneAt) -> colour. dx/dy = offset from the body centre in sprig-body units.
   const SKINS = {
     gold(x, y, t, dx, dy) {
@@ -332,12 +351,82 @@
       if (h === 0 || (h === 11 && t < 2)) return t === 2 ? '#f6c83a' : '#fff27a';
       return WITCH[0][t];
     },
+    // ---- special-egg skins ----
+    // Eclipse: a sunny-gold side and a night-blue crescent with tiny stars, meeting at a thin glowing seam (the face stays on the sunny side)
+    eclipse(x, y, t, dx, dy, at, k) {
+      const u = 1 / k;
+      if (eclSide(dx, dy) < 0) return eclSide(dx + u, dy) >= 0 ? ECL.dusk[t] : ECL.sun[t];
+      if (eclSide(dx - u, dy) < 0 || eclSide(dx, dy - u) < 0 || eclSide(dx, dy + u) < 0) return ECL.seam;
+      for (const [sx, sy, c] of ECL_STARS) if (Math.abs(dx - sx) < 0.5 * u && Math.abs(dy - sy) < 0.5 * u) return c;
+      if (eclSide(dx - 2 * u, dy) < 0) return ECL.night[0];
+      return ECL.night[Math.max(1, t)];
+    },
+    // Galaxy: deep indigo with a soft nebula band and twinkly stars
+    galaxy(x, y, t, dx, dy, at, k) {
+      for (const [sx, sy] of GAL_TWINKLE) {
+        const ox = Math.round((dx - sx) * k), oy = Math.round((dy - sy) * k);
+        if (!ox && !oy) return '#ffffff';
+        if (k >= 1 && Math.abs(ox) + Math.abs(oy) === 1) return '#aab4ff';
+      }
+      if (Math.abs(dx) < 2 && dy > -4.6 && dy < 2.6) return GAL[t]; // calm between the eye patches
+      if (!faceZone(dx, dy, 0.4) && (x * 37 + y * 23 + ((x * y) % 5) * 7) % 19 === 0) return ['#ffffff', '#fff6b0', '#b8f0ff'][(x + y) % 3];
+      const v = dy - dx * 0.8;
+      if (Math.abs(v) < 1.1) return NEB[t];
+      if (Math.abs(v) < 2.3 && (x + y) & 1) return NEB[Math.min(2, t + 1)];
+      return GAL[t];
+    },
+    // Frost: icy white-blue with a snowy cap, little snowflakes and frosty glints
+    frost(x, y, t, dx, dy, at, k) {
+      const u = 1 / k, cap = -5 + Math.sin(dx * 1.1 + 0.6) * 0.75;
+      if (dy < cap) return '#ffffff';
+      if (dy < cap + u) return (x + y) & 1 ? '#ffffff' : FROST[0];
+      for (const [sx, sy] of FROST_FLAKES) {
+        const ox = Math.round((dx - sx) * k), oy = Math.round((dy - sy) * k);
+        if (!ox && !oy) return '#ffffff';
+        if (k >= 1 && Math.abs(ox) === 1 && Math.abs(oy) === 1) return '#ffffff';
+      }
+      if (t > 0 && !faceZone(dx, dy, 0.4) && (x * 29 + y * 47) % 31 === 0) return '#f0faff'; // frosty glints
+      return FROST[t];
+    },
+    // Blossom: soft spring pink with tiny 5-petal flowers (white petals, yellow middle)
+    blossom(x, y, t, dx, dy, at, k) {
+      for (const [sx, sy] of k >= 1 ? BLOS_AT : BLOS_ORB) {
+        const ox = Math.round((dx - sx) * k), oy = Math.round((dy - sy) * k);
+        if (Math.abs(ox) > 1 || Math.abs(oy) > 1) continue;
+        if (!ox && !oy) return '#fbf236';
+        if (oy === -1 && !ox) return '#ffffff';
+        if (oy === 0) return '#ffffff';
+        if (oy === 1 && ox) return '#fff4f8';
+      }
+      return BLOS[t];
+    },
+    // Pearl: pearly white with a gentle pastel sheen in soft rings round the highlight
+    pearl(x, y, t, dx, dy) {
+      const r = Math.hypot(dx + 3.5, dy + 4.2), band = Math.floor(r / 2.6) % 4;
+      return PEARL[band][t];
+    },
   };
   // the face stays readable on patterned skins: an oval around the eyes and mouth (sprig-body units)
   const faceZone = (dx, dy, grow) => (dx / (6.2 + grow)) ** 2 + ((dy + 0.9) / (3.5 + grow)) ** 2 < 1;
   const SKIN_IDS = Object.keys(SKINS);
+  // sparkle colours per special skin (and 'shiny'), for the garden's twinkles: PX.SKIN_FX[id] -> ['#hex', ...]
+  const SKIN_FX = {
+    gold: ['#fff27a', '#ffffff'], rainbow: ['#f07a84', '#f6a83a', '#fbf236', '#99e550', '#5fcde4', '#c9a2f0'], crystal: ['#ffffff', '#c8ecfa', '#d8ccf8'], ember: ['#f6a83a', '#fff27a'],
+    pumpkin: ['#ffb040', '#fff27a'], ghost: ['#ffffff', '#e0d8ff'], mummy: ['#fffaf0', '#e8dcc0'], candycorn: ['#ffffff', '#ff9a22', '#ffd23a'],
+    vampire: ['#4a3a6c', '#e8506a', '#c9a2f0'], witch: ['#8e56c8', '#9ad862', '#fff27a'],
+    eclipse: ['#fff27a', '#f6a83a', '#ffffff', '#9aa6f4'], galaxy: ['#ffffff', '#fff6b0', '#c9a2f0', '#b8f0ff'], frost: ['#ffffff', '#c8ecfa', '#e8f6ff'],
+    blossom: ['#ffffff', '#f7b6c8', '#fbf236'], pearl: ['#ffffff', '#fce8f0', '#e4ecfc', '#ece4fc'],
+    shiny: ['#ffffff', '#fff6c8'],
+  };
   const SPOOKY_SKINS = ['pumpkin', 'ghost', 'mummy', 'candycorn', 'vampire', 'witch'];
-  const SKIN_BELLY = { ember: '#fff0c4', pumpkin: '#ffe2b0', ghost: '#ffffff', candycorn: '#fff8e0', vampire: '#f4eeff', witch: '#f0e2ff', mummy: null };
+  const SKIN_BELLY = { ember: '#fff0c4', pumpkin: '#ffe2b0', ghost: '#ffffff', candycorn: '#fff8e0', vampire: '#f4eeff', witch: '#f0e2ff', mummy: null,
+    eclipse: '#fff4d6', galaxy: '#e6dcff', frost: '#f6fbff', blossom: '#fff6fa', pearl: '#fffaf6' };
+  const SKIN_BELLY_SHADE = { eclipse: '#c89060', galaxy: '#8a78c8', frost: '#8cb4dc', blossom: '#d890b0', pearl: '#b8aed0' }; // newer skins (older ones keep the brown)
+  const SKIN_DARK = { galaxy: 1 }; // dark skins get the pale eye patches that dark bodies have
+  // [mid, dark] of each skin, so the newer pattern stickers can pick a colour that shows up on it
+  const SKIN_TONE = { gold: ['#fcd850', '#a8680e'], rainbow: ['#fbe46a', '#8062c0'], crystal: ['#c8ecfa', '#8ab8e0'], ember: ['#d24552', '#8a2433'], pumpkin: ['#f7922e', '#c8581c'],
+    ghost: ['#efeaff', '#c9bdf0'], mummy: ['#ece0c4', '#8a7456'], candycorn: ['#ff9a22', '#d0660c'], vampire: ['#4a3a6c', '#2e2448'], witch: ['#8e56c8', '#5a2e8a'],
+    eclipse: ['#fcc43e', '#c86a1c'], galaxy: ['#3a2e88', '#231a56'], frost: ['#c4e4f8', '#8cbae2'], blossom: ['#fbc2da', '#e690b8'], pearl: ['#ecf0fc', '#c8cfe8'] };
   function applySkin(g, skin, cx, cy, k, base) {
     const f = SKINS[skin]; if (!f) return;
     base = base || RAMPS.cream;
@@ -350,9 +439,9 @@
   }
 
   // ---------------- Hats & extras (shared by buildSprig and the hat icons; sprig 32x32 coordinates) ----------------
-  const HAT_IDS = ['crown', 'beanie', 'tophat', 'flower', 'bow', 'leafcap', 'party', 'wizard', 'sunhat', 'cap', 'witch'];
-  const EXTRA_IDS = ['halo', 'star', 'moon'];
-  const HIDES_LEAVES = { beanie: 1, tophat: 1, wizard: 1, sunhat: 1, cap: 1, witch: 1 };
+  const HAT_IDS = ['crown', 'beanie', 'tophat', 'flower', 'bow', 'leafcap', 'party', 'wizard', 'sunhat', 'cap', 'witch', 'flowercrown', 'bandana', 'headphones', 'propeller'];
+  const EXTRA_IDS = ['halo', 'star', 'moon', 'heart'];
+  const HIDES_LEAVES = { beanie: 1, tophat: 1, wizard: 1, sunhat: 1, cap: 1, witch: 1, propeller: 1 };
   // striped cone from base-left / base-right to tip; stripes spiral a little, 3-tone across the cone
   function cone(h, bl, br, tp, ramps, n) {
     const T = new Grid(h.w, h.h); T.poly([bl, br, tp], '#fff');
@@ -364,7 +453,7 @@
     }
     return h;
   }
-  function hatArt(h, hat, crowned, bloom) {
+  function hatArt(h, hat, crowned, bloom, icon) { // icon: the closet icon version (wide hats kept within 16 px)
     switch (hat) {
       case 'crown': h.poly([[11, 14.5], [11, 9], [13.5, 11.5], [16, 8], [18.5, 11.5], [21, 9], [21, 14.5]], '#f6c83a').rect(11, 13, 10, 1, '#c7861c'); h.px([[15, 12], [16, 12]], '#d95763'); h.px([[12, 11], [16, 9]], '#fff27a'); if (crowned) h.poly([[13.5, 12], [16, 9.5], [18.5, 12]], null); break;
       case 'beanie': h.ell(16, 16.2, 7.8, 4.6, RAMPS.berry, 0, (x, y) => y <= 15).rect(9, 15, 14, 2, '#fbf3dc'); h.ell(16, 10.2, 1.8, 1.8, '#ffffff'); break;
@@ -414,6 +503,45 @@
         h.set(18, 15, '#9fd8ff'); h.set(19, 15, '#9fd8ff');
         break;
       }
+      // ---- newer hats ----
+      case 'flowercrown': { // a leafy wreath round the top of the head with little flowers (leaves, buds and blooms stay visible)
+        const LF = ['#99e550', '#6abe30', '#37946e'];
+        for (const [x, y0] of [[9, 16], [10, 16], [11, 15], [12, 15], [13, 14], [14, 14], [17, 14], [18, 14], [19, 15], [20, 15], [21, 16], [22, 16]]) { h.set(x, y0, LF[0]); h.set(x, y0 + 1, LF[1]); }
+        h.px([[15, 14], [16, 14]], LF[1]); h.px([[15, 15], [16, 15]], LF[2]);
+        for (const [x, y, p, c] of [[10, 15, '#f7a6c8', '#fbf236'], [13, 13, '#ffffff', '#fbf236'], [18, 13, '#c9a2f0', '#fbf236'], [21, 15, '#fff27a', '#f6a83a']]) { h.px([[x, y - 1], [x - 1, y], [x + 1, y], [x, y + 1]], p); h.set(x, y, c); }
+        h.px([[12, 15], [19, 15]], LF[2]); h.set(9, 15, '#ffd6e8'); h.set(18, 12, '#ece0ff'); // petal highlights
+        break;
+      }
+      case 'bandana': { // a red spotty headband with a knot and two flappy tails on the right
+        const RD = ['#ff8a8a', '#e0303c', '#961c30'], x0 = icon ? 11 : 9, x1 = icon ? 20 : 22;
+        for (let x = x0; x <= x1; x++) { h.set(x, 16, x < x0 + 3 ? RD[0] : RD[1]); h.set(x, 17, x > x1 - 3 ? RD[2] : RD[1]); }
+        for (let x = x0 + 1; x <= x1 - 1; x++) h.set(x, 15, x < x0 + 3 || x > x1 - 3 ? RD[1] : RD[0]);
+        const k = x1 + 1; // knot, then the tails
+        h.px([[k, 15], [k, 16], [k, 17], [k - 1, 18]], RD[1]); h.set(k, 16, RD[0]);
+        if (icon) { h.px([[k + 1, 14], [k + 2, 14]], RD[1]); h.px([[k + 1, 18], [k + 2, 18]], RD[2]); }
+        else { h.px([[k + 1, 14], [k + 2, 13], [k + 2, 14], [k + 3, 13]], RD[1]); h.px([[k + 1, 18], [k + 2, 18], [k + 2, 19], [k + 3, 19]], RD[2]); h.set(k + 1, 16, RD[2]); h.set(k + 1, 17, RD[2]); }
+        h.px([[x0 + 2, 16], [x0 + 6, 15], [x0 + 9, 17], [x0 + 5, 17], [x1 - 1, 16]], '#ffffff');
+        break;
+      }
+      case 'headphones': { // a band hugging the top of the head (under the leaves) and round ear cups
+        const CUP = ['#ffb0c8', '#f0588c', '#a82a5c'], BD = ['#eef0f6', '#b4bccc', '#6e7690'], sp = icon ? 2.4 : 0;
+        h.px([[10, 15], [11, 14], [12, 14], [13, 14], [14, 14], [15, 14], [16, 14], [17, 14], [18, 14], [19, 14], [20, 14], [21, 15]], BD[1]); h.px([[12, 14], [13, 14], [14, 14]], BD[0]); h.px([[19, 14], [20, 14]], BD[2]);
+        for (const s of [-1, 1]) { const cx = 16 + s * (7.6 - sp); h.ell(cx, 17.8, 1.8, 2.5, CUP); h.set(Math.floor(cx - 0.9), 16, '#ffe0ec'); }
+        break;
+      }
+      case 'propeller': { // a four-colour beanie with a little propeller on top
+        const P4 = [['#ff8a8a', '#e0303c', '#961c30'], ['#fffab0', '#fcd82c', '#c49c14'], ['#b4ccff', '#4a78f0', '#2a44ac'], ['#c8f494', '#5cc83a', '#2c8434']];
+        const T = new Grid(h.w, h.h); T.ell(16, 16.2, 7.8, 4.9, '#fff', 0, (x, y) => y <= 15);
+        for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) if (T.get(x, y)) {
+          const a = Math.atan2(y + 0.5 - 11, x + 0.5 - 16), R2 = P4[Math.max(0, Math.min(3, Math.floor((Math.PI - a) / (Math.PI / 4))))];
+          const d = (x + 0.5 - 16) / 7.8; h.set(x, y, R2[d < -0.5 ? 0 : d > 0.5 ? 2 : 1]);
+        }
+        h.rect(9, 15, 14, 2, '#3f55b8'); h.rect(9, 15, 4, 1, '#639bff');
+        h.px([[16, 9], [16, 10]], '#8c93a8'); // post
+        h.ell(13.2, 7.9, 2.7, 0.95, P4[0], -0.22).ell(18.8, 7.9, 2.7, 0.95, P4[1], -0.22).ell(16, 8, 0.9, 0.9, '#fbf236');
+        h.px([[11, 12], [12, 11]], '#ffffff');
+        break;
+      }
     }
     return h;
   }
@@ -423,8 +551,61 @@
       case 'halo': h.ell(16, 6.5 + ey, 5, 1.6, '#fbf236').ell(16, 6.5 + ey, 3.3, 0.7, null); break;
       case 'star': h.px([[16, 5], [15, 6], [16, 6], [17, 6], [16, 7]].map(([x, y]) => [x + (crowned ? 7 : 0), y + (crowned ? 1 : 0)]), '#fbf236'); break;
       case 'moon': h.px([[15, 5], [14, 6], [14, 7], [15, 8], [16, 8]].map(([x, y]) => [x + (crowned ? 9 : 0), y + (crowned ? 1 : 0)]), '#c9a2f0'); break;
+      case 'heart': { // a little floating heart (off to the side of a bud or bloom, like the star)
+        const ox = crowned ? 7 : 0, oy = crowned ? 1 : 0;
+        h.px([[15, 4], [17, 4], [14, 5], [15, 5], [16, 5], [17, 5], [18, 5], [15, 6], [16, 6], [17, 6], [16, 7]].map(([x, y]) => [x + ox, y + oy]), '#f7608a');
+        h.px([[14, 5], [15, 4]].map(([x, y]) => [x + ox, y + oy]), '#ffb4cc');
+        break;
+      }
     }
     return h;
+  }
+
+  // RIM: plain body-ramp pixels on the body's silhouette edge. Facing the light (upper-left) -> [x, y, tone, +1] rim light;
+  // facing away (lower-right) -> [x, y, tone, -1] soft core shade. Patterns, belly, face, outline and silhouette are never touched.
+  function rimPixels(g, body, R) { // body: Uint8Array(w*h), 1 = inside the body ellipse
+    const out = [], W = g.w, edge = (x, y) => g.get(x, y) === INK && !body[y * W + x]; // outline outside the body, not a part's inner outline
+    for (let i = 0; i < body.length; i++) {
+      if (!body[i]) continue;
+      const x = i % W, y = (i / W) | 0, t = R.indexOf(g.a[i]);
+      if (t < 0) continue;
+      const d = ((x + 0.5 - 16) / 8.3) * 0.55 + ((y + 0.5 - 22) / 7.7) * 0.85;
+      if (d < -0.3 && (edge(x, y - 1) || edge(x - 1, y))) out.push([x, y, t, 1]);
+      else if (d > 0.45 && (edge(x, y + 1) || edge(x + 1, y))) out.push([x, y, t, -1]);
+    }
+    return out;
+  }
+  // rim colours: step one tone up/down the body ramp (past the ends: blend toward white / ink); skins blend their own colours
+  const rimMemo = new Map();
+  function rimColor(c, t, s, R) {
+    if (R) { if (s > 0 && t > 0) return R[t - 1]; if (s < 0 && t < 2) return R[t + 1]; c = R[t]; }
+    const key = c + (s > 0 ? '+' : '-') + (R ? 'r' : 's');
+    let v = rimMemo.get(key);
+    if (v === undefined) {
+      v = s > 0 ? mixHex(c, '#ffffff', R ? 0.35 : 0.3) : mixHex(c, INK, 0.2);
+      if (rimMemo.size > 2000) rimMemo.clear();
+      rimMemo.set(key, v);
+    }
+    return v;
+  }
+
+  // ---------------- Newer pattern stickers (pixel lists on the 32x32 Sprout, kept off the eyes, cheeks and mouth) ----------------
+  const mirPts = pts => pts.concat(pts.map(([x, y]) => [31 - x, y]));
+  const PAT_PTS = {
+    zigzag: mirPts([[15, 16], [14, 17], [13, 16], [12, 15], [11, 16], [10, 17], [9, 18]]), // across the forehead, under the leaves
+    patches: [[12, 16], [13, 16], [10, 17], [11, 17], [12, 17], [13, 17], [14, 17], [9, 18], [10, 18], [11, 18], [12, 18], [13, 18], [14, 18], [9, 19], [10, 19], [11, 19], [14, 19], [10, 20], [11, 20], [14, 20], [10, 21], [11, 21],
+      [17, 14], [17, 15], [18, 15], [19, 15], [18, 16], [19, 16], [20, 16], [19, 17], [20, 17],
+      [21, 25], [22, 25], [21, 26], [22, 26], [20, 27], [21, 27]],
+    tiger: mirPts([[9, 17], [10, 17], [11, 17], [9, 18], [8, 20], [9, 20], [10, 20], [9, 25], [10, 25], [9, 26], [13, 15], [14, 16]]),
+    moonmark: [[15, 15], [16, 15], [14, 16], [15, 16], [14, 17], [15, 17], [15, 18], [16, 18]],
+  };
+  const SHINY_BAND = [[18, 15], [19, 16], [20, 17], [21, 18], [19, 15], [20, 16], [21, 17], [22, 18]], SHINY_GLINTS = [[19, 15], [9, 24]];
+  const rgbOf = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const lumOf = h => { const [r, g, b] = rgbOf(h); return (r * 0.3 + g * 0.59 + b * 0.11) / 255; };
+  // a sticker colour that shows: the chosen colour, or (when it would vanish on a pale body) mostly the body's own dark tone
+  function patternInk(pc, mid, dark) {
+    if (!mid || !/^#[0-9a-f]{6}$/i.test(pc || '')) return pc;
+    return Math.abs(lumOf(pc) - lumOf(mid)) >= 0.15 ? pc : mixHex(pc, dark, 0.85);
   }
 
   // pose: { frame:0|1 (idle bob / walk step), walk, flap, arms:'down'|'up'|'out'|'paddle'|'hold', eyes:'blink'|'happy'|'closed'|'sad'|..., mouth:'smile'|'open'|'o'|'flat'|'grin' }
@@ -529,8 +710,8 @@
       else { g.ell(12.4, 29.2 + fl, 2.8, 1.8, fc); g.ell(19.6, 29.2 + fr, 2.8, 1.8, fc); }
     }
     // body
-    const bodyMask = new Set();
-    g.ell(16, 22, 8.3, 7.7, R, 0, (x, y) => { bodyMask.add(x + ',' + y); return true; });
+    const bodyMask = new Set(), bodyIdx = new Uint8Array(32 * 32);
+    g.ell(16, 22, 8.3, 7.7, R, 0, (x, y) => { bodyMask.add(x + ',' + y); if (x >= 0 && y >= 0 && x < 32 && y < 32) bodyIdx[y * 32 + x] = 1; return true; });
     // pattern on body
     const onBody = (x, y) => bodyMask.has(x + ',' + y);
     const pc = L.patternColor;
@@ -539,6 +720,10 @@
     if (L.pattern === 'twotone' && !skin) for (const k of bodyMask) { const [x, y] = k.split(',').map(Number); if (y <= 18) g.set(x, y, pc); }
     if (L.pattern === 'mask') for (const k of bodyMask) { const [x, y] = k.split(',').map(Number); if (y >= 19 && y <= 21 && x >= 10 && x <= 21) g.set(x, y, pc); }
     if (L.pattern === 'freckles') g.px([[8, 21], [9, 20], [10, 21], [23, 21], [22, 20], [21, 21], [9, 23], [22, 23]].filter(([x, y]) => onBody(x, y)), pc2);
+    // newer stickers: in the pattern colour, or a deeper body tone when that colour would vanish on a pale body
+    const newPat = Object.prototype.hasOwnProperty.call(PAT_PTS, L.pattern) ? L.pattern : null;
+    const pcN = newPat ? patternInk(newPat === 'moonmark' && pc2 === BELLY ? '#fff27a' : pc2, skin ? (SKIN_TONE[skin] || [])[0] : R[1], skin ? (SKIN_TONE[skin] || [])[1] : R[2]) : null;
+    if (newPat) g.px(PAT_PTS[newPat].filter(([x, y]) => onBody(x, y)), pcN);
     // belly (ember skin: warm cream dragon belly)
     const bellyCol = skin && skin in SKIN_BELLY ? SKIN_BELLY[skin] : (L.belly || BELLY);
     if (bellyCol) g.ell(16, 26, 4.8, 2.9, bellyCol, 0, onBody);
@@ -546,7 +731,7 @@
     // soft shading under the belly (dithered one row up) and a glossy highlight on the head
     if (bellyCol) {
       const isB = (x, y) => { const c = g.get(x, y); return c === bellyCol || c === '#f6d68a'; };
-      const bsh = mixHex(bellyCol, skin ? '#b08a60' : R[2], 0.28), bpts = [];
+      const bsh = mixHex(bellyCol, skin ? (SKIN_BELLY_SHADE[skin] || '#b08a60') : R[2], 0.28), bpts = [];
       for (let y = 23; y < 30; y++) for (let x = 10; x < 22; x++) if (isB(x, y) && (!isB(x, y + 1) || (!isB(x, y + 2) && (x + y) & 1) || (!isB(x + 1, y) && x > 18))) bpts.push([x, y]);
       g.px(bpts, bsh);
       if (!skin) g.px([[11, 16], [12, 16], [10, 17]].filter(([x, y]) => g.get(x, y) === R[0]), mixHex(R[0], '#ffffff', 0.55));
@@ -639,8 +824,18 @@
     void onlyB;
     // socks: shade the sole of each foot
     if (L.pattern === 'socks' && !tent) { const sd = mixHex(pc2, INK, 0.3); for (let y = 26; y < 32; y++) for (let x = 8; x < 24; x++) if (g.get(x, y) === pc2 && !onBody(x, y) && g.get(x, y + 1) === INK) g.set(x, y, sd); }
+    // soft volume (PX.RIM): found on body-ramp (or skin-sentinel) pixels, painted once the body's final colours are known
+    const rim = RIM ? rimPixels(g, bodyIdx, R) : null;
+    if (rim && !skin) for (const [x, y, t, s] of rim) g.set(x, y, rimColor(null, t, s, R));
     // special skin: repaint every sentinel (body-ramp) pixel
     if (skin) applySkin(g, skin, 16, 22, 1, RAMPS[L.body] || RAMPS.mint);
+    if (rim && skin) for (const [x, y, t, s] of rim) if (!(skin === 'ghost' && y >= 26)) g.set(x, y, rimColor(g.get(x, y), t, s, null));
+    // shiny (L.shiny === true): a soft lighter diagonal band high on the right of the head and two tiny white glints.
+    // Recolours body pixels only (never the outline), so the silhouette stays the same; skinned bodies just get the glints.
+    if (L.shiny === true) {
+      if (!skin) for (const [x, y] of SHINY_BAND) { if (!onBody(x, y)) continue; const t = R.indexOf(g.get(x, y)); if (t >= 0) g.set(x, y, t === 0 ? mixHex(R[0], '#ffffff', 0.5) : R[t - 1]); }
+      for (const [x, y] of SHINY_GLINTS) if (onBody(x, y) && g.filled(x, y)) g.set(x, y, '#ffffff');
+    }
     // face
     let eyes = P.eyes || L.eyes;
     const k = INK, w = '#ffffff', eyeShine = mixHex(L.eyeColor || '#5b6ee1', INK, 0.25);
@@ -653,6 +848,23 @@
         case 'sleepy': g.px([[a, 20], [b, 20], [a, 21], [b, 21]], k); g.px([[a - 1, 20], [b + 1, 20]], k); break;
         case 'dot': g.px([[sd < 0 ? b : a, 20], [sd < 0 ? b : a, 21]], k); break;
         case 'sparkle': g.px([[a, 19], [b, 19], [a, 20], [b, 20]], k); g.px([[a, 21], [b, 21]], L.eyeColor || '#5b6ee1'); g.set(a, 19, w); g.set(b, 21, w); g.px([[a - 1, 20], [b + 1, 20]], k); break;
+        // newer styles (hatched eye styles; pose eyes like happy/blink/closed/sad still replace them)
+        case 'star': { // golden star-shaped eyes with an ink edge (3 wide, 4 tall), so they show on pale and yellow bodies too
+          const c = sd < 0 ? a : b;
+          g.px([[c, 18], [c - 1, 19], [c + 1, 19], [c - 1, 21], [c + 1, 21]], k);
+          g.set(c, 19, '#fbf236'); g.set(c, 20, '#fff6c8'); g.px([[c - 1, 20], [c + 1, 20]], '#f6c83a');
+          break;
+        }
+        case 'wink': // left eye open, right eye closed in a happy arch
+          if (sd > 0) { g.px([[a, 20], [b, 20]], k); g.px([[a - 1, 21], [b + 1, 21]], k); }
+          else { g.px([[a, 19], [b, 19], [a, 20], [b, 20], [a, 21], [b, 21]], k); g.set(a, 19, w); g.set(b, 21, eyeShine); }
+          break;
+        case 'big': { // bigger shiny eyes: 3 wide, 4 tall, soft outer corners
+          const o = sd < 0 ? a - 1 : b + 1;
+          g.px([[a, 18], [b, 18], [a, 19], [b, 19], [a, 20], [b, 20], [a, 21], [b, 21], [o, 19], [o, 20]], k);
+          g.set(a, 19, w); g.set(a, 21, L.eyeColor || '#5b6ee1'); g.set(b, 21, eyeShine);
+          break;
+        }
         default:
           g.px([[a, 19], [b, 19], [a, 20], [b, 20], [a, 21], [b, 21]], k); g.set(a, 19, w); g.set(b, 21, eyeShine);
           if (eyes === 'brave') { if (sd < 0) g.px([[a - 1, 17], [a, 17], [b, 18]], k); else g.px([[b + 1, 17], [b, 17], [a, 18]], k); }
@@ -661,7 +873,7 @@
     };
     // Dark bodies (night, plum, cocoa…) swallow ink eyes: give them pale eye patches and a muzzle so the face reads.
     const bodyMid = ((RAMPS[L.body] || RAMPS.mint)[1]).slice(1), lum = (parseInt(bodyMid.slice(0, 2), 16) * 0.3 + parseInt(bodyMid.slice(2, 4), 16) * 0.59 + parseInt(bodyMid.slice(4, 6), 16) * 0.11) / 255;
-    if (!skin && lum < 0.42) {
+    if ((!skin && lum < 0.42) || (skin && SKIN_DARK[skin])) {
       const pale = '#e8ecff', onFace = (x, y) => g.filled(x, y);
       for (const x0 of [12, 18]) for (let y = 18; y <= 22; y++) for (let x = x0 - 1; x <= x0 + 2; x++) {
         const corner = (y === 18 || y === 22) && (x === x0 - 1 || x === x0 + 2);
@@ -1799,6 +2011,70 @@
       g.poly([[5.6, 6.4], [8.2, 4.2], [4, 1.4]], '#fbe0a0'); g.poly([[14.4, 6.4], [11.8, 4.2], [16, 1.4]], '#fbe0a0'); g.poly([[8.8, 4], [11.2, 4], [10, 1.2]], '#f6c83a');
       g.outline(); g.px([[5, 6], [5, 7], [6, 5]], '#ffb0b8'); g.px([[8, 12], [10, 16], [6, 18]], '#f6c83a');
     },
+    // ---- special eggs (2026) ----
+    eclipse(g) { // sunny gold with a starry night crescent, joined by a glowing seam
+      const e = eggShape(g, ECL.sun);
+      const side = (x, y) => Math.hypot(x + 0.5 - 4.2, (y + 0.5 - 12.8) * 0.72) - 7.2; // < 0: sunny side
+      for (const [x, y, dx, dy] of e) {
+        if (side(x, y) < 0) { if (side(x + 1, y) >= 0) g.set(x, y, dy > 0.45 ? ECL.dusk[2] : ECL.dusk[1]); continue; }
+        if (side(x - 1, y) < 0 || side(x, y - 1) < 0 || side(x, y + 1) < 0) g.set(x, y, ECL.seam);
+        else if (side(x - 2, y) < 0) g.set(x, y, ECL.night[0]);
+        else g.set(x, y, dx > 0.62 || dy > 0.72 ? ECL.night[2] : ECL.night[1]);
+      }
+      g.outline();
+      g.px([[5, 12], [6, 12], [7, 12], [5, 13], [7, 13], [5, 14], [6, 14], [7, 14]], '#fff6b0'); g.set(6, 13, '#ffffff'); // a little sun...
+      g.px([[6, 10], [6, 16], [3, 13], [9, 13], [4, 11], [8, 11], [4, 15], [8, 15]], '#e27a26');
+      g.px([[14, 7], [13, 8], [13, 9], [14, 10]], '#fff6b0'); g.set(15, 7, '#fff6b0'); // ...and a tiny crescent moon
+      g.px([[12, 18], [15, 15], [16, 11]], '#ffffff'); g.px([[13, 13], [11, 21]], '#fff27a'); g.px([[15, 3], [14, 4], [16, 4], [15, 5]], '#c9d0ff'); g.set(15, 4, '#ffffff');
+      g.px([[5, 6], [5, 7], [6, 5]], '#ffffff');
+      g.px([[1, 4], [0, 5], [2, 5], [1, 6]], '#fff27a'); g.px([[18, 17], [17, 18], [19, 18], [18, 19]], '#c9d0ff'); g.px([[16, 1]], '#ffffff');
+    },
+    starry(g) { // deep indigo with a soft nebula band and twinkly stars
+      const e = eggShape(g, GAL);
+      for (const [x, y] of e) {
+        const t = GAL.indexOf(g.get(x, y)), v = (y + 0.5 - 13) + (x + 0.5 - 10) * 0.8;
+        if (Math.abs(v) < 1.3) g.set(x, y, NEB[Math.max(0, t)]);
+        else if (Math.abs(v) < 2.8 && (x + y) & 1) g.set(x, y, NEB[Math.min(2, Math.max(0, t) + 1)]);
+      }
+      g.outline();
+      for (const [cx, cy] of [[7, 8], [13, 16]]) { g.px([[cx - 1, cy], [cx + 1, cy], [cx, cy - 1], [cx, cy + 1]], '#b8c4ff'); g.set(cx, cy, '#ffffff'); }
+      g.px([[12, 6], [5, 15], [15, 11], [9, 19], [11, 10], [6, 18]], '#ffffff'); g.px([[14, 8], [8, 13], [12, 20]], '#fff6b0'); g.px([[4, 11], [15, 18]], '#b8f0ff');
+      g.px([[5, 6], [6, 5]], '#9a8ef0');
+      g.px([[17, 2], [16, 3], [18, 3], [17, 4]], '#fff6b0'); g.set(17, 3, '#ffffff'); g.px([[1, 16], [2, 9]], '#c9a2f0'); g.px([[18, 12]], '#b8f0ff');
+    },
+    frost(g) { // icy blue under a snowy cap, with a snowflake and frosty glints
+      const e = eggShape(g, FROST);
+      const capAt = x => 7.2 + Math.sin(x * 1.25 + 0.4) * 0.9;
+      for (const [x, y] of e) { const cap = capAt(x); if (y + 0.5 < cap) g.set(x, y, '#ffffff'); else if (y + 0.5 < cap + 1) g.set(x, y, '#8cc0ea'); }
+      g.outline();
+      g.px([[5, 9], [12, 9], [12, 10], [15, 9]].filter(([x, y]) => g.filled(x, y)), '#ffffff'); g.px([[12, 11]].filter(([x, y]) => g.filled(x, y)), '#dff4ff'); // icicles
+      const fx = 11, fy = 14; // a snowflake
+      g.px([[fx, fy - 2], [fx, fy - 1], [fx, fy + 1], [fx, fy + 2], [fx - 2, fy], [fx - 1, fy], [fx + 1, fy], [fx + 2, fy], [fx - 2, fy - 2], [fx + 2, fy - 2], [fx - 2, fy + 2], [fx + 2, fy + 2], [fx - 1, fy - 1], [fx + 1, fy - 1], [fx - 1, fy + 1], [fx + 1, fy + 1]], '#ffffff'); g.set(fx, fy, '#dff4ff');
+      for (const [x, y] of [[6, 18], [15, 19]]) g.px([[x, y], [x - 1, y - 1], [x + 1, y - 1], [x - 1, y + 1], [x + 1, y + 1]].filter(([a, b]) => g.filled(a, b)), '#ffffff');
+      g.px([[5, 13], [16, 13], [9, 21]].filter(([x, y]) => g.filled(x, y)), '#f0faff');
+      g.px([[5, 6], [6, 5]], '#dff4ff');
+      g.px([[1, 7], [0, 8], [2, 8], [1, 9]], '#ffffff'); g.px([[18, 16], [17, 17], [19, 17], [18, 18]], '#c8ecfa'); g.px([[16, 2], [3, 19]], '#c8ecfa');
+    },
+    blossom(g) { // soft spring pink sprinkled with little 5-petal flowers
+      const e = eggShape(g, BLOS);
+      g.outline();
+      const flower = (x, y) => { g.px([[x, y - 1], [x - 1, y], [x + 1, y]], '#ffffff'); g.px([[x - 1, y + 1], [x + 1, y + 1]], '#fff4f8'); g.set(x, y, '#fbf236'); };
+      for (const [x, y] of [[7, 8], [13, 11], [6, 15], [12, 18], [10, 4]]) flower(x, y);
+      g.px([[10, 13], [16, 15], [8, 20], [4, 11]].filter(([x, y]) => g.filled(x, y)), '#ffe8f2');
+      g.px([[5, 6], [6, 5]], '#ffffff');
+      g.px([[1, 5], [2, 5], [1, 6]], '#f7b6c8'); g.px([[18, 16], [18, 17]], '#f7b6c8'); g.px([[17, 20], [2, 15]], '#ffd6e6'); g.px([[16, 2]], '#ffffff'); void e;
+    },
+    pearl(g) { // pearly white with a soft pastel sheen and a bright shine
+      const e = eggShape(g, PEARL[0]);
+      for (const [x, y, dx, dy] of e) {
+        const t = PEARL[0].indexOf(g.get(x, y)), r = Math.hypot(x + 0.5 - 6.5, (y + 0.5 - 8) * 0.8), band = Math.floor(r / 2.4 + ((x + y) & 1) * 0.3) % 4;
+        g.set(x, y, PEARL[band][Math.max(0, t)]);
+        if (dx > 0.2 && dx < 0.7 && dy > 0.35 && dy < 0.75 && t === 2 && (x + y) & 1) g.set(x, y, PEARL[band][1]); // soft reflected light
+      }
+      g.outline();
+      g.px([[5, 6], [6, 6], [5, 7], [6, 5], [4, 8]], '#ffffff'); g.px([[7, 5], [4, 9]], '#fff8fc');
+      g.px([[1, 5], [0, 6], [2, 6], [1, 7]], '#ffffff'); g.px([[18, 16], [18, 17]], '#f7c6de'); g.px([[17, 19], [16, 2]], '#c8d8ff');
+    },
   };
   const EL_ICON = {
     leaf: [['....kkk', '..kkLLk', '.kLLLek', 'kLLeeEk', 'kLeeEk.', 'keEEk..', 'kkkk...'], { L: '#99e550', e: '#6abe30', E: '#37946e' }],
@@ -1861,6 +2137,11 @@
         case 'freckles': put([[3, 6], [4, 5], [5, 6], [8, 6], [9, 5], [10, 6], [6, 3]], '#a8653a'); put([[4, 8], [5, 8], [8, 8], [9, 8]], '#f4a3b8'); break;
         case 'heart': g.px([[4, 4], [5, 4], [7, 4], [8, 4], [3, 5], [4, 5], [5, 5], [6, 5], [7, 5], [8, 5], [9, 5], [3, 6], [4, 6], [5, 6], [6, 6], [7, 6], [8, 6], [9, 6], [4, 7], [5, 7], [6, 7], [7, 7], [8, 7], [5, 8], [6, 8], [7, 8], [6, 9]], '#e8608a'); g.px([[4, 5]], '#ffb0c8'); break;
         case 'socks': piece(g, t => t.str(['......ppp', '......www', '......www', '.....wwww', '...wwwwww', '...ppwwwp'], 0, 3, { p: '#f07aa8', w: '#ffffff' })); g.px([[5, 8], [6, 8], [7, 8]], '#dfe8fb'); break;
+        case 'zigzag': for (let x = 2; x <= 10; x++) { const y = [7, 6, 5, 6, 7, 6, 5, 6, 7][x - 2]; put([[x, y], [x, y + 1]], C); } break;
+        case 'patches': put([[4, 3], [5, 3], [3, 4], [4, 4], [5, 4], [6, 4], [3, 5], [4, 5], [5, 5], [4, 6], [8, 7], [9, 7], [7, 8], [8, 8], [9, 8], [8, 9], [9, 9], [9, 4], [9, 5], [10, 5]], C); break;
+        case 'tiger': { const L2 = [[2, 4], [3, 4], [4, 5], [2, 7], [3, 7], [4, 7], [3, 9], [4, 9], [6, 2], [6, 3]]; put(L2.concat(L2.map(([x, y]) => [12 - x, y])), C); break; }
+        case 'moonmark': g.px([[6, 3], [7, 3], [8, 3], [5, 4], [6, 4], [7, 4], [4, 5], [5, 5], [6, 5], [4, 6], [5, 6], [4, 7], [5, 7], [6, 7], [5, 8], [6, 8], [7, 8], [6, 9], [7, 9], [8, 9]], '#fbf236');
+          g.px([[6, 3], [5, 4], [4, 5], [4, 6], [4, 7]], '#fff6c8'); g.px([[8, 3], [7, 4], [6, 5], [6, 7], [7, 8], [8, 9]], '#f6c83a'); break;
         default: break;
       }
       g.outline('#ffffff'); g.outline();
@@ -1869,7 +2150,7 @@
     // 16x14 icon of a hat or extra (same art as on the Sprig)
     hat(id) {
       const h = new Grid(32, 32);
-      if (EXTRA_IDS.includes(id)) extraArt(h, id, false); else hatArt(h, id, false, null);
+      if (EXTRA_IDS.includes(id)) extraArt(h, id, false); else hatArt(h, id, false, null, true);
       h.outline();
       return cropCentre(h, 16, 14);
     },
@@ -2483,10 +2764,20 @@
 
   // ---------------- Chiptune feedback sounds ----------------
   const Sound = (() => {
-    let ac = null, muted = false;
-    function ctx() { if (!ac) { const A = window.AudioContext || window.webkitAudioContext; if (A) ac = new A(); } return ac; }
+    let ac = null, muted = false, held = false, primed = false;
+    function ctx() {
+      if (ac && ac.state === 'closed') ac = null;
+      if (!ac) { const A = window.AudioContext || window.webkitAudioContext; if (A) { try { ac = new A(); } catch (e) { ac = null; } } }
+      return ac;
+    }
+    // resume whenever the context isn't running: iOS reports 'suspended', or 'interrupted' after a call / backgrounding
+    function wake(a) {
+      if (!a || a.state === 'running' || a.state === 'closed') return;
+      try { const p = a.resume(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* not allowed yet: the next tap tries again */ }
+    }
     function tone(f0, f1, dur, type, vol, delay) {
-      const a = ctx(); if (!a || muted) return;
+      if (muted || held) return; // held: page hidden, so nothing queues up to burst out on return
+      const a = ctx(); if (!a) return;
       const t0 = a.currentTime + (delay || 0);
       const o = a.createOscillator(), gn = a.createGain();
       o.type = type || 'square'; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
@@ -2494,7 +2785,8 @@
       o.connect(gn); gn.connect(a.destination); o.start(t0); o.stop(t0 + dur + 0.02);
     }
     function noise(dur, vol, freq) {
-      const a = ctx(); if (!a || muted) return;
+      if (muted || held) return;
+      const a = ctx(); if (!a) return;
       const n = Math.floor(a.sampleRate * dur), b = a.createBuffer(1, n, a.sampleRate), d = b.getChannelData(0);
       let v = 0; for (let i = 0; i < n; i++) { if (i % 6 === 0) v = Math.random() * 2 - 1; d[i] = v * (1 - i / n); }
       const s = a.createBufferSource(); s.buffer = b; const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq || 900;
@@ -2517,8 +2809,20 @@
       snap: () => { noise(0.06, 0.25, 3000); tone(1800, 900, 0.04, 'square', 0.02); },
     };
     return {
-      play(n) { try { fx[n] && fx[n](); } catch (e) { /* audio optional */ } },
-      unlock() { try { const a = ctx(); if (a && a.state === 'suspended') a.resume(); } catch (e) {} },
+      play(n) { try { if (!muted && !held && ac) wake(ac); fx[n] && fx[n](); } catch (e) { /* audio optional */ } },
+      // call from a tap: creates / resumes the context (and on first use plays a silent blip, which older iOS needs)
+      unlock() {
+        held = false;
+        try {
+          const a = ctx(); if (!a) return;
+          wake(a);
+          if (!primed) { primed = true; const b = a.createBuffer(1, 1, 22050), s = a.createBufferSource(); s.buffer = b; s.connect(a.destination); s.start(0); }
+        } catch (e) { /* audio optional */ }
+      },
+      // page hidden -> suspend (saves battery, stops stray notes); page shown -> resume
+      suspend() { held = true; try { if (ac && ac.state === 'running') { const p = ac.suspend(); if (p && p.catch) p.catch(() => {}); } } catch (e) { /* audio optional */ } },
+      resume() { held = false; try { if (ac) wake(ac); } catch (e) { /* audio optional */ } },
+      get state() { return ac ? ac.state : 'none'; },
       get muted() { return muted; }, set muted(v) { muted = !!v; },
     };
   })();
@@ -2528,5 +2832,10 @@
     gumballMachine, gumballColors: GUM.map(r => r[1]),
     // pet houses: door (bottom centre) and window centres, relative to the bottom-centre anchor
     HOMES: { shroomhouse: { door: [0, 0], win: [[8, -12]], w: 36, h: 40 }, beachhut: { door: [0, 0], win: [[-10, -13], [9, -13]], w: 30, h: 38 },
-      crystalcave: { door: [0, 0], win: [[12, -12]], w: 42, h: 30 }, gingerhouse: { door: [0, 0], win: [[-10, -13], [9, -13]], w: 32, h: 36 } }, GUMBALL_W: 40, GUMBALL_H: 60, SKIN_IDS, SPOOKY_SKINS, HAT_IDS, EXTRA_IDS, PATTERN_IDS: ['spots', 'stripes', 'twotone', 'mask', 'star', 'freckles', 'heart', 'socks'] };
+      crystalcave: { door: [0, 0], win: [[12, -12]], w: 42, h: 30 }, gingerhouse: { door: [0, 0], win: [[-10, -13], [9, -13]], w: 32, h: 36 } }, GUMBALL_W: 40, GUMBALL_H: 60, SKIN_IDS, SPOOKY_SKINS, HAT_IDS, EXTRA_IDS, SKIN_FX,
+    PATTERN_IDS: ['spots', 'stripes', 'twotone', 'mask', 'star', 'freckles', 'heart', 'socks', 'zigzag', 'patches', 'tiger', 'moonmark'],
+    EYE_IDS: ['round', 'sparkle', 'dot', 'sleepy', 'brave', 'star', 'wink', 'big'], // styles a Sprout can hatch with (pose eyes like happy/blink are separate)
+    // soft rim light + core shade on Sprout bodies (on by default); setting it clears the sprite cache so the change shows at once
+    get RIM() { return RIM; }, set RIM(v) { v = !!v; if (v !== RIM) { RIM = v; cache.clear(); } },
+  };
 })();
