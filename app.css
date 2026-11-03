@@ -15,7 +15,7 @@
 @keyframes bump{40%{transform:scale(1.15)}}
 #stage{flex:1 1 auto;position:relative;min-height:0;overflow:hidden}
 .screen{position:absolute;inset:0;overflow:hidden}
-#nav{flex:0 0 auto;display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));background:var(--panel);
+#nav{flex:0 0 auto;display:grid;grid-template-columns:repeat(var(--nav-n,6),minmax(0,1fr));gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));background:var(--panel);
   border-top:3px solid var(--edge);position:relative;z-index:5}
 #nav button{position:relative;border:0;background:transparent;border-radius:12px;padding:4px 0 3px;display:flex;flex-direction:column;align-items:center;gap:1px;
   font-family:var(--f-ui);font-weight:600;font-size:14px;color:var(--ink-soft);min-height:48px}
@@ -84,3 +84,217 @@
 .bk-row b{display:block;font-size:15px}
 .bk-row small{display:block;font-size:13px;color:var(--ink-soft)}
 .bk-row .btn{padding:6px 12px;font-size:15px}
+
+/* =====================================================================================================================
+   Solunar Sprouts menu kit + shared moments (app.js: celebrate / wipe / fx / evolution / goal chip / daily gift / errors)
+   One cosy look for every hub: cream cards with a tan edge, leaf greens, sunny gold, moon blues, Pixelify Sans headings,
+   Fredoka for reading, and a mode colour per screen. Classes: .sv-*.
+   ===================================================================================================================== */
+:root{--sv-ink:#5b4630;--sv-dk:#3b2c3a;--sv-night:#2a2440;--sv-cream:#fffdf6;--sv-moon:#9fb4f0;--sv-moon-dk:#4a5a9e;--sv-leaf:#6abe30;
+  --sv-out:2px 0 var(--sv-dk),-2px 0 var(--sv-dk),0 2px var(--sv-dk),0 -2px var(--sv-dk),2px 2px var(--sv-dk),-2px 2px var(--sv-dk),2px -2px var(--sv-dk),-2px -2px var(--sv-dk);
+  --sv-out3:3px 0 var(--sv-dk),-3px 0 var(--sv-dk),0 3px var(--sv-dk),0 -3px var(--sv-dk),3px 3px var(--sv-dk),-3px 3px var(--sv-dk),3px -3px var(--sv-dk),-3px -3px var(--sv-dk),0 6px rgba(42,36,64,.35)}
+
+/* ---------- mode colours: one per screen (tab strip, banners, hub cards, selected tabs, results windows) ---------- */
+.screen{--mode:#5aab45;--mode-dk:#2b8243;--bg1:#e6f5dc;--bg2:#d6edc8}
+#scr-garden{--mode:#5aab45;--mode-dk:#2b8243;--bg1:#e6f5dc;--bg2:#d6edc8}
+#scr-race{--mode:#f39a32;--mode-dk:#b35f12;--bg1:#fdf0dc;--bg2:#f8e2c2}
+#scr-battle{--mode:#e0535f;--mode-dk:#962b36;--bg1:#fbe8e6;--bg2:#f5d8d6}
+#scr-arcade{--mode:#9a6ad0;--mode-dk:#5e3a8c;--bg1:#efe7fa;--bg2:#e2d6f3}
+#scr-shop{--mode:#f2b632;--mode-dk:#a8780c;--bg1:#fdf5d8;--bg2:#f8ecc0}
+#scr-sprouts{--mode:#5a8fd8;--mode-dk:#2f5a9a;--bg1:#e3edfb;--bg2:#d2e2f6}
+#nav [data-go=garden]{--nav-c:#5aab45}#nav [data-go=race]{--nav-c:#f39a32}#nav [data-go=battle]{--nav-c:#e0535f}
+#nav [data-go=arcade]{--nav-c:#9a6ad0}#nav [data-go=shop]{--nav-c:#f2b632}#nav [data-go=sprouts]{--nav-c:#5a8fd8}
+#nav button{border-top:4px solid transparent}
+#nav button[aria-current="page"]{border-top-color:var(--nav-c,var(--sun-edge));animation:svTab .16s ease-out}
+#nav button:active{transform:translateY(2px)}
+#nav button span{line-height:1.05;text-align:center}
+/* six tabs: smaller labels on a phone so they fit */
+@media (max-width:520px){#nav{gap:2px;padding-left:4px;padding-right:4px}#nav button{font-size:12.5px}#nav button canvas{width:30px;height:30px}}
+@keyframes svTab{50%{transform:scale(1.06)}}
+
+/* ---------- screen change (app.js go()): fade in; menu screens also rise a little (canvas screens only fade) ---------- */
+.screen.scr-in{animation:svScrIn .18s ease-out}
+#scr-race.scr-in,#scr-battle.scr-in,#scr-shop.scr-in,#scr-sprouts.scr-in,#scr-arcade.scr-in{animation-name:svScrInUp}
+@keyframes svScrIn{from{opacity:0}}
+@keyframes svScrInUp{from{opacity:0;transform:translateY(10px)}}
+
+/* ---------- wide screens (iPads fill the screen: ui.css) ---------- */
+@media (min-width:600px){
+  #hud{padding:8px 16px}
+  #hud .player-chip span{font-size:19px}
+  .pill-stat{font-size:16px}
+  #nav button{font-size:14.5px}
+  #nav button canvas{width:34px;height:34px}
+  /* hubs: everything (tabs and lists too) in a centred column up to 760px; the whole width still scrolls */
+  html body .b-hub,html body .r-hub{padding-left:max(12px,calc(50% - 368px));padding-right:max(12px,calc(50% - 368px))}
+  html body .sh-wrap,html body .sp-wrap{max-width:760px}
+  .modal-card{max-width:440px}
+  .modal-card .m-body,.card p{font-size:16px}
+  .btn{min-height:48px}
+  .btn.wide{min-height:54px;font-size:20px}
+  .icon-btn{min-height:0}
+}
+/* the bottom tabs: capped and centred on a wide screen */
+@media (min-width:900px){#nav{grid-template-columns:repeat(var(--nav-n,6),minmax(0,128px));justify-content:center;gap:10px}}
+/* HOLD-NARROW: the Arcade isn't built for a wide screen yet, so on an iPad it keeps exactly the width the whole game had before
+   (460px, or 62% of the height up to 680px on a tall screen), centred, until its builder opts in by adding sv-wide-arcade to
+   <html>. (.screen is absolutely placed in #stage, so only its sides move; the scene measures its own box.) */
+@media (min-width:600px){html:not(.sv-wide-arcade) #scr-arcade{ /* HOLD-NARROW */ left:max(0px,calc(50% - 230px));right:max(0px,calc(50% - 230px));box-shadow:0 0 0 3px rgba(91,70,48,.22),0 0 30px rgba(43,90,30,.2)}}
+@media (min-width:600px) and (min-height:900px){html:not(.sv-wide-arcade) #scr-arcade{ /* HOLD-NARROW */ left:max(0px,calc(50% - min(340px,31vh)));right:max(0px,calc(50% - min(340px,31vh)))}}
+
+/* ---------- the menu kit: banners, hub cards, tabs ---------- */
+/* a screen banner: the mode colour with a soft brown edge, a Pixelify title in cream with an ink outline, a cream stat chip.
+   (The Shop and Sprouts heads are cards with more inside them: they get the card look below, with the mode colour on top.) */
+.sv-banner,html body .screen :is(.b-top,.r-head){display:flex;align-items:center;gap:10px;min-height:56px;padding:8px 14px;border:2px solid var(--sv-ink);border-bottom-width:5px;
+  border-radius:20px;color:#fff;background:var(--mode);background:linear-gradient(180deg,color-mix(in srgb,var(--mode) 78%,#fff),var(--mode));
+  box-shadow:inset 0 3px 0 rgba(255,255,255,.35),0 3px 0 rgba(91,70,48,.2)}
+.sv-banner :is(h1,h2),html body .screen :is(.b-top h1,.r-head h2,.r-head h1){margin:0;color:#fff;font-family:var(--f-px);font-weight:700;text-shadow:var(--sv-out),0 4px 0 rgba(59,44,58,.25)}
+.sv-banner :is(h1,h2){flex:1 1 auto;font-size:26px;line-height:1.05}
+.sv-chip,html body .screen :is(.b-top .b-rec,.r-head .r-count){flex:0 0 auto;background:var(--sv-cream);border:2px solid var(--sv-ink);border-radius:999px;color:var(--sv-ink);
+  font-family:var(--f-ui);font-weight:700;padding:3px 12px;font-variant-numeric:tabular-nums}
+html body .screen :is(.r-head .label,.r-head .r-sub){color:#fff;text-shadow:0 1px 0 rgba(59,44,58,.6)}
+@media (min-width:600px){.sv-banner,html body .screen :is(.b-top,.r-head){min-height:64px}.sv-banner :is(h1,h2){font-size:30px}}
+/* hub cards: cream with the tan edge, the screen's colour along the top */
+.sv-card,html body :is(.b-hub,.r-hub,.sh-wrap,.sp-wrap) .panel{background:var(--panel);border:2px solid var(--line);border-top:6px solid var(--mode);border-bottom:5px solid var(--edge);border-radius:20px;
+  box-shadow:0 3px 0 rgba(91,70,48,.12)}
+/* tabs inside screens: cream with a tan edge; the selected one is filled with the screen's colour */
+.sv-tab,html body :is(.b-tab,.r-tab,.sh-tab,.sp-tabs button){border:2px solid var(--line);border-bottom:4px solid var(--edge);background:var(--panel);color:var(--ink);transition:transform .1s}
+.sv-tab:active,html body :is(.b-tab,.r-tab,.sh-tab,.sp-tabs button):active{transform:translateY(2px)}
+.sv-tab[aria-selected="true"],html body :is(.b-tab,.r-tab,.sh-tab,.sp-tabs button)[aria-selected="true"]{background:var(--mode);background:linear-gradient(180deg,color-mix(in srgb,var(--mode) 75%,#fff),var(--mode));
+  border-color:var(--mode-dk);color:#fff;text-shadow:0 1px 0 rgba(59,44,58,.5)}
+.btn{transition:transform .1s ease-out}
+.btn.go{text-shadow:0 1px 0 rgba(20,60,16,.4)}
+/* pop-ups: the cream card with a sunny band on top, over a soft twilight shade */
+#modalRoot .overlay{background:rgba(42,36,64,.5)}
+.modal-card{border-top:7px solid var(--sun);box-shadow:0 14px 44px rgba(42,36,64,.4),0 0 0 3px rgba(255,255,255,.35)}
+/* the top bar on a phone: the clock shows only its sun or moon and the time, so the player's name fits beside the goal chip */
+@media (max-width:440px){#clockText .ck-w{display:none}#hud{gap:6px;padding-left:10px;padding-right:10px}.pill-stat{padding-left:6px;padding-right:9px}}
+
+/* ---------- messages: a message box just under the top bar ---------- */
+.toast{top:70px;bottom:auto;width:max-content;max-width:min(560px,calc(100% - 32px));background:var(--sv-cream);color:var(--sv-ink);border:2px solid var(--sv-ink);border-bottom-width:4px;border-radius:18px;
+  box-shadow:inset 0 0 0 2px var(--sv-cream),inset 0 0 0 4px #cdeec3,0 8px 22px rgba(42,36,64,.25);font:600 16px/1.3 var(--f-ui);padding:10px 16px 10px;z-index:38;white-space:normal;text-align:center}
+#app.chrome-off .toast{top:calc(14px + env(safe-area-inset-top,0px))}
+@media (min-width:600px){.toast{font-size:17px;top:76px}}
+
+/* ---------- next-goal chip (app.js goalTick): a cream pill in the top bar; only its icon on a phone ---------- */
+.goal-chip{flex:0 1 auto;min-width:0;max-width:360px;margin:0 auto;display:flex;align-items:center;gap:6px;height:44px;padding:2px 14px 2px 6px;background:var(--sv-cream);
+  border:2px solid var(--line);border-top:4px solid var(--sun);border-bottom:4px solid var(--edge);border-radius:999px;font:600 15px/1 var(--f-ui);color:var(--ink);white-space:nowrap;overflow:hidden}
+.goal-chip span{overflow:hidden;text-overflow:ellipsis}
+.goal-chip canvas{height:32px;width:auto;max-width:36px;flex:0 0 auto}
+.goal-chip:active{transform:translateY(2px);border-bottom-width:2px}
+.goal-chip.pop{animation:svGoal .5s ease-out}
+@keyframes svGoal{30%{transform:scale(1.08)}}
+@media (min-width:600px){.goal-chip{font-size:16px;height:46px}}
+@media (max-width:599px){.goal-chip{flex:0 0 auto;width:48px;height:48px;padding:0;justify-content:center}.goal-chip span{display:none}}
+
+/* ---------- on-screen error bar (app.js reportError): for a grown-up to screenshot ---------- */
+.sv-err{position:fixed;left:8px;right:8px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:9999;max-width:640px;margin:0 auto;background:var(--sv-night);color:#fff;
+  border:2px solid var(--berry);border-radius:12px;padding:8px 12px;font:600 13px/1.35 var(--f-ui);box-shadow:0 4px 0 rgba(0,0,0,.3);cursor:pointer}
+
+/* ---------- celebrate(): a twilight sky above every scene and pop-up ---------- */
+.sv-cel-title,.sv-res-title{text-shadow:var(--sv-out3)}
+.sv-cel{position:absolute;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;overflow:hidden;touch-action:none;
+  background:radial-gradient(circle at 50% 36%,rgba(255,214,120,.38),rgba(255,214,120,0) 30%),radial-gradient(circle at 50% 38%,rgba(78,88,164,.9),rgba(30,26,62,.96) 72%);animation:svFade .22s ease-out}
+.sv-cel-rays{position:absolute;left:50%;top:38%;width:min(760px,130vmin);aspect-ratio:1;transform:translate(-50%,-50%);pointer-events:none;border-radius:50%;
+  background:repeating-conic-gradient(from 0deg,rgba(255,214,102,.26) 0deg 9deg,rgba(255,214,102,0) 9deg 22.5deg);
+  -webkit-mask:radial-gradient(closest-side,#000 25%,transparent 100%);mask:radial-gradient(closest-side,#000 25%,transparent 100%);
+  animation:svRays 12s linear infinite;will-change:transform}
+.sv-cel.k-legend .sv-cel-rays,.sv-cel.k-evolve .sv-cel-rays{background:repeating-conic-gradient(from 0deg,rgba(190,206,255,.32) 0deg 9deg,rgba(190,206,255,0) 9deg 22.5deg)}
+.sv-cel.k-trophy .sv-cel-rays,.sv-cel.k-star .sv-cel-rays{background:repeating-conic-gradient(from 0deg,rgba(255,204,68,.36) 0deg 9deg,rgba(255,204,68,0) 9deg 22.5deg)}
+.sv-cel-fx{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:2}
+.sv-cel-box{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;max-width:560px;max-height:100%;text-align:center}
+.sv-cel-hero{position:relative;display:flex;align-items:flex-end;justify-content:center;padding-bottom:12px;animation:svPop .4s cubic-bezier(.2,1.5,.45,1) .05s both}
+/* (a little grassy hill under the picture) */
+.sv-cel-hero::before{content:"";position:absolute;left:50%;bottom:0;width:80%;min-width:110px;height:26px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(closest-side,#99e550,#6abe30 70%,rgba(106,190,48,0));box-shadow:inset 0 -4px 0 rgba(43,130,67,.55)}
+.sv-cel-hero canvas{position:relative;display:block}
+.sv-cel-eb{display:inline-block;padding:4px 14px 5px;background:var(--accent);border:2px solid var(--sv-dk);border-radius:999px;font:600 15px/1.1 var(--f-ui);color:#fff8e6;letter-spacing:.04em;text-transform:uppercase;box-shadow:0 3px 0 rgba(0,0,0,.3)}
+.sv-cel.k-legend .sv-cel-eb,.sv-cel.k-evolve .sv-cel-eb{background:var(--sv-moon-dk)}
+.sv-cel.k-gift .sv-cel-eb,.sv-cel.k-trophy .sv-cel-eb{background:#c0612a}
+.sv-cel-title{margin:2px 0 0;font-family:var(--f-px);font-weight:700;font-size:clamp(32px,6.6vw,58px);line-height:1.06;color:#ffd65a;text-wrap:balance;
+  animation:svTitle .45s cubic-bezier(.2,1.4,.4,1) .2s both,svShine .7s ease-out .75s}
+.sv-cel-sub{margin:0;max-width:30em;font:600 17px/1.35 var(--f-ui);color:#fff8e6;text-shadow:0 2px 0 rgba(0,0,0,.45);text-wrap:balance}
+.sv-cel .sv-res-tiles{margin:4px 0 0;width:100%;max-width:520px}
+.sv-cel-ok{min-width:min(260px,100%);min-height:58px;font-size:21px;margin-top:8px;transition:opacity .25s}
+.sv-cel-ok.wait{opacity:.4}
+@media (min-width:600px){.sv-cel-sub{font-size:19px}.sv-cel-ok{min-height:62px;font-size:22px}}
+.sv-cel.rm .sv-cel-rays{animation:none}
+.sv-cel.rm .sv-cel-hero,.sv-cel.rm .sv-cel-title{animation:svFade .3s ease-out both}
+
+/* ---------- wipe(), flying coins, the big middle banner ---------- */
+.sv-wipe{position:absolute;left:0;top:0;width:100%;height:100%;z-index:9500;pointer-events:auto;touch-action:none}
+.sv-fly{position:absolute;inset:0;z-index:9600;pointer-events:none;overflow:hidden}
+.sv-fly canvas{position:absolute;left:0;top:0;will-change:transform}
+.sv-bnr{position:absolute;left:0;right:0;top:36%;z-index:9400;display:flex;justify-content:center;padding:10px 16px 12px;pointer-events:none;
+  background:linear-gradient(180deg,var(--bc1),var(--bc2));border-top:4px solid var(--sv-dk);border-bottom:4px solid var(--sv-dk);box-shadow:0 6px 0 rgba(0,0,0,.2);
+  animation:svBnrIn .28s cubic-bezier(.2,1.3,.4,1) both}
+.sv-bnr b{font-family:var(--f-px);font-weight:700;font-size:clamp(38px,8vw,68px);line-height:1;color:#fff;white-space:nowrap;text-shadow:var(--sv-out3);
+  animation:svBnrText .4s cubic-bezier(.2,1.3,.4,1) .05s both}
+.sv-bnr.num b{font-family:var(--f-ui);font-weight:700}
+.sv-bnr.t-go{--bc1:#99e550;--bc2:#2b8243}.sv-bnr.t-go b{color:#ffd65a}
+.sv-bnr.t-info{--bc1:#8fc8f0;--bc2:#3a86c8}
+.sv-bnr.t-warn{--bc1:#f48a92;--bc2:#a83a46}
+.sv-bnr.t-moon{--bc1:#8e9ae0;--bc2:#2f2a6a}.sv-bnr.t-moon b{color:#e8edff}
+.sv-bnr.out{animation:svBnrOut .28s ease-in forwards}
+.sv-bnr.rm,.sv-bnr.rm b{animation:svFade .2s ease-out both}
+.sv-bnr.rm.out{animation:svFadeOut .28s forwards}
+
+/* ---------- results window (every mode): .sv-res overlay > .sv-res-win: title, hero on a grassy hill, tiles, one green + one cream button ---------- */
+.sv-res{position:absolute;inset:0;z-index:45;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(42,36,64,.62);animation:svFade .2s ease-out}
+.sv-res-win{position:relative;width:100%;max-width:420px;max-height:100%;overflow-y:auto;overscroll-behavior:contain;background:var(--panel);border:2px solid var(--sv-ink);border-top:10px solid var(--mode,var(--accent));
+  border-bottom-width:6px;border-radius:24px;box-shadow:inset 0 0 0 3px #fffdf6,0 18px 50px rgba(30,26,62,.45);padding:16px;text-align:center;color:var(--ink);
+  animation:svDrop .26s cubic-bezier(.2,1.3,.4,1) both}
+.sv-res-title{margin:2px 0 10px;font-family:var(--f-px);font-weight:700;font-size:42px;line-height:1.05;color:#ffd65a;text-wrap:balance;animation:svShine .6s ease-out .3s}
+.sv-res-title.lose{color:#c9d4f6;text-shadow:3px 0 #3c4570,-3px 0 #3c4570,0 3px #3c4570,0 -3px #3c4570,3px 3px #3c4570,-3px 3px #3c4570,3px -3px #3c4570,-3px -3px #3c4570,0 6px rgba(0,0,0,.18)}
+.sv-res-hero{position:relative;display:flex;align-items:flex-end;justify-content:center;gap:12px;min-height:128px;margin:0 auto 10px;padding-bottom:12px}
+.sv-res-hero::before{content:"";position:absolute;left:50%;bottom:0;width:min(78%,300px);height:30px;transform:translateX(-50%);border-radius:50%;background:#8fd16a;box-shadow:inset 0 -5px 0 #5aab45,0 2px 0 rgba(91,70,48,.2)}
+.sv-res-hero>*{position:relative}
+.sv-res-tiles{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:10px 0 4px}
+.sv-res-tile{flex:1 1 0;min-width:92px;max-width:170px;display:grid;justify-items:center;align-content:start;gap:3px;background:var(--sv-cream);border:2px solid var(--line);border-bottom:4px solid var(--edge);border-radius:16px;padding:8px 6px 7px}
+.sv-res-tile canvas{width:32px;height:32px}
+.sv-res-tile b{font:700 28px/1 var(--f-ui);font-variant-numeric:tabular-nums;color:var(--ink)}
+.sv-res-tile small{font:600 13px/1.2 var(--f-ui);color:var(--ink-soft)}
+.sv-res-btns{display:flex;gap:10px;margin-top:16px}
+.sv-res-btns .btn{flex:1 1 0;min-height:52px;font-size:18px}
+.sv-res-btns .btn.go{flex-grow:1.5}
+@media (min-width:600px){.sv-res-win{max-width:540px;padding:20px 22px}.sv-res-title{font-size:54px}.sv-res-hero{min-height:160px}.sv-res-btns .btn{min-height:58px;font-size:19px}}
+
+/* ---------- the evolution scene (app.js showEvolution): built on the celebrate layer ---------- */
+.sv-evo .sv-cel-rays{opacity:0;transition:opacity .8s;background:repeating-conic-gradient(from 0deg,rgba(190,206,255,.3) 0deg 9deg,rgba(190,206,255,0) 9deg 22.5deg)}
+.sv-evo.glow .sv-cel-rays,.sv-evo.done .sv-cel-rays{opacity:1}
+.sv-evo.done .sv-cel-rays{background:repeating-conic-gradient(from 0deg,rgba(255,214,102,.3) 0deg 9deg,rgba(255,214,102,0) 9deg 22.5deg)}
+.sv-evo .sv-cel-hero{animation:none}
+.sv-evo.glow:not(.done) .sv-cel-hero canvas{filter:drop-shadow(0 0 10px rgba(255,240,170,.9))}
+.sv-evo.done .sv-cel-hero{animation:svPop .4s cubic-bezier(.2,1.5,.45,1) both}
+.sv-evo-flash{position:absolute;inset:0;z-index:3;background:#fff8e0;opacity:0;pointer-events:none}
+.sv-evo-flash.on{animation:svFlash .6s ease-out}
+.sv-evo-say{margin:6px 0 0;width:100%;max-width:520px;background:var(--sv-cream);color:var(--sv-ink);border:2px solid var(--sv-ink);border-bottom-width:4px;border-radius:18px;
+  box-shadow:inset 0 0 0 2px var(--sv-cream),inset 0 0 0 4px #cdeec3,0 4px 0 rgba(0,0,0,.3);padding:12px 16px;font:600 18px/1.35 var(--f-ui);text-align:left;text-wrap:pretty}
+.sv-evo-moves{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px}
+.sv-evo-moves small{width:100%;font:600 14px/1 var(--f-ui);color:#fff8e6;letter-spacing:.04em;text-transform:uppercase;text-shadow:0 1px 0 rgba(0,0,0,.5)}
+.sv-evo-moves .chip-el{font-size:15px;padding:4px 10px;border:2px solid var(--sv-dk)}
+@media (min-width:600px){.sv-evo-say{font-size:20px}}
+
+/* ---------- the title menu's Music button (added by app.js beside Sound; a copy of menu.js's Sound button) ---------- */
+.mm-music{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.mm-music canvas{width:26px;height:22px}
+
+@keyframes svFade{from{opacity:0}}
+@keyframes svFadeOut{to{opacity:0}}
+@keyframes svRays{to{transform:translate(-50%,-50%) rotate(360deg)}}
+@keyframes svPop{0%{transform:scale(0)}65%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes svTitle{0%{opacity:0;transform:translateY(14px) scale(.9)}100%{opacity:1;transform:none}}
+@keyframes svShine{0%,100%{filter:none}35%{filter:brightness(1.35)}}
+@keyframes svDrop{0%{opacity:0;transform:scale(.9)}70%{opacity:1;transform:scale(1.04)}100%{transform:none}}
+@keyframes svBnrIn{from{transform:scaleY(0)}}
+@keyframes svBnrText{from{opacity:0;transform:translateX(30vw)}}
+@keyframes svBnrOut{to{opacity:0;transform:scaleY(0)}}
+@keyframes svFlash{0%{opacity:0}25%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){
+  .screen.scr-in{animation-name:svScrIn}
+  #nav button[aria-current="page"]{animation:none}
+  .sv-cel-rays{animation:none}.sv-cel-hero,.sv-cel-title{animation:svFade .3s ease-out both}
+  .sv-res-win{animation:svFade .2s ease-out both}.sv-res-title{animation:none}
+  .sv-bnr,.sv-bnr b{animation:svFade .2s ease-out both}.sv-bnr.out{animation:svFadeOut .28s forwards}
+  .sv-evo.done .sv-cel-hero{animation:svFade .3s ease-out both}
+  .goal-chip.pop{animation:none}
+}

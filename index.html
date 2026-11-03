@@ -6,9 +6,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Pixelify+Sans:wght@400;500;600;700&display=swap">
+<!-- (fonts load without blocking the first paint: the game never waits for them; the fallback faces are used until they arrive) -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Pixelify+Sans:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Pixelify+Sans:wght@400;500;600;700&display=swap"></noscript>
 <link rel="stylesheet" href="ui.css">
 <link rel="stylesheet" href="app.css">
+
+<!-- the "Loading…" splash: removed first thing by PS.ui.boot() (app.js). If the game hasn't started after 9 s (a script failed to
+     load or threw), it turns into "Tap to try again" with the first error, so the screen never sits frozen on it. -->
+<div id="bootSplash" style="position:fixed;inset:0;z-index:99999;background:#bfe3b4 radial-gradient(#cdeec3 22%,transparent 24%) 0 0/22px 22px;color:#5b4630;font:600 19px/1.35 Fredoka,ui-rounded,system-ui,-apple-system,sans-serif;text-align:center"><style>@keyframes bootSpin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){#bootSplash svg{animation:none!important}}</style><svg width="96" height="96" viewBox="0 0 64 64" style="position:absolute;left:50%;top:50%;margin:-60px 0 0 -48px;animation:bootSpin 3s linear infinite" aria-hidden="true"><g fill="#ffcc44" stroke="#5b4630" stroke-width="2"><path d="M32 2l4 9h-8zM32 62l-4-9h8zM2 32l9-4v8zM62 32l-9 4v-8zM10.8 10.8l9.2 3.4-5.8 5.8zM53.2 53.2l-9.2-3.4 5.8-5.8zM10.8 53.2l3.4-9.2 5.8 5.8zM53.2 10.8l-3.4 9.2-5.8-5.8z"/><circle cx="32" cy="32" r="15"/></g><path d="M37 21a12 12 0 1 0 0 22a9.5 9.5 0 1 1 0-22z" fill="#9fb4f0" stroke="#5b4630" stroke-width="2"/></svg><div id="bootMsg" style="position:absolute;left:16px;right:16px;top:50%;margin-top:52px">Loading…</div></div>
+<script>
+(function () { // (startup safety: see the splash above; no game code here)
+  var first = null;
+  window.addEventListener('error', function (e) { if (!first && e && (e.message || e.error)) first = String(e.message || e.error); });
+  setTimeout(function () {
+    var s = document.getElementById('bootSplash'), m = document.getElementById('bootMsg'); if (!s || !m) return;
+    m.innerHTML = 'The game is taking a while. <b>Tap to try again.</b>' + (first ? '<br><small style="font-weight:500;font-size:13px">' + first.slice(0, 140).replace(/[<&]/g, '') + '</small>' : '');
+    s.style.cursor = 'pointer'; s.onclick = function () { location.reload(); };
+  }, 9000);
+})();
+</script>
 <meta name="theme-color" content="#fff8e6">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -23,6 +40,7 @@
 <div id="app">
   <header id="hud">
     <button class="player-chip" id="playerChip" aria-label="Main menu: switch player"><canvas class="px" id="playerAvatar" width="32" height="32"></canvas><span id="playerName" class="px-title">Player</span></button>
+    <button class="goal-chip" id="goalChip" type="button" hidden><canvas class="px" width="16" height="16"></canvas><span></span></button>
     <div class="hud-pills">
       <div class="pill-stat" id="clockPill" title="Day and night switch every 15 minutes">
         <canvas class="px" id="clockIcon" width="9" height="9"></canvas><span id="clockText" class="num">Day</span>
@@ -35,6 +53,7 @@
     <section class="screen" id="scr-garden" data-screen="garden"></section>
     <section class="screen" id="scr-race" data-screen="race" hidden></section>
     <section class="screen" id="scr-battle" data-screen="battle" hidden></section>
+    <section class="screen" id="scr-arcade" data-screen="arcade" hidden></section>
     <section class="screen" id="scr-shop" data-screen="shop" hidden></section>
     <section class="screen" id="scr-sprouts" data-screen="sprouts" hidden></section>
   </main>
@@ -43,6 +62,7 @@
     <button data-go="garden" aria-current="page"><canvas class="px" width="16" height="16"></canvas><span>Garden</span><i class="badge" hidden></i></button>
     <button data-go="race"><canvas class="px" width="16" height="16"></canvas><span>Race</span><i class="badge" hidden></i></button>
     <button data-go="battle"><canvas class="px" width="16" height="16"></canvas><span>Battle</span><i class="badge" hidden></i></button>
+    <button data-go="arcade"><canvas class="px" width="16" height="16"></canvas><span>Arcade</span><i class="badge" hidden></i></button>
     <button data-go="shop"><canvas class="px" width="16" height="16"></canvas><span>Shop</span><i class="badge" hidden></i></button>
     <button data-go="sprouts"><canvas class="px" width="16" height="16"></canvas><span>Sprouts</span><i class="badge" hidden></i></button>
   </nav>
@@ -53,6 +73,9 @@
 
 <script src="version.js"></script>
 <script src="pixel.js"></script>
+<script src="audio.js"></script>
+<script src="art-trophies.js"></script>
+<script src="art-arcade.js"></script>
 <script src="data.js"></script>
 <script src="state.js"></script>
 <script src="app.js"></script>
@@ -60,6 +83,7 @@
 <script src="garden.js"></script>
 <script src="race.js"></script>
 <script src="battle.js"></script>
+<script src="arcade.js"></script>
 <script src="shop.js"></script>
 <script src="sprouts.js"></script>
 <script>PS.ui.boot();</script>

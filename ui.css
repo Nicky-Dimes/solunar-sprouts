@@ -11,15 +11,19 @@
   --f-px:"Pixelify Sans", ui-monospace, Menlo, monospace;
   color-scheme: light;
 }
-html{height:100%;box-sizing:border-box}
+html{height:100%;box-sizing:border-box;overflow:hidden;overscroll-behavior:none}
+/* the page never slides or bounces, and no picture can be dragged off (Safari lets you drag a canvas as an image) */
+body{overflow:hidden;position:fixed;inset:0;width:100%}
+canvas,img,svg{-webkit-user-drag:none;-webkit-touch-callout:none}
 *,*::before,*::after{box-sizing:inherit}
 body{height:100%;margin:0;color:var(--ink);font-family:var(--f-ui);font-weight:500;
   background-color:var(--ground);
   background-image:radial-gradient(var(--dots) 22%, transparent 24%);background-size:22px 22px;
   overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 #app{position:relative;height:100%;max-width:460px;margin:0 auto;overflow:hidden;touch-action:none;background:var(--ground)}
-/* tall screens (an iPad held upright) get a wider game instead of a phone-sized strip; phones and landscape stay as they were */
-@media (min-width:600px) and (min-height:900px){#app{max-width:min(680px,62vh)}}
+/* iPads (600px and wider) fill the whole screen; hubs centre their content in a column (app.css "wide screens"), and a screen that
+   isn't ready for a wide layout yet is held to the old width (app.css HOLD-NARROW) */
+@media (min-width:600px){#app{max-width:none}}
 canvas.px{image-rendering:pixelated;image-rendering:crisp-edges}
 button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
 
@@ -61,3 +65,6 @@ button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
   padding:18px 18px calc(24px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 30px rgba(60,44,24,.3);z-index:20;animation:sheetUp .25s ease-out;touch-action:pan-y}
 @keyframes sheetUp{from{transform:translateY(30px);opacity:.5}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion: reduce){.sheet{animation:none}}
+/* any big button that can't be pressed yet looks flat and greyed */
+.btn:disabled,.btn[disabled]{background:var(--slot);border-color:var(--line);color:var(--ink-soft);box-shadow:none;cursor:default;filter:saturate(.4)}
+.btn:disabled:active,.btn[disabled]:active{transform:none;border-bottom-width:5px;margin-bottom:0}

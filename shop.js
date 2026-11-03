@@ -7,6 +7,12 @@
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const cap = s => String(s).charAt(0).toUpperCase() + String(s).slice(1);
   const aOrAn = w => (/^[aeiou]/i.test(String(w)) ? 'an' : 'a');
+  const RMO = (() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
+  // a jingle from audio.js when its engine is there (its stand-in is one shared no-op), otherwise an older sound
+  const jingle = (id, fb) => {
+    try { if (PX.Music && PX.Music.jingle && PX.Music.jingle !== PX.Music.stop) { PX.Music.jingle(id); return; } } catch (e) { /* audio optional */ }
+    try { PX.Sound.play(fb || 'level'); } catch (e) { /* audio optional */ }
+  };
 
   const CSS = `
 .sh-scroll{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
@@ -31,10 +37,10 @@
 .sh-jump{display:inline-flex;align-items:center;gap:4px;margin:4px 0 0;border:2px solid var(--line);border-bottom-width:3px;border-radius:10px;background:var(--panel);padding:2px 10px;
   font-family:var(--f-ui);font-weight:600;font-size:14px;color:var(--ink)}
 .sh-jump canvas{display:block;margin:-3px 0}
-.sh-list{display:grid;gap:12px}
+.sh-list{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));align-items:start}
 .sh-sec{font-size:22px;margin:22px 2px 2px;color:#96461c}
 .sh-sec-sub{margin:0 2px 10px;font-size:14px;color:var(--ink-soft);font-weight:600}
-.sh-list.fruit{grid-template-columns:1fr 1fr;gap:10px}
+.sh-list.fruit{grid-template-columns:repeat(auto-fill,minmax(min(46%,160px),1fr));gap:10px;align-items:stretch}
 .sh-card{background:var(--panel);border:2px solid var(--line);border-bottom:5px solid var(--edge);border-radius:20px;padding:12px;display:grid;grid-template-columns:92px 1fr;gap:2px 12px;align-items:start}
 .sh-info{min-width:0;align-self:center}
 .sh-art{position:relative;display:grid;place-items:center;height:92px;border-radius:16px;background:var(--slot);border:2px solid var(--line)}
@@ -42,8 +48,8 @@
 .sh-card:nth-child(2n) .sh-art canvas{animation-delay:-.6s}
 @keyframes sh-bob{50%{transform:translateY(-3px)}}
 @media (prefers-reduced-motion: reduce){.sh-art canvas{animation:none}}
-.sh-own{position:absolute;top:-8px;right:-8px;min-width:26px;height:26px;padding:0 6px;display:grid;place-items:center;border-radius:13px;background:var(--sun);border:2px solid var(--sun-edge);
-  font-family:var(--f-ui);font-weight:700;font-size:14.5px;color:#4a3210}
+.sh-own{position:absolute;top:-9px;right:-9px;min-width:30px;height:30px;padding:0 7px;display:grid;place-items:center;border-radius:15px;background:var(--sun);border:2px solid var(--sun-edge);
+  font-family:var(--f-ui);font-weight:700;font-size:17px;color:#4a3210;box-shadow:0 2px 0 rgba(60,44,24,.18)}
 .sh-title{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:2px}
 .sh-title h3{margin:0;font-family:var(--f-px);font-weight:700;font-size:21px;line-height:1.05;color:var(--ink)}
 .sh-blurb{margin:4px 0 0;font-size:14px;line-height:1.35;color:var(--ink-soft)}
@@ -67,11 +73,13 @@
 .sh-status{flex:1;font-size:14px;line-height:1.3;color:var(--ink-soft)}
 .sh-status b{color:var(--ink);font-weight:600}
 .sh-status .short{color:#a3402f;font-weight:600}
-.sh-price{display:inline-flex;align-items:center;gap:6px;font-size:17px;padding:7px 12px 6px;white-space:nowrap}
-.sh-price canvas{width:18px;height:18px}
+.sh-price{display:inline-flex;align-items:center;gap:7px;font-size:20px;padding:7px 14px 6px;min-height:48px;white-space:nowrap}
+.sh-price canvas{width:22px;height:22px}
 .sh-price.short{background:var(--slot);border-color:var(--line);color:var(--ink-soft)}
 .sh-card.mini{grid-template-columns:1fr;text-align:center;padding:10px 10px 10px;gap:0}
 .sh-card.mini .sh-art{height:72px}
+.sh-card.mini{grid-template-rows:auto auto auto 1fr auto}
+.sh-card.mini .sh-gives{align-self:start}
 .sh-card.mini .sh-title{justify-content:center;margin-top:8px}
 .sh-card.mini .sh-title h3{font-size:17px}
 .sh-card.mini .sh-blurb{font-size:14px;min-height:2.7em}
@@ -79,6 +87,10 @@
 .sh-card.mini .sh-buy{flex-direction:column;gap:6px;margin-top:10px;padding-top:8px}
 .sh-card.mini .sh-price{width:100%;justify-content:center}
 .sh-card.mini .sh-status{text-align:center}
+.sh-meter{display:block;height:10px;margin-top:5px;border-radius:6px;background:var(--slot);border:2px solid var(--line);overflow:hidden;max-width:180px}
+.sh-meter i{display:block;height:100%;background:linear-gradient(90deg,#f6c83a,#e0a800);border-radius:4px}
+.sh-card.mini .sh-meter{margin:5px auto 0}
+.sh-art .sh-peek{animation-duration:1.6s}
 .sh-foot{margin:14px 4px 0;font-size:14px;line-height:1.4;color:var(--ink-soft);text-align:center}
 .m-body .sh-m-price{display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--f-px);font-weight:600;font-size:18px;margin:0 0 8px;color:var(--ink)}
 .m-body .sh-m-price canvas{width:18px;height:18px}
@@ -144,6 +156,20 @@
 .sh-gb-why{margin:0;text-align:center;font-size:14px;line-height:1.3;color:var(--ink-soft)}
 .sh-gb-why b{color:#a3402f}
 @media (prefers-reduced-motion: reduce){.sh-gb-ball.rolling{animation-duration:.01s}.sh-gb-ball.ready .gb,.sh-gb-ball .tw,.sh-gb-tap,.sh-gb-stage.shake .sh-gb-machine{animation:none}}
+/* the capsule lands with a bounce, then splits in two with a glow: white (often), blue (rare) or gold (super rare) */
+.sh-gb-ball.ready .gb{animation:sh-gb-land .55s ease-out,sh-gb-wait .9s ease-in-out .55s infinite}
+@keyframes sh-gb-land{0%{transform:translateY(-16px)}40%{transform:translateY(0)}60%{transform:translateY(-6px)}80%{transform:translateY(0)}90%{transform:translateY(-2px)}100%{transform:translateY(0)}}
+.sh-gb-half{position:absolute;left:0;top:0;display:block;pointer-events:none}
+.sh-gb-half canvas{display:block;image-rendering:pixelated}
+.sh-gb-half.top{-webkit-clip-path:inset(0 0 50% 0);clip-path:inset(0 0 50% 0);animation:sh-half-t .55s cubic-bezier(.2,.7,.3,1) forwards}
+.sh-gb-half.bot{-webkit-clip-path:inset(50% 0 0 0);clip-path:inset(50% 0 0 0);animation:sh-half-b .55s cubic-bezier(.2,.7,.3,1) forwards}
+@keyframes sh-half-t{to{transform:translate(-20px,-28px) rotate(-30deg);opacity:0}}
+@keyframes sh-half-b{to{transform:translate(18px,12px) rotate(24deg);opacity:0}}
+.sh-gb-glow{position:absolute;left:50%;top:50%;width:150px;height:150px;margin:-75px 0 0 -75px;border-radius:50%;pointer-events:none;z-index:-1;background:radial-gradient(rgba(255,255,255,.95),rgba(255,255,255,0) 68%);animation:sh-glow .45s ease-out forwards}
+.sh-gb-glow.rare{width:210px;height:210px;margin:-105px 0 0 -105px;background:radial-gradient(rgba(150,200,255,.95),rgba(110,170,255,0) 68%);animation-duration:.8s}
+.sh-gb-glow.super{width:270px;height:270px;margin:-135px 0 0 -135px;background:radial-gradient(rgba(255,220,90,1),rgba(255,190,40,0) 68%);animation-duration:1.2s}
+@keyframes sh-glow{0%{transform:scale(.2);opacity:0}35%{opacity:1}100%{transform:scale(1);opacity:.85}}
+@media (prefers-reduced-motion: reduce){.sh-gb-half,.sh-gb-glow,.sh-gb-ball.ready .gb{animation-duration:.01s!important}}
 
 /* what's inside: real odds, from the D.GUMBALL weights */
 .sh-odds{background:var(--field);border:2px dashed var(--line);border-radius:16px;padding:10px 12px 12px}
@@ -176,17 +202,21 @@
   function injectCSS() { if (document.getElementById('sh-css')) return; const st = document.createElement('style'); st.id = 'sh-css'; st.textContent = CSS; document.head.appendChild(st); }
 
   // ---------- helpers ----------
-  // copy a sprite into a canvas at an integer scale, sized from the sprite itself
+  // a sprite's size in art px (hi-res PX canvases carry .k: their bitmap is k x finer than their art size)
+  const artW = c => (PX.artW ? PX.artW(c) : c.width), artH = c => (PX.artH ? PX.artH(c) : c.height);
+  // copy a sprite into a canvas at an integer scale: the bitmap keeps every fine pixel, the CSS size comes from the art size
+  // (no scale: the page's CSS sizes it; canvases that nothing else sizes pass data-scale="1")
   function put(cv, src, scale) {
     cv.width = src.width; cv.height = src.height;
-    const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, cv.width, cv.height); x.drawImage(src, 0, 0);
-    if (scale) { cv.style.width = src.width * scale + 'px'; cv.style.height = src.height * scale + 'px'; }
+    const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, cv.width, cv.height); x.drawImage(src, 0, 0, src.width, src.height);
+    if (scale) { cv.style.width = artW(src) * scale + 'px'; cv.style.height = artH(src) * scale + 'px'; }
     cv.classList.add('px');
   }
-  // pad a sprite to a square so the modal's square sprite box doesn't stretch it
+  // pad a sprite to a square so the modal's square sprite box doesn't stretch it (it keeps the sprite's resolution tag)
   function square(src) {
     const n = Math.max(src.width, src.height), c = document.createElement('canvas'); c.width = n; c.height = n;
-    const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(src, Math.floor((n - src.width) / 2), n - src.height); return c;
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(src, Math.floor((n - src.width) / 2), n - src.height, src.width, src.height);
+    return PX.keepK ? PX.keepK(src, c) : c;
   }
   // <canvas data-sh="coin"> and friends are painted after innerHTML
   function hydrate(root) {
@@ -197,6 +227,7 @@
         if (k === 'coin') src = PS.ui.icon('coin');
         else if (k === 'critter') src = PX.critter(id);
         else if (k === 'egg') src = PX.item('egg', id);
+        else if (k === 'eggpeek') src = eggPeek(id);
         else if (k === 'fruit') src = PX.item('fruit', id);
         else if (k === 'icon') src = PS.ui.icon(id);
         else if (k === 'bigcoin') src = PX.item('bigcoin');
@@ -209,6 +240,40 @@
     });
   }
   const coin = () => '<canvas data-sh="coin"></canvas>';
+  // a rare egg with the Sprout it hatches peeking out of the cracked top (its skin, hat and sparkly eyes); cached per egg
+  const peekCache = new Map();
+  function eggPeek(id) {
+    let c = peekCache.get(id); if (c) return c;
+    const E = D.EGGS[id] || {}, egg = PX.item('egg', id), K = egg.k || 1, ew = artW(egg), eh = artH(egg);
+    let spr = null;
+    try {
+      const L = PX.cloneLook(PX.DEFAULT_LOOK);
+      if (Array.isArray(E.bodies) && E.bodies.length) L.body = E.bodies[0];
+      if (E.skin) L.skin = E.skin;
+      if (E.sparkle) L.eyes = 'sparkle';
+      if (E.hat && D.HATS && D.HATS[E.hat]) L[D.HATS[E.hat].slot || 'hat'] = E.hat;
+      spr = PX.sprig(L, { eyes: 'happy', mouth: 'open', arms: 'up' });
+    } catch (e) { spr = null; }
+    if (!spr || !spr.width) return egg;
+    // (laid out in art px; drawn at the egg's resolution, K fine px per art px)
+    const sw = artW(spr), sh = artH(spr), W = Math.max(ew, sw) + 2, H = eh + 14, ex = Math.floor((W - ew) / 2), ey = H - eh, cut = Math.round(eh * 0.42);
+    c = document.createElement('canvas'); c.width = W * K; c.height = H * K;
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+    // the Sprout stands inside the egg (its feet low in the shell), then the bottom of the shell goes in front with a zigzag crack
+    const feetY = ey + Math.round(eh * 0.56), ax = PX.SPRIG_AX == null ? sw / 2 : PX.SPRIG_AX, ay = PX.SPRIG_AY == null ? sh - 1 : PX.SPRIG_AY;
+    x.setTransform(K, 0, 0, K, 0, 0); x.drawImage(spr, Math.round(W / 2 - ax), feetY - ay, sw, sh); x.setTransform(1, 0, 0, 1, 0, 0);
+    const FW = egg.width, FH = egg.height;
+    let px = null; try { px = egg.getContext('2d').getImageData(0, 0, FW, FH).data; } catch (e) { px = null; }
+    x.fillStyle = '#222034';
+    // the shell's front, one fine column at a time under a smooth zigzag break (an ink edge as thick as the outer ring)
+    for (let i = 0; i < FW; i++) {
+      const u = (i + 0.5) / K, z = 2 - Math.abs((u % 4) - 2), r0 = Math.round((cut + z) * K);
+      x.drawImage(egg, i, r0, 1, FH - r0, ex * K + i, ey * K + r0, 1, FH - r0);
+      if (!px || px[(r0 * FW + i) * 4 + 3] > 128) x.fillRect(ex * K + i, ey * K + r0, 1, K);
+    }
+    if (PX.keepK) PX.keepK(egg, c);
+    peekCache.set(id, c); return c;
+  }
   // names in D.COLORS / D.PATTERNS are plain strings; tolerate {name} objects and missing entries too
   const nameIn = (tbl, id) => { const v = tbl && tbl[id]; return typeof v === 'string' ? v : (v && v.name) || cap(id); };
   const colorName = id => nameIn(D.COLORS, id), patternName = id => nameIn(D.PATTERNS, id);
@@ -218,6 +283,8 @@
   // Uses the artist's sprites when pixel.js has them: PX.gumballMachine(frame), PX.gumballColors, PX.item('gumball'|'paint'|'pattern'|'hat'|'skin', id).
   // Stand-ins keep everything drawable when a sprite is missing: PX.item() answers kinds it doesn't know with its 9x9 grey dot,
   // a hat it can't draw comes back empty, and a pattern it has no sticker for comes back as the blank sticker.
+  // Every stand-in is a k = 2 grid finished with PX.hd (one level of detail with the Sprouts: smooth fine edges, 1-fine-px inner
+  // lines, one ink ring). (The old stickers and hats re-read from Sprout sprites are gone: pixel.js draws every hat and pattern.)
   // Shared with sprouts.js as PS.styleArt.
   const ART = (() => {
     const GB = ['#e5535f', '#f6a83a', '#fbf236', '#6abe30', '#5fcde4', '#639bff', '#9a6ad0', '#f7b6c8'];
@@ -232,7 +299,8 @@
     const colors = () => (Array.isArray(PX.gumballColors) && PX.gumballColors.length ? PX.gumballColors : GB);
     const bodyRamp = id => (PX.RAMPS && PX.RAMPS[id]) || MORE_RAMPS[id] || ['#dfe3ea', '#9badb7', '#595a70'];
     const G = (w, h) => new PX.Grid(w, h);
-    const hex = (d, i) => '#' + [d[i], d[i + 1], d[i + 2]].map(v => v.toString(16).padStart(2, '0')).join('');
+    // the shared finishing pass (an older pixel.js without it: a plain outline)
+    const hd = (g, o) => { try { if (PX.hd) PX.hd(g, o); else if (o && o.outline) g.outline(); } catch (e) { /* art optional */ } return g; };
     const pixels = c => { try { return c.getContext('2d').getImageData(0, 0, c.width, c.height).data; } catch (e) { return null; } };
     const clear = d => { for (let i = 3; i < d.length; i += 4) if (d[i]) return false; return true; };
     const sameData = (x, y) => { if (x.length !== y.length) return false; for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return false; return true; };
@@ -240,7 +308,7 @@
     // the artist's sprite, or null when pixel.js has nothing real for it (each sprite is read once; results are cached in item())
     function fromPX(kind, id) {
       try {
-        const c = PX.item(kind, id); if (!c || !c.width || (c.width === 9 && c.height === 9)) return null;
+        const c = PX.item(kind, id); if (!c || !c.width || (artW(c) === 9 && artH(c) === 9)) return null; // (9 x 9 art px: pixel.js's 'unknown' dot)
         const d = pixels(c); if (d && clear(d)) return null;
         if (kind === 'pattern' && id !== 'plain' && d) {
           if (!blank) { const b = PX.item('pattern', '␀'); blank = { w: b.width, h: b.height, d: pixels(b) }; }
@@ -265,72 +333,36 @@
       heart: g => stamp(g, STICK, t => t.ell(5, 5.4, 1.9, 1.9, '#e5535f').ell(8, 5.4, 1.9, 1.9, '#e5535f').poly([[3.1, 5.8], [9.9, 5.8], [6.5, 10]], '#e5535f')),
       socks: g => stamp(g, STICK, t => t.rect(0, 8, 13, 1, '#ffffff').rect(0, 9, 13, 4, PINK)),
     };
-    // a pattern with no sticker art: a round sticker cut from a Sprout wearing it (face and belly), so it still shows the real pattern
-    function stickerFromSprig(id) {
-      const L = PX.cloneLook(PX.DEFAULT_LOOK); Object.assign(L, { body: 'cloud', pattern: id, patternColor: PINK, hat: 'none', extra: 'none' });
-      const src = PX.sprig(L, { eyes: 'happy' }), w = src.width, h = src.height, d = pixels(src); if (!d) return null;
-      const g = G(13, 13), cx = Math.floor(w / 2) - 6, cy = Math.round(h * 0.69) - 6;
-      for (let y = 0; y < 13; y++) for (let x = 0; x < 13; x++) {
-        if ((x - 6) * (x - 6) + (y - 6) * (y - 6) > 31) continue;
-        const sx = cx + x, sy = cy + y, i = (sy * w + sx) * 4, ok = sx >= 0 && sy >= 0 && sx < w && sy < h && d[i + 3] >= 128;
-        g.set(x, y, ok ? hex(d, i) : STICK);
-      }
-      g.outline('#ffffff'); g.outline(); return g.canvas();
-    }
-    // hats from the sprite itself: draw a Sprout with and without it and keep the pixels that changed
-    function hatFromSprig(id, slot) {
-      const base = PX.cloneLook(PX.DEFAULT_LOOK); base.hat = 'none'; base.extra = 'none';
-      const on = PX.cloneLook(base); on[slot] = id;
-      const A = PX.sprig(on, {}), B = PX.sprig(base, {}), w = A.width, h = A.height;
-      if (B.width !== w || B.height !== h) return null;
-      const a = A.getContext('2d').getImageData(0, 0, w, h).data, b = B.getContext('2d').getImageData(0, 0, w, h).data;
-      const g = G(w, h); let x0 = w, y0 = h, x1 = -1, y1 = -1;
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-        const i = (y * w + x) * 4;
-        if (a[i + 3] < 128 || (a[i] === b[i] && a[i + 1] === b[i + 1] && a[i + 2] === b[i + 2] && a[i + 3] === b[i + 3])) continue;
-        if (a[i] === 0x22 && a[i + 1] === 0x20 && a[i + 2] === 0x34) continue; // ink: re-outlined below
-        g.set(x, y, hex(a, i));
-        x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
-      }
-      if (x1 < 0 || (x1 - x0 + 1) * (y1 - y0 + 1) < 4) return null;
-      g.outline();
-      const out = G(16, 14), ox = Math.round((x0 + x1 + 1) / 2) - 8, oy = Math.round((y0 + y1 + 1) / 2) - 7;
-      for (let y = 0; y < 14; y++) for (let x = 0; x < 16; x++) out.set(x, y, g.get(x + ox, y + oy));
-      return out.canvas();
-    }
     const HAND = { // hats the Sprout sprite can't draw yet
-      party: g => { layer(g, t => { t.poly([[3.5, 13], [12.5, 13], [8, 2.5]], '#5fcde4'); t.px([[7, 6], [9, 9], [6, 11], [10, 12], [8, 4]], '#f7b6c8'); t.px([[8, 8], [6, 9], [9, 11]], '#fbf236'); }); layer(g, t => t.ell(8, 2, 1.6, 1.6, '#fbf236')); },
-      wizard: g => { layer(g, t => t.poly([[4, 11.5], [12, 11.5], [11.5, 1], [8.5, 4]], '#9a6ad0').px([[7, 7], [6, 8], [7, 8], [8, 8], [7, 9]], '#fbf236')); layer(g, t => t.ell(8, 11.8, 7.4, 1.6, '#5e3a8e')); },
+      party: g => { layer(g, t => { t.poly([[3.5, 13], [12.5, 13], [8, 2.5]], '#5fcde4'); for (const [x, y] of [[7, 6], [9, 9], [6, 11], [10, 12], [8, 4]]) t.ell(x + 0.5, y + 0.5, 0.6, 0.6, '#f7b6c8'); for (const [x, y] of [[8, 8], [6, 9], [9, 11]]) t.ell(x + 0.5, y + 0.5, 0.6, 0.6, '#fbf236'); }); layer(g, t => t.ell(8, 2, 1.6, 1.6, '#fbf236')); },
+      wizard: g => { layer(g, t => t.poly([[4, 11.5], [12, 11.5], [11.5, 1], [8.5, 4]], '#9a6ad0').poly(PX.starPts(7.5, 8.2, 1.7, 0.7, 5), '#fbf236')); layer(g, t => t.ell(8, 11.8, 7.4, 1.6, '#5e3a8e')); },
       sunhat: g => { layer(g, t => t.ell(8, 10.2, 7.4, 2.4, ['#fbe0a0', '#e8b860', '#b08030'])); layer(g, t => t.ell(8, 8, 4.2, 4, ['#fbe0a0', '#e8b860', '#b08030'], 0, (x, y) => y <= 9).rect(4, 7, 9, 2, '#e5535f')); },
-      cap: g => { layer(g, t => t.ell(12, 11, 3.8, 1.4, '#3f55b8')); layer(g, t => t.ell(7, 10, 5.6, 5, ['#9fd8ff', '#639bff', '#3f55b8'], 0, (x, y) => y <= 10).px([[7, 5]], '#fbf236')); },
+      cap: g => { layer(g, t => t.ell(12, 11, 3.8, 1.4, '#3f55b8')); layer(g, t => t.ell(7, 10, 5.6, 5, ['#9fd8ff', '#639bff', '#3f55b8'], 0, (x, y) => y <= 10).ell(7.5, 5.5, 0.7, 0.7, '#fbf236')); },
       generic: g => layer(g, t => t.ell(8, 10, 6, 5, ['#b7c2cc', '#8c93a8', '#595a70'], 0, (x, y) => y <= 11)),
     };
     const SKIN = { gold: ['#fffbd0', '#f6c83a', '#b87818'], crystal: ['#f4feff', '#c8ecfa', '#8ab8e0'], ember: ['#ffb070', '#e8543a', '#8a2433'] };
     const STAND = {
-      gumball(i) { const g = G(7, 7); g.ell(3.5, 3.5, 2.6, 2.6, ramp3(colors()[(+i || 0) % colors().length])); g.outline(); g.set(2, 2, '#ffffff'); return g.canvas(); },
+      gumball(i) { const g = G(7, 7); g.ell(3.5, 3.5, 2.6, 2.6, ramp3(colors()[(+i || 0) % colors().length])); g.ell(2.5, 2.4, 0.7, 0.6, '#ffffff'); return hd(g, { outline: true }).canvas(); },
       paint(id) {
         const R = bodyRamp(id), g = G(13, 13);
         g.rect(2, 4, 9, 8, '#b7c2cc').rect(2, 4, 2, 8, '#dfe8fb').rect(9, 4, 2, 8, '#8c93a8');
         g.rect(2, 6, 9, 4, R[1]).rect(2, 6, 2, 4, R[0]).rect(9, 6, 2, 4, R[2]);
-        g.ell(6.5, 3.4, 4.5, 1.6, R[1]); g.outline();
-        g.px([[4, 3], [5, 3]], R[0]); g.px([[7, 5], [5, 4]], R[1]); g.px([[3, 10]], '#ffffff');
-        return g.canvas();
+        g.ell(6.5, 3.4, 4.5, 1.6, R[1]); g.ell(5.6, 3, 1.6, 0.6, R[0]);
+        g.dots([[3, 10], [3, 10.5], [3.5, 9.5]], '#ffffff');
+        return hd(g, { outline: true }).canvas();
       },
       pattern(id) {
-        if (!PATTERN[id]) { try { const c = stickerFromSprig(id); if (c) return c; } catch (e) { /* plain sticker below */ } }
-        const g = G(13, 13); g.ell(6.5, 6.5, 5.6, 5.6, STICK); (PATTERN[id] || PATTERN.plain)(g); g.outline(); g.px([[4, 2], [3, 3]], '#ffffff'); return g.canvas();
+        const g = G(13, 13); g.ell(6.5, 6.5, 5.6, 5.6, STICK); (PATTERN[id] || PATTERN.plain)(g); g.dots([[4, 2.5], [3.5, 3], [3, 3.5]], '#ffffff'); return hd(g, { outline: true }).canvas();
       },
       hat(id) {
-        const H = D.HATS[id];
-        let c = null; try { if (H && !HAND[id]) c = hatFromSprig(id, H.slot); } catch (e) { c = null; }
-        if (c) return c;
-        const g = G(16, 14); (HAND[id] || HAND.generic)(g); return g.canvas();
+        const g = G(16, 14); (HAND[id] || HAND.generic)(g); return hd(g).canvas();
       },
       skin(id) {
         const g = G(13, 13); g.poly(PX.starPts(6.5, 7, 6.2, 2.8, 5), '#ffffff');
-        if (id === 'rainbow') { const band = ['#f07a84', '#f6a83a', '#fbf236', '#99e550', '#5fcde4', '#9a6ad0']; for (let i = 0; i < g.a.length; i++) if (g.a[i]) g.a[i] = band[Math.min(5, Math.floor((i / 13 | 0) / 2.1))]; }
-        else { const R = SKIN[id] || SKIN.gold; g.ell(6.5, 7, 6.5, 6.5, R, 0, (x, y) => g.filled(x, y)); }
-        g.outline(); g.px([[5, 5], [6, 4]], '#ffffff'); return g.canvas();
+        // (rainbow bands by fine row: g.fw fine pixels per row, g.k per art px)
+        if (id === 'rainbow') { const band = ['#f07a84', '#f6a83a', '#fbf236', '#99e550', '#5fcde4', '#9a6ad0'], fw = g.fw || g.w, k = g.k || 1; for (let i = 0; i < g.a.length; i++) if (g.a[i]) g.a[i] = band[Math.min(5, Math.floor(((i / fw) | 0) / k / 2.1))]; }
+        else { const R = SKIN[id] || SKIN.gold, f = g.a.slice(), k = g.k || 1, fw = g.fw || g.w, on = (x, y) => !!f[Math.floor(y * k) * fw + Math.floor(x * k)]; on.fine = true; g.ell(6.5, 7, 6.5, 6.5, R, 0, on); }
+        g.dots([[5, 5], [5.5, 4.5], [6, 4]], '#ffffff'); return hd(g, { outline: true }).canvas();
       },
     };
     const cache = {};
@@ -357,7 +389,7 @@
       layer(g, t => { PX.stroke(t, [[20, 42], [hx, hy]], 1.1, 1.1, '#595a70'); t.ell(hx, hy, 2, 2, ['#fff27a', '#f6c83a', '#c7861c']); });
       if (frame === 3) layer(g, t => t.rect(15, 47, 10, 6, '#45283c').rect(14, 53, 12, 2, MET[2]));
       else layer(g, t => t.rect(15, 47, 10, 6, MET[1]).rect(15, 47, 10, 1, MET[0]).rect(18, 51, 4, 1, MET[2]));
-      return g.canvas();
+      return hd(g).canvas();
     }
     const mcache = {};
     function machine(frame) {
@@ -372,10 +404,11 @@
       const g = G(16, 20), RED = ['#f07a84', '#d24552', '#8a2433'];
       layer(g, t => t.poly([[3, 12], [13, 12], [14, 19], [2, 19]], RED[1]));
       layer(g, t => t.ell(8, 7, 6.2, 6, '#eaf7ff'));
-      [[5, 9], [8, 10], [11, 9], [6, 6], [10, 6], [8, 4]].forEach(([x, y], i) => g.ell(x, y, 1.3, 1.3, colors()[(i * 3) % colors().length], 0, (a, b) => g.get(a, b) === '#eaf7ff'));
-      g.set(5, 3, '#ffffff');
+      const glass = (a, b) => g.get(a, b) === '#eaf7ff'; glass.fine = true;
+      [[5, 9], [8, 10], [11, 9], [6, 6], [10, 6], [8, 4]].forEach(([x, y], i) => g.ell(x, y, 1.45, 1.45, ramp3(colors()[(i * 3) % colors().length]), 0, glass));
+      g.dots([[4.5, 3.5], [4.5, 4], [5, 3]], '#ffffff');
       layer(g, t => t.rect(6, 15, 4, 2, '#45283c'));
-      return (tab = g.canvas());
+      return (tab = hd(g).canvas());
     }
     return { kinds: ['gumball', 'paint', 'pattern', 'hat', 'skin'], item, machine, tabIcon, colors };
   })();
@@ -481,12 +514,13 @@
   }
   // the note beside a buy button; recomputed in place when coins change
   function statusHTML(kind, id) {
-    const short = priceOf(kind, id) - coinsNow();
-    if (kind === 'fruit') { const n = PS.S.fruits[id] || 0; return short > 0 ? `<span class="short">${fmt(short)} short</span>` : n ? `You have <b>${n}</b>` : 'None yet'; }
+    const price = priceOf(kind, id), short = price - coinsNow();
+    const meter = short > 0 && price > 0 ? `<span class="sh-meter" aria-hidden="true"><i style="width:${Math.max(4, Math.round(coinsNow() / price * 100))}%"></i></span>` : '';
+    if (kind === 'fruit') { const n = PS.S.fruits[id] || 0; return short > 0 ? `<span class="short">${fmt(short)} short</span>${meter}` : n ? `You have <b>${n}</b>` : 'None yet'; }
     const notes = [];
     if (kind === 'rare') { const n = pouchCount(id); if (n) notes.push(`<b>${n}</b> waiting in your pouch`); if (bondedWith(id).length) notes.push('A second one on the same Sprout only adds a little.'); }
     if (kind === 'egg') { const n = eggCount(id); if (n) notes.push(`<b>${n}</b> waiting in the Garden`); }
-    if (short > 0) notes.unshift(`<span class="short">${fmt(short)} coins short</span>`);
+    if (short > 0) notes.unshift(`<span class="short">${fmt(short)} coins short</span>${meter}`);
     return notes.length ? notes.join('<br>') : 'You can afford this';
   }
   function buyRow(kind, id) {
@@ -520,14 +554,14 @@
     const skin = e.skin && D.SKINS[e.skin], hat = e.hat && D.HATS[e.hat];
     const extra = id === 'golden' ? ' Also won from Master races and the Legend League.' : '';
     return `<article class="sh-card">
-      <div class="sh-art"><canvas data-sh="egg:${id}" data-scale="3"></canvas>${n ? `<span class="sh-own" title="Waiting in the Garden">${n}</span>` : ''}</div>
+      <div class="sh-art" style="background:linear-gradient(#fff8e6, var(--slot))"><canvas class="sh-peek" data-sh="eggpeek:${id}" data-scale="2"></canvas>${n ? `<span class="sh-own" title="Waiting in the Garden">${n}</span>` : ''}</div>
       <div class="sh-info"><div class="sh-title"><h3>${esc(e.name)}</h3>${e.sparkle ? '<span class="sh-chip" style="background:#e0a800">Sparkly</span>' : ''}${e.spooky ? '<span class="sh-chip" style="background:#df7126">Spooky</span>' : ''}</div>
       <p class="sh-blurb">${esc(e.desc || '')}${extra}</p></div>
       <dl class="sh-facts">
         ${e.bonus ? `<div class="sh-fact"><dt>Bonus</dt><dd><span class="sh-chip soft">+${e.bonus} XP in every stat</span></dd></div>` : ''}
         ${bond ? `<div class="sh-fact"><dt>Bonded</dt><dd>${bond}</dd></div>` : ''}
-        ${skin ? `<div class="sh-fact"><dt>Skin</dt><dd><span class="sh-chip soft"><canvas data-sh="skin:${e.skin}"></canvas>${esc(skin.name || cap(e.skin))}</span></dd></div>` : ''}
-        ${hat ? `<div class="sh-fact"><dt>Hat</dt><dd><span class="sh-chip soft"><canvas data-sh="hat:${e.hat}"></canvas>${esc(hat.name)}</span></dd></div>` : ''}
+        ${skin ? `<div class="sh-fact"><dt>Skin</dt><dd><span class="sh-chip soft"><canvas data-sh="skin:${e.skin}" data-scale="1"></canvas>${esc(skin.name || cap(e.skin))}</span></dd></div>` : ''}
+        ${hat ? `<div class="sh-fact"><dt>Hat</dt><dd><span class="sh-chip soft"><canvas data-sh="hat:${e.hat}" data-scale="1"></canvas>${esc(hat.name)}</span></dd></div>` : ''}
         <div class="sh-fact"><dt>Hatch</dt><dd>Tap it ${e.taps || 5} times in the Garden</dd></div>
       </dl>
       ${buyRow('egg', id)}
@@ -726,15 +760,27 @@
   }
   function openGumball() {
     if (gb.phase !== 'ready' || !gb.res) return;
-    gb.phase = 'opening';
-    PX.Sound.play('crack'); PX.buzz(25);
+    gb.phase = 'opening'; gb.rar = rarOfRes(gb.res, gb.tier);
+    PX.Sound.play('crack'); PX.buzz(gb.rar === 'often' ? 25 : 45);
     const stage = root.querySelector('.sh-gb-stage'), ball = stage && stage.querySelector('.sh-gb-ball');
     refreshGumball();
     if (stage && ball) {
-      const sr = stage.getBoundingClientRect(), br = ball.getBoundingClientRect();
-      burst(stage, br.left - sr.left + br.width / 2, br.top - sr.top + br.height / 2, gb.tier === 'mega' ? 22 : 14, gb.tier === 'mega' ? 90 : 60);
+      const sr = stage.getBoundingClientRect(), br = ball.getBoundingClientRect(), big = gb.tier === 'mega' || gb.rar !== 'often';
+      burst(stage, br.left - sr.left + br.width / 2, br.top - sr.top + br.height / 2, gb.rar === 'super' ? 30 : big ? 22 : 14, big ? 90 : 60);
+      // the capsule splits in two (copies of the ball fly apart) over a glow in the prize's rarity colour
+      const gbc = ball.querySelector('canvas.gb');
+      if (gbc && !RMO) {
+        const half = cls => { const sp = document.createElement('span'); sp.className = 'sh-gb-half ' + cls; const c2 = document.createElement('canvas'); c2.width = gbc.width; c2.height = gbc.height; c2.style.width = gbc.offsetWidth + 'px'; c2.style.height = gbc.offsetHeight + 'px'; c2.getContext('2d').drawImage(gbc, 0, 0, gbc.width, gbc.height); sp.appendChild(c2); return sp; };
+        ball.appendChild(half('top')); ball.appendChild(half('bot')); gbc.style.visibility = 'hidden';
+      }
+      const glow = document.createElement('span'); glow.className = 'sh-gb-glow ' + gb.rar; ball.insertBefore(glow, ball.firstChild);
+      if (gb.rar !== 'often') setTimeout(() => { try { PX.Sound.play('chime'); } catch (e) { /* audio optional */ } }, 260);
     }
-    setTimeout(showPrize, 420);
+    setTimeout(showPrize, gb.rar === 'super' ? 1200 : gb.rar === 'rare' ? 800 : 450);
+  }
+  // 'often' (white glow), 'rare' (blue) or 'super' (gold), from the same weights as the odds list
+  function rarOfRes(r, tier) {
+    try { const key = prizeKey(r, tier), o = key ? oddsOf(tier).find(x => x.k === key) : null, R = o ? rarityOf(o.p) : null; return R && (R.id === 'super' || R.id === 'rare') ? R.id : 'often'; } catch (e) { return 'often'; }
   }
   function prizeArt(r) {
     try {
@@ -756,7 +802,7 @@
     // honest words: say how rare the prize really is (from the same weights as the odds list) instead of "Jackpot!"
     const G = D.GUMBALL[gb.tier] || {}, key = prizeKey(r, gb.tier), o = key ? oddsOf(gb.tier).find(x => x.k === key) : null, rar = o ? rarityOf(o.p) : null;
     const special = !!rar && (rar.id === 'rare' || rar.id === 'super');
-    PX.Sound.play(special ? 'evolve' : 'level');
+    jingle(special ? 'rare' : 'item', special ? 'evolve' : 'level');
     const partner = state.active(), isEgg = (r.type === 'egg' || /egg$/.test(r.type)) && D.EGGS[r.id];
     const buttons = [{ label: 'Yay!', kind: 'primary' }];
     if (r.type === 'paint' || r.type === 'pattern' || r.type === 'hat') {
@@ -860,7 +906,7 @@
     let got = 0;
     for (let i = 0; i < (n || 1); i++) { if (state.buy(kind, id)) got++; else break; }
     if (!got) { PX.Sound.play('miss'); PS.ui.toast(PS.S.coins < info.price ? 'Not enough coins.' : 'That can\'t be bought right now.'); return; }
-    PX.Sound.play('level'); PX.buzz(25);
+    jingle('item', 'level'); PX.buzz(25);
     let title, body, area = PS.S.area, buttons = null;
     if (kind === 'rare') {
       title = `You got a ${esc(info.name)}!`;

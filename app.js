@@ -13,32 +13,184 @@
   let current = null, mounted = {}, t = 0;
 
   // ---------------- tiny pixel icons for the chrome ----------------
+  // Drawn like the Sprouts (one level of detail everywhere): 2 fine pixels per art pixel, smooth shapes (ell / sell / poly /
+  // stroke), soft 5-step shading lit from the upper left, 1-fine-pixel inner lines, fine detail with dot / dots, and one outer
+  // ink ring from PX.hd. Each kind is made once (a few small canvases; callers only read them).
+  const iconC = {};
+  const INK = '#222034', GOLD = ['#fff27a', '#f6c83a', '#c7861c'], LEAF = ['#a6ec70', '#6abe30', '#37946e'];
+  const IN = g => { const f = (x, y) => g.filled(x, y); f.fine = true; return f; }; // (a fine mask: only where the grid is filled)
+  const piece = (g0, draw) => { const t = new PX.Grid(g0.w, g0.h, g0.k); draw(t); t.outline(); g0.merge(t); return g0; }; // its own 1-fine-px outline
+  const finish = (g, o) => (PX.hd ? PX.hd(g, o) : g);
   function icon(kind) {
-    const G = PX.Grid;
-    const g = new G(16, 16);
+    const have = iconC[kind]; if (have) return have;
+    let c = null;
+    try { c = drawIcon(kind); } catch (e) { console.error('icon', kind, e); }
+    if (!c) { const g = new PX.Grid(9, 9); g.ell(4.5, 4.5, 3.5, 3.5, ['#dfe3ea', '#8c93a8', '#595a70']); g.outline(); c = finish(g).canvas(); }
+    return (iconC[kind] = c);
+  }
+  function drawIcon(kind) {
+    const G = PX.Grid, g = new G(16, 16);
     switch (kind) {
-      case 'garden': g.rect(7, 9, 2, 6, '#8f563b'); g.ell(8, 6.5, 5.5, 4.8, ['#99e550', '#6abe30', '#37946e']); g.outline(); g.px([[5, 5]], '#ffffff'); g.px([[10, 7]], '#d24552'); break;
-      case 'race': g.rect(3, 1, 1, 14, '#595a70'); g.rect(4, 2, 9, 7, '#ffffff'); for (let y = 0; y < 7; y++) for (let x = 0; x < 9; x++) if ((x + y) % 2) g.set(4 + x, 2 + y, '#222034'); g.outline(); break;
-      case 'battle': g.poly([[3, 13], [11, 3], [13, 3], [13, 5], [5, 13]], '#dfe8fb'); g.rect(2, 11, 4, 3, '#8f563b'); g.poly([[13, 13], [5, 3], [3, 3], [3, 5], [11, 13]], '#f6c83a'); g.outline(); break;
-      case 'shop': g.ell(8, 9.5, 5.5, 5, ['#f7b6c8', '#e07ba0', '#a2477a']); g.rect(6, 3, 4, 2, '#a2477a'); g.outline(); g.px([[7, 8], [8, 8], [7, 9], [8, 10], [9, 10], [8, 11], [7, 11]], '#fff27a'); break;
-      case 'sprouts': return PX.sprig(PX.cloneLook(PX.DEFAULT_LOOK), { eyes: 'happy', mouth: 'open' });
-      case 'coin': { const c = new G(9, 9); c.ell(4.5, 4.5, 4, 4, ['#fff27a', '#f6c83a', '#c7861c']); c.px([[4, 2], [4, 3], [4, 4], [4, 5], [4, 6]], '#c7861c'); c.px([[3, 2]], '#ffffff'); return c.canvas(); }
-      case 'sun': { const c = new G(9, 9); c.ell(4.5, 4.5, 3, 3, '#f6c83a'); c.px([[4, 0], [4, 8], [0, 4], [8, 4], [1, 1], [7, 1], [1, 7], [7, 7]], '#f6c83a'); return c.canvas(); }
-      case 'moon': { const c = new G(9, 9); c.ell(4.5, 4.5, 3.8, 3.8, '#c9a2f0'); c.ell(6, 3.5, 3, 3, null); c.outline(); return c.canvas(); }
-      case 'sound': case 'mute': { // a little speaker, with sound waves or a cross
-        const c = new G(13, 11); c.rect(1, 4, 3, 3, '#dfe8fb'); c.poly([[3.5, 4], [7.5, 0.5], [7.5, 10.5], [3.5, 7]], '#dfe8fb'); c.outline();
-        if (kind === 'sound') c.px([[9, 4], [9, 5], [9, 6], [11, 2], [11, 3], [12, 4], [12, 5], [12, 6], [11, 7], [11, 8]], '#222034');
-        else c.px([[9, 3], [10, 4], [11, 5], [12, 6], [9, 7], [10, 6], [12, 4], [11, 3], [11, 7], [12, 8], [9, 8], [12, 2]], '#d24552');
+      case 'garden': // a round fruit tree: soft canopy, bark, two shiny apples
+        g.poly([[6.9, 15.4], [7.3, 9.4], [8.7, 9.4], [9.1, 15.4]], '#8f563b'); g.poly([[5.6, 15.4], [7.2, 14.2], [8.8, 14.2], [10.4, 15.4]], '#8f563b');
+        g.ell(8, 6.4, 5.7, 4.7, LEAF[1]); g.ell(4.3, 8.4, 2.9, 2.3, LEAF[1]); g.ell(11.7, 8.4, 2.9, 2.3, LEAF[1]);
+        g.sell(8, 7.0, 6.6, 5.6, LEAF, 0, IN(g));
+        g.outline();
+        g.dots([[7.6, 10.5], [7.6, 11.5], [7.6, 12.5], [8.1, 13.0]], '#b07850');
+        g.dots([[5.0, 4.6], [5.5, 4.6], [5.0, 5.1], [9.6, 3.6], [10.1, 3.6], [3.5, 7.6], [4.0, 7.6], [11.5, 6.1], [12.0, 6.1]], '#c8f490');
+        for (const [x, y] of [[10.6, 7.8], [5.6, 6.0]]) { g.ell(x, y, 1.15, 1.1, ['#ff8a90', '#e23e4a', '#9a2232']); g.dot(x - 0.5, y - 0.5, '#ffffff'); }
+        g.outerLine(); return g.canvas();
+      case 'race': { // a waving checkered flag
+        g.poly([[3.0, 2.0], [3.9, 2.0], [3.9, 15.4], [3.0, 15.4]], '#8c93a8'); g.dots([[3.0, 3], [3.0, 4], [3.0, 5], [3.0, 6], [3.0, 7], [3.0, 8], [3.0, 9], [3.0, 10], [3.0, 11], [3.0, 12], [3.0, 13], [3.0, 14]], '#d8dee8');
+        const wave = x => Math.sin((x - 4) * 0.75) * 0.7, top = [], bot = [];
+        for (let x = 4; x <= 13.6; x += 0.4) { top.push([x, 2.4 + wave(x)]); bot.unshift([x, 9.4 + wave(x)]); }
+        const F = new G(16, 16); F.poly(top.concat(bot), '#ffffff');
+        for (let fy = 0; fy < F.fh; fy++) for (let fx = 0; fx < F.fw; fx++) if (F.fget(fx, fy)) {
+          const x = (fx + 0.5) / F.k, y = (fy + 0.5) / F.k - wave(x), cx = Math.floor((x - 4) / 1.6), cy = Math.floor((y - 2.4) / 1.75);
+          const dark = (cx + cy) & 1, sh = wave(x + 0.6) > wave(x) ? 0 : 1;
+          F.fset(fx, fy, dark ? (sh ? INK : '#3a3858') : (sh ? '#dfe8fb' : '#ffffff'));
+        }
+        g.merge(F); g.ell(3.45, 1.6, 1.05, 1.05, GOLD);
+        g.outline(); g.dot(3.1, 1.2, '#ffffff'); g.outerLine(); return g.canvas();
+      }
+      case 'battle': { // two crossed swords (silver and gold)
+        const sword = (t, m, blade, edge, guard) => {
+          const X = x => (m ? 16 - x : x);
+          PX.stroke(t, [[X(5.4), 10.6], [X(12.6), 3.4]], 0.95, 0.8, blade); t.poly([[X(12.0), 2.8], [X(14.0), 2.0], [X(13.2), 4.0]], blade);
+          PX.stroke(t, [[X(2.9), 9.6], [X(6.4), 13.1]], 0.55, 0.55, guard); PX.stroke(t, [[X(4.4), 11.6], [X(2.6), 13.4]], 0.6, 0.6, '#8f563b'); t.ell(X(2.2), 13.8, 0.85, 0.85, guard);
+          for (let i = 0; i < 7; i++) t.dot(X(6.4 + i), 9.2 - i, edge);
+        };
+        const A = new G(16, 16); sword(A, false, '#dfe8fb', '#ffffff', '#f6c83a'); A.outline();
+        const B = new G(16, 16); sword(B, true, '#fcd850', '#fff6b0', '#d24552'); B.outline();
+        g.merge(A); g.merge(B); g.outerLine(); return g.canvas();
+      }
+      case 'shop': { // the round pink money pouch: frilly top, tie band, a gold coin
+        const PR = ['#ffc8dc', '#e07ba0', '#a2477a'];
+        piece(g, t => { t.ell(8, 9.9, 5.7, 5.0, PR[1]); t.poly([[5.9, 6.0], [10.1, 6.0], [9.2, 3.8], [6.8, 3.8]], PR[1]); t.sell(7.4, 9.0, 6.6, 6.4, PR, 0, IN(t)); });
+        piece(g, t => t.sell(8, 2.7, 2.7, 1.35, ['#fff0f6', PR[0], PR[1]]));
+        piece(g, t => t.poly([[5.6, 4.0], [10.4, 4.0], [10.4, 5.2], [5.6, 5.2]], '#b8508a'));
+        piece(g, t => t.sell(8, 10.5, 2.5, 2.5, GOLD));
+        g.dots([[8, 9.5], [8, 10.0], [8, 10.5], [8, 11.0], [8, 11.5]], '#c7861c'); g.dot(7.0, 9.4, '#ffffff'); g.dots([[3.4, 8.4], [3.4, 8.9], [3.9, 7.9]], '#ffe4f0'); g.dot(6.6, 4.3, '#e88ab8');
+        g.outerLine(); return g.canvas();
+      }
+      case 'arcade': { // an arcade stick: plum base, red ball, sunny button
+        const PB = ['#c9a2f0', '#9a6ad0', '#5e3a8c'];
+        const B = new G(16, 16); B.poly([[2.0, 10.0], [14.0, 10.0], [14.4, 14.4], [1.6, 14.4]], PB[1]); B.sell(6.4, 11.0, 9.6, 5.0, PB, 0, IN(B)); B.outline();
+        g.merge(B); piece(g, t => t.poly([[5.4, 4.4], [6.6, 4.4], [6.7, 10.6], [5.3, 10.6]], '#8c93a8'));
+        piece(g, t => t.sell(6, 4.0, 2.8, 2.6, ['#ff9a9a', '#e5535f', '#962b36']));
+        piece(g, t => t.sell(11, 10.9, 1.9, 1.3, GOLD));
+        g.dots([[5.0, 2.8], [5.5, 2.8], [5.0, 3.3]], '#ffffff'); g.dot(10.4, 10.4, '#ffffff'); g.dots([[3.0, 11.0], [3.5, 11.0], [4.0, 11.0]], '#e8d8ff');
+        g.outerLine(); return g.canvas();
+      }
+      case 'sprouts': return navSprout();
+      case 'coin': { // a gold coin: soft round shading, an engraved slot with a lit edge, a shine
+        const c = new G(9, 9); c.ell(4.5, 4.5, 3.5, 3.5, GOLD); c.outline();
+        c.dots([[4.25, 3.0], [4.25, 3.5], [4.25, 4.0], [4.25, 4.5], [4.25, 5.0], [4.25, 5.5], [4.25, 6.0]], '#c7861c');
+        c.dots([[4.75, 3.0], [4.75, 3.5], [4.75, 4.0], [4.75, 4.5], [4.75, 5.0], [4.75, 5.5], [4.75, 6.0]], '#fff27a');
+        c.dots([[2.75, 2.75], [3.25, 2.25], [2.75, 3.25]], '#ffffff');
+        return finish(c).canvas();
+      }
+      case 'sun': { // a small sun: soft disc and eight little rays (the clock by day)
+        const c = new G(9, 9);
+        piece(c, t => { for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, ca = Math.cos(a), sa = Math.sin(a), q = i % 2 ? 3.2 : 3.45; t.poly([[4.5 + Math.cos(a - 0.36) * 2.2, 4.5 + Math.sin(a - 0.36) * 2.2], [4.5 + ca * q, 4.5 + sa * q], [4.5 + Math.cos(a + 0.36) * 2.2, 4.5 + Math.sin(a + 0.36) * 2.2]], '#f6c83a'); } });
+        piece(c, t => t.ell(4.5, 4.5, 2.35, 2.35, GOLD));
+        c.dots([[3.5, 3.5], [4.0, 3.25], [3.25, 4.0]], '#ffffff');
+        return finish(c).canvas();
+      }
+      case 'moon': { // a lilac crescent (the clock by night)
+        const c = new G(9, 9); c.ell(4.2, 4.7, 3.45, 3.45, ['#e8d8ff', '#c9a2f0', '#9a6ad0']); c.ell(6.1, 3.3, 2.7, 2.7, null); c.outline();
+        c.dots([[2.0, 4.5], [2.0, 5.0], [2.25, 5.5]], '#f4ecff');
+        return finish(c).canvas();
+      }
+      case 'sound': case 'mute': { // a little speaker, with sound waves or a red cross
+        const c = new G(13, 11);
+        piece(c, t => { t.poly([[1.2, 3.9], [3.8, 3.9], [3.8, 7.1], [1.2, 7.1]], '#dfe8fb'); t.poly([[3.6, 4.0], [7.0, 1.3], [7.0, 9.7], [3.6, 7.0]], '#dfe8fb'); });
+        finish(c, { shade: 0.16 });
+        c.dots([[2.0, 4.6], [2.0, 5.1], [5.0, 3.4], [5.5, 3.0], [6.0, 2.6]], '#ffffff');
+        if (kind === 'sound') { const w = (r, s) => { const p = []; for (let a = -s; a <= s + 1e-6; a += s / 6) p.push([7.6 + Math.cos(a) * r, 5.5 + Math.sin(a) * r]); PX.stroke(c, p, 0.5, 0.5, INK); }; w(2.0, 0.75); w(4.0, 0.8); }
+        else { const X = new G(13, 11); PX.stroke(X, [[8.6, 3.6], [11.6, 7.4]], 0.6, 0.6, '#d24552'); PX.stroke(X, [[11.6, 3.6], [8.6, 7.4]], 0.6, 0.6, '#d24552'); X.outline(); c.merge(X); }
         return c.canvas();
       }
+      case 'music': case 'nomusic': { // two little notes on a beam, or crossed out (same size as the speaker)
+        const c = new G(13, 11);
+        piece(c, t => {
+          t.ell(3.3, 8.2, 2.0, 1.45, '#dfe8fb', -0.35); t.ell(9.6, 7.2, 2.0, 1.45, '#dfe8fb', -0.35);
+          t.poly([[4.4, 2.8], [5.3, 2.8], [5.3, 8.1], [4.4, 8.1]], '#dfe8fb'); t.poly([[10.7, 1.6], [11.6, 1.6], [11.6, 7.1], [10.7, 7.1]], '#dfe8fb');
+          t.poly([[4.4, 2.6], [11.6, 1.0], [11.6, 2.8], [4.4, 4.4]], '#dfe8fb');
+        });
+        finish(c, { shade: 0.16 });
+        c.dots([[2.4, 7.6], [2.9, 7.3], [8.7, 6.6], [9.2, 6.3]], '#ffffff');
+        if (kind === 'nomusic') { const X = new G(13, 11); PX.stroke(X, [[1.6, 1.4], [11.4, 9.6]], 0.6, 0.6, '#d24552'); X.outline(); c.merge(X); }
+        return c.canvas();
+      }
+      case 'trophy': { // a gold cup with handles on a little wooden stand
+        piece(g, t => { t.poly([[4.4, 12.3], [11.6, 12.3], [12.3, 14.6], [3.7, 14.6]], '#8f563b'); t.sell(7.0, 12.0, 6.5, 3.6, ['#c28569', '#8f563b', '#663931'], 0, IN(t)); });
+        piece(g, t => t.poly([[7.1, 8.6], [8.9, 8.6], [8.7, 12.4], [7.3, 12.4]], '#c7861c'));
+        piece(g, t => { PX.stroke(t, [[4.2, 3.2], [2.2, 3.4], [2.0, 5.2], [4.4, 6.6]], 0.55, 0.55, '#f6c83a'); PX.stroke(t, [[11.8, 3.2], [13.8, 3.4], [14.0, 5.2], [11.6, 6.6]], 0.55, 0.55, '#f6c83a'); });
+        piece(g, t => { t.poly([[3.4, 2.0], [12.6, 2.0], [12.0, 6.6], [10.0, 9.0], [6.0, 9.0], [4.0, 6.6]], '#f6c83a'); t.sell(7.0, 4.0, 7.0, 6.2, GOLD, 0, IN(t)); });
+        g.dots([[4.0, 2.75], [4.5, 2.75], [5.0, 2.75], [5.5, 2.75], [6.0, 2.75], [6.5, 2.75], [7.0, 2.75], [7.5, 2.75], [8.0, 2.75], [8.5, 2.75], [9.0, 2.75], [9.5, 2.75], [10.0, 2.75], [10.5, 2.75], [11.0, 2.75], [11.5, 2.75]], '#fff6b0');
+        g.dots([[5.25, 3.5], [5.25, 4.0], [5.25, 4.5], [5.5, 5.0], [5.75, 5.5], [6.25, 6.0]], '#ffffff');
+        return finish(g).canvas();
+      }
+      case 'heart': {
+        piece(g, t => { t.ell(5.4, 6.2, 3.1, 3.0, '#e5535f'); t.ell(10.6, 6.2, 3.1, 3.0, '#e5535f'); t.poly([[2.45, 7.0], [13.55, 7.0], [8, 13.6]], '#e5535f'); t.sell(7.2, 6.8, 7.0, 7.2, ['#ff9a9a', '#e5535f', '#962b36'], 0, IN(t)); });
+        g.dots([[4.0, 4.5], [4.5, 4.0], [5.0, 4.0], [4.0, 5.0]], '#ffffff'); g.dot(5.5, 4.0, '#ffd8d8');
+        return finish(g).canvas();
+      }
+      case 'gift': { // a red present with a sunny ribbon and bow
+        piece(g, t => t.poly([[2.2, 6.6], [13.8, 6.6], [13.8, 14.4], [2.2, 14.4]], '#e5535f'));
+        piece(g, t => t.poly([[1.3, 4.4], [14.7, 4.4], [14.7, 7.0], [1.3, 7.0]], '#f77a84'));
+        piece(g, t => t.poly([[7.0, 4.4], [9.0, 4.4], [9.0, 14.4], [7.0, 14.4]], '#fff27a'));
+        piece(g, t => { t.ell(5.7, 2.9, 2.2, 1.35, '#fff27a', 0.4); t.ell(10.3, 2.9, 2.2, 1.35, '#fff27a', -0.4); });
+        piece(g, t => t.ell(8, 3.7, 1.05, 0.95, '#f6c83a'));
+        finish(g, { shade: 0.14 });
+        g.dots([[2.5, 4.9], [3.0, 4.9], [3.5, 4.9], [2.75, 7.5], [2.75, 8.0], [2.75, 8.5]], '#ffd0d4'); g.dots([[7.5, 5.0], [7.5, 5.5], [7.5, 8.0], [7.5, 8.5], [7.5, 9.0]], '#fff9c4');
+        return g.canvas();
+      }
     }
+    return null;
+  }
+  // the Sprouts tab: the hi-res Sprout drawn at the same pixel size as the other 16 x 16 tab icons (half its own size: each
+  // 2 x 2 block becomes one fine pixel, ink wins so its lines stay, other colours blend), with the same outer ink ring
+  function navSprout() {
+    const src = PX.sprig(PX.cloneLook(PX.DEFAULT_LOOK), { eyes: 'happy', mouth: 'open' }), k = src.k || 1;
+    if (k !== 2 || src.width !== 64) return src;
+    const d = src.getContext('2d').getImageData(0, 0, 64, 64).data, g = new PX.Grid(16, 16), hex = v => (v < 16 ? '0' : '') + v.toString(16);
+    for (let fy = 0; fy < 32; fy++) for (let fx = 0; fx < 32; fx++) {
+      let r = 0, gg = 0, b = 0, n = 0, ink = false;
+      for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+        const i = ((fy * 2 + dy) * 64 + fx * 2 + dx) * 4; if (d[i + 3] < 128) continue;
+        if (d[i] === 0x22 && d[i + 1] === 0x20 && d[i + 2] === 0x34) ink = true;
+        r += d[i]; gg += d[i + 1]; b += d[i + 2]; n++;
+      }
+      if (ink) g.fset(fx, fy, INK); else if (n >= 2) g.fset(fx, fy, '#' + hex(Math.round(r / n)) + hex(Math.round(gg / n)) + hex(Math.round(b / n)));
+    }
+    g.outerLine();
     return g.canvas();
   }
-  function paint(canvas, src) { const x = canvas.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, canvas.width, canvas.height); if (src.width === canvas.width) x.drawImage(src, 0, 0); else x.drawImage(src, 0, 0, canvas.width, canvas.height); }
+  // copy a sprite into a canvas element at its own (fine) size; a CSS size, or the snapper (watchCanvases), shows it crisp
+  function paint(canvas, src) {
+    if (src.k && (canvas.width !== src.width || canvas.height !== src.height)) fitCanvas(canvas, src);
+    canvas._pk = src.k || 1;
+    const x = canvas.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, canvas.width, canvas.height); x.drawImage(src, 0, 0, canvas.width, canvas.height);
+  }
   // draw a sprout (or any look) into a canvas element; pose optional
   function drawSproutTo(canvas, sOrLook, pose) {
-    const L = sOrLook && sOrLook.stats ? state.lookOf(sOrLook) : sOrLook;
-    canvas.width = 32; canvas.height = 32; paint(canvas, PX.sprig(L, pose || {}));
+    const L = sOrLook && sOrLook.stats ? state.lookOf(sOrLook) : sOrLook, src = PX.sprig(L, pose || {});
+    if (!src.k) { canvas.width = 32; canvas.height = 32; }
+    fitCanvas(canvas, src); paint(canvas, src);
+  }
+  // size a canvas's bitmap to a sprite (hi-res sprites have k x more pixels). Canvases sized by CSS keep their size; one
+  // that was only sized by its width/height attributes gets that size pinned in CSS so it doesn't grow on screen.
+  function fitCanvas(canvas, src) {
+    const aw = PX.artW ? PX.artW(src) : src.width, ah = PX.artH ? PX.artH(src) : src.height;
+    canvas._pk = src.k || 1; // (the snapper below keeps whole device pixels per art pixel for a hi-res picture)
+    if (src.k && canvas.isConnected && !canvas.style.width) {
+      const cs = getComputedStyle(canvas), w = parseFloat(cs.width), h = parseFloat(cs.height);
+      if (Math.abs(w - canvas.width) < 0.5 && Math.abs(h - canvas.height) < 0.5) { canvas.style.width = (canvas.width === aw ? aw : w) + 'px'; canvas.style.height = (canvas.height === ah ? ah : h) + 'px'; }
+    }
+    if (canvas.width !== src.width) canvas.width = src.width;
+    if (canvas.height !== src.height) canvas.height = src.height;
   }
 
   // ---------------- HUD ----------------
@@ -54,11 +206,25 @@
     refreshPlayerChip();
     $('coinText').textContent = (coinFreeze == null ? PS.S.coins : coinFreeze).toLocaleString();
     const night = PS.clock.isNight(), ms = PS.clock.msToSwitch(), m = Math.floor(ms / 60000), s = Math.floor(ms / 1000) % 60;
-    $('clockText').textContent = `${night ? 'Night' : 'Day'} ${m}:${String(s).padStart(2, '0')}`;
+    // (the word sits in its own span: a phone hides it, the sun or moon icon says it, so the player's name keeps its room)
+    const ct = $('clockText'); if (!ct.firstElementChild) ct.innerHTML = '<span class="ck-w"></span><span class="ck-t"></span>';
+    ct.firstElementChild.textContent = night ? 'Night ' : 'Day '; ct.lastElementChild.textContent = `${m}:${String(s).padStart(2, '0')}`;
     const want = night ? 'moon' : 'sun';
     if ($('clockIcon').dataset.k !== want) { paint($('clockIcon'), icon(want)); $('clockIcon').dataset.k = want; }
     document.querySelector('[data-go="garden"] .badge').hidden = !PS.S.eggs.length;
+    if (booted) { try { menuMusic(); goalTick(); dailyTick(); } catch (e) { console.error(e); reportError(e, 'goals'); } }
   }
+  let booted = false;
+
+  // ---------------- iPad & laptop guards ----------------
+  // Safari lets you press-and-hold or drag a canvas off the screen as a picture, pinch-zoom the page and select text with a
+  // double tap; none of that belongs in the game (the garden handles its own pinch on its canvas with pointer events).
+  const typing = el => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+  document.addEventListener('dragstart', e => e.preventDefault());
+  document.addEventListener('selectstart', e => { if (!typing(e.target)) e.preventDefault(); });
+  document.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+  for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
+  document.addEventListener('focusout', e => { if (typing(e.target)) setTimeout(() => { if (!typing(document.activeElement) && (window.scrollX || window.scrollY)) window.scrollTo(0, 0); }, 50); });
 
   // ---------------- navigation ----------------
   function go(name, params) {
@@ -66,10 +232,14 @@
     if (current && PS.scenes[current] && PS.scenes[current].hide) PS.scenes[current].hide();
     document.querySelectorAll('.screen').forEach(el => { el.hidden = el.dataset.screen !== name; });
     document.querySelectorAll('#nav button').forEach(b => { if (b.dataset.go === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-    current = name;
+    const prev = current; current = name;
     const root = $('scr-' + name);
-    if (sc && !mounted[name]) { mounted[name] = true; try { sc.mount(root); } catch (e) { console.error(e); root.innerHTML = `<div class="card" style="margin:20px auto">This screen failed to load.</div>`; } }
-    if (sc && sc.show) sc.show(params || {});
+    // the new screen fades in (menus also rise a little: app.css .scr-in); only when the screen really changes
+    if (root && prev !== name) { root.classList.remove('scr-in'); void root.offsetWidth; root.classList.add('scr-in'); }
+    if (sc && !mounted[name]) { mounted[name] = true; try { sc.mount(root); } catch (e) { console.error(e); reportError(e, name); root.innerHTML = `<div class="card" style="margin:20px auto">This screen failed to load.</div>`; } }
+    // hub music first, so a scene's own show() can start its own track straight after (a race, a battle, a mini-game)
+    music();
+    if (sc && sc.show) { try { sc.show(params || {}); } catch (e) { console.error(e); reportError(e, name); } }
     if (!sc) root.innerHTML = `<div style="padding:24px"><div class="card">Coming soon.</div></div>`;
   }
   let chromeOn = true, held = false, heldToast = null;
@@ -89,10 +259,22 @@
   // ---------------- modals (queued) ----------------
   // opts: { eyebrow, title, html, sprite: sprout|look|canvas, pose, buttons:[{label, kind:'primary'|'go'|'danger'|'', onClick(close)}], row, dismiss:true }
   const queue = []; let open = null;
+  // A tap that opens a pop-up when the finger lifts is followed by the browser's own click at the same spot, which would land on
+  // the new pop-up. A click whose press began before the pop-up opened isn't meant for it (keyboard clicks have detail 0).
+  let pressN = 0;
+  for (const tp of ['pointerdown', 'touchstart']) document.addEventListener(tp, () => { pressN++; }, { capture: true, passive: true });
   function modal(opts) { queue.push(opts); pumpModals(); }
   function pumpModals() {
-    if (open || held || !queue.length) return;
-    const o = queue.shift(); open = o;
+    if (open || !queue.length) return;
+    // (while a race or battle holds pop-ups, only a moment that scene asked for itself, a celebrate() without wait, may show)
+    const qi = held ? queue.findIndex(q => q.force) : 0;
+    if (qi < 0) return;
+    const o = queue.splice(qi, 1)[0]; open = o;
+    if (o.cel) { try { showCelebrate(o); } catch (e) { console.error(e); reportError(e, 'celebrate'); $('modalRoot').innerHTML = ''; open = null; o.done(); pumpModals(); } return; }
+    if (o.evo) { // (if the scene can't run: the plain pop-up it replaced)
+      try { showEvolution(o); } catch (e) { console.error(e); reportError(e, 'evolve'); $('modalRoot').innerHTML = ''; open = null; queue.unshift(evoModal(o.evo)); pumpModals(); }
+      return;
+    }
     const root = $('modalRoot');
     root.innerHTML = `<div class="overlay" role="dialog" aria-modal="true"><div class="card modal-card">
       ${o.sprite ? '<canvas class="px m-sprite" width="32" height="32"></canvas>' : ''}
@@ -100,8 +282,10 @@
       ${o.title ? `<h1>${o.title}</h1>` : ''}
       <div class="m-body">${o.html || ''}</div>
       <div class="modal-btns ${o.row ? 'row' : ''}"></div></div></div>`;
+    const openN = pressN, openT = performance.now();
+    root.querySelector('.overlay').addEventListener('click', e => { if (e.detail && pressN === openN && performance.now() - openT < 700) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
     const cv = root.querySelector('.m-sprite');
-    if (cv) { if (o.sprite instanceof HTMLCanvasElement) { cv.width = o.sprite.width; cv.height = o.sprite.height; paint(cv, o.sprite); } else drawSproutTo(cv, o.sprite, o.pose || { eyes: 'happy', mouth: 'open', arms: 'up' }); }
+    if (cv) { if (o.sprite instanceof HTMLCanvasElement) { fitCanvas(cv, o.sprite); paint(cv, o.sprite); } else drawSproutTo(cv, o.sprite, o.pose || { eyes: 'happy', mouth: 'open', arms: 'up' }); }
     const close = () => { root.innerHTML = ''; open = null; if (o.onClose) o.onClose(); pumpModals(); };
     const btns = o.buttons && o.buttons.length ? o.buttons : [{ label: 'OK', kind: 'primary' }];
     const box = root.querySelector('.modal-btns');
@@ -109,7 +293,7 @@
     if (o.dismiss !== false) root.querySelector('.overlay').addEventListener('click', e => { if (e.target.classList.contains('overlay')) close(); });
     if (o.mount) o.mount(root.querySelector('.card'), close);
   }
-  function closeModal() { if (open) { $('modalRoot').innerHTML = ''; open = null; pumpModals(); } }
+  function closeModal() { if (!open) return; if (open.kill) { open.kill(); return; } $('modalRoot').innerHTML = ''; open = null; pumpModals(); } // (a celebrate or evolution closes itself, so its promise resolves)
 
   // ---------------- sprout picker ----------------
   // opts: { title, eyebrow, note, filter(s)->true|string(reason disabled), extra(s)->html, onPick(s) }
@@ -198,16 +382,35 @@
   }
   PS.on('save:failed', () => saveWarning('This device just refused to save the game.'));
   PS.on('save:ok', () => { saveWarned = false; });
-  PS.on('sprout:evolve', e => {
-    const s = e.s, fi = state.formInfo(s), mv = fi.moves.map(id => D.MOVES[id].name).join(', ');
-    const why = s.stage === 1 ? `Its ${state.natureKind(s) === 'sun' ? 'sunny' : state.natureKind(s) === 'moon' ? 'moonlit' : 'wild'} nature shaped its bud.`
-      : `It bloomed as a ${D.FLOWERS[s.flower].name} because it lives in the ${D.AREAS[s.area].name} and has a ${state.natureKind(s)} nature.`;
-    PX.Sound.play('evolve');
-    modal({ eyebrow: 'Evolution', title: `${PS.state.esc(s.name)} became a ${fi.name}!`, sprite: s, html: `<p>${why}</p><p><b>New moves:</b> ${mv}</p>`, buttons: [{ label: 'Wonderful', kind: 'primary' }] });
+  // why a Sprout changed the way it did (the evolution scene says it at the end)
+  function evoWhy(s, stg) {
+    try {
+      const nk = state.natureKind(s);
+      return (stg == null ? s.stage : stg) === 1 ? `Its ${nk === 'sun' ? 'sunny' : nk === 'moon' ? 'moonlit' : 'wild'} nature shaped its bud.`
+        : `It bloomed as a ${D.FLOWERS[s.flower].name} because it lives in the ${D.AREAS[s.area].name} and has a ${nk} nature.`;
+    } catch (e) { return ''; }
+  }
+  function evoModal(e) { // the plain pop-up (only if the scene can't run)
+    const s = e.s, fi = state.formInfo(s), mv = (fi.moves || []).map(id => (D.MOVES[id] || {}).name).filter(Boolean).join(', ');
+    return { eyebrow: 'Evolution', title: `${E(e.name || s.name)} became a ${E(e.to || fi.name)}!`, sprite: s, html: `<p>${E(evoWhy(s, e.stage))}</p>${mv ? `<p><b>New moves:</b> ${E(mv)}</p>` : ''}`, buttons: [{ label: 'Wonderful', kind: 'primary' }] };
+  }
+  PS.on('sprout:evolve', e => { if (e && e.s && !e.s.npc) { queue.push({ evo: e }); pumpModals(); } }); // (the evolution scene: showEvolution)
+  PS.on('egg:new', e => { refresh(); const eg = D.EGGS[e.egg.kind] || D.EGGS.meadow, ar = D.AREAS[e.egg.area] || D.AREAS.meadow; toast(`New ${eg.name}! It's waiting in the ${ar.name}.`, 3200); });
+  // a hatch: the garden plays its own little moment; the very first Sprout, a Shiny, or the first from a special egg also gets the big one
+  PS.on('egg:hatch', e => {
+    const s = e && e.s, egg = e && e.egg; if (!s || s.npc) return;
+    const shiny = !!(s.look && s.look.shiny), kind = egg && egg.kind, special = kind && !D.AREAS[kind] && D.EGGS[kind];
+    const first = PS.S.sprouts.length === 1, J = journey(), hk = J.hatched && typeof J.hatched === 'object' ? J.hatched : (J.hatched = {});
+    const firstKind = special && !hk[kind]; if (kind) hk[kind] = 1; PS.save();
+    if (!shiny && !first && !firstKind) return;
+    goalT = performance.now() + 2500; // (a goal reached by this hatch is paid after the moment, where it can be seen)
+    setTimeout(() => celebrate({ kind: 'hatch', wait: true, eyebrow: shiny ? 'A Shiny Sprout!' : 'It hatched!', title: `Hi, ${s.name}!`, sprite: s, cry: true,
+      sub: shiny ? `${s.name} is Shiny! It shimmers like the moon.` : special ? `Your first Sprout from a ${D.EGGS[kind].name}!` : `${s.name} is yours to look after. Say hi!`, button: 'Hi!' }), first ? 600 : 1400); // (the very first: before the garden's own "Say hi" pop-up, which then queues after it)
   });
-  PS.on('egg:new', e => { refresh(); toast(`New ${D.EGGS[e.egg.kind].name}! It's waiting in the ${D.AREAS[e.egg.area].name}.`, 3200); });
+  // something new to play or collect (any screen can send it): PS.emit('unlock', { title, sub, eyebrow, icon:<canvas>, sprite, tiles })
+  PS.on('unlock', e => { if (e && e.title) celebrate({ kind: e.kind || 'unlock', wait: true, eyebrow: e.eyebrow || 'Unlocked!', title: e.title, sub: e.sub || '', icon: e.icon || null, sprite: e.sprite || null, tiles: e.tiles, button: e.button || 'Hooray!' }); });
   PS.on('levelup', e => { if (current !== 'race' && current !== 'battle') toast(`${e.s.name}: ${D.STAT_META[e.stat].label} Lv ${e.lv}`); });
-  PS.on('night', e => { toast(e.isNight ? 'Night has fallen. Night creatures are out.' : 'Good morning! The sun is up.', 3000); refresh(); });
+  PS.on('night', e => { toast(e.isNight ? 'Night has fallen. Night creatures are out.' : 'Good morning! The sun is up.', 3000); refresh(); if (current === 'garden' && chromeOn && !held && !open) music(); });
 
   // ---------------- parent gate (keeps kids out of the testing tools and erase buttons) ----------------
   // One right answer opens grown-up actions for 2 minutes, and putting the app away closes them again
@@ -359,6 +562,9 @@
   // stylesheets (a 32px Sprout shown at 34 or 76 CSS px, a 26px critter squeezed into 22), which doubles some pixel rows and not
   // others. This snaps every small pixel-art canvas to the nearest whole-pixel scale for this screen (1x, 2x or 3x), preferring
   // a slightly smaller size over a bigger one so layouts don't overflow. Big scene canvases draw at device resolution and are skipped.
+  // Hi-res pictures (2 fine pixels per art pixel; paint / fitCanvas mark the canvas with _pk) snap so each fine pixel is whole
+  // device pixels when that keeps the size within 15%; otherwise (e.g. a 3x iPhone) each art pixel is whole device pixels, so
+  // nothing grows or shrinks by a third. In a box smaller than the bitmap (1x screens) a hi-res picture is halved, never grown.
   const snapQ = new Set(); let snapRaf = 0;
   const pxOf = v => (typeof v === 'string' && /px$/.test(v) ? parseFloat(v) : 0);
   function queueSnap(c) { snapQ.add(c); if (!snapRaf) { snapRaf = 1; Promise.resolve().then(flushSnap); } } // before the next paint
@@ -366,14 +572,16 @@
     snapRaf = 0;
     const dpr = window.devicePixelRatio || 1, todo = [];
     for (const c of snapQ) { // read everything first (one style pass), then write
-      if (!c.isConnected || !c.width || !c.height || c.width > 200 || c.height > 200 || 'nosnap' in c.dataset) continue;
+      if (!c.isConnected || !c.width || !c.height || c.width > 400 || c.height > 400 || (c.width === 300 && c.height === 150) || 'nosnap' in c.dataset) continue; // (400: hi-res sprites are twice their art size; 300 x 150 is a canvas nothing has sized yet, e.g. a scene before its first frame)
       const cs = getComputedStyle(c); if (!/pixelated|crisp/.test(cs.imageRendering)) continue;
       const mine = c.dataset.sw && c.style.width === c.dataset.sw && c.style.height === c.dataset.sh;
       let rw = mine ? +c.dataset.rw : pxOf(c.style.width) || pxOf(cs.width), rh = mine ? +c.dataset.rh : pxOf(c.style.height) || pxOf(cs.height);
       if (!rw && !rh) continue;
       const k = Math.min(rw ? rw / c.width : Infinity, rh ? rh / c.height : Infinity), phys = k * dpr;
       const lo = Math.max(1, Math.floor(phys)), hi = Math.max(1, Math.ceil(phys));
-      const n = Math.abs(phys - lo) / phys <= 1.25 * Math.abs(hi - phys) / phys || lo === hi ? lo : hi;
+      let n = Math.abs(phys - lo) / phys <= 1.25 * Math.abs(hi - phys) / phys || lo === hi ? lo : hi;
+      if (phys < 0.75) n = 1 / Math.max(1, Math.round(1 / phys)); // a hi-res sprite in a small box (1x screens): halve it, don't let it grow
+      else if (c._pk > 1 && Math.abs(n - phys) / phys > 0.15) { const m = Math.max(1, Math.round(phys * c._pk)) / c._pk; if (Math.abs(m - phys) < Math.abs(n - phys)) n = m; }
       const w = c.width * n / dpr, h = c.height * n / dpr;
       if (mine && Math.abs(w - pxOf(c.style.width)) < 0.01 && Math.abs(h - pxOf(c.style.height)) < 0.01) continue;
       todo.push([c, rw || w, rh || h, w, h]);
@@ -390,28 +598,59 @@
   }
 
   // ---------------- loop ----------------
-  let last = performance.now(), hudT = 0;
+  let last = performance.now(), hudT = 0, looping = false;
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
     const sc = PS.scenes[current];
-    if (sc && sc.frame && mounted[current] && !PS.ui.menuOpen) { try { sc.frame(dt, t); } catch (e) { console.error(e); } } // the main menu covers the screen: don't draw it twice
-    hudT -= dt; if (hudT <= 0) { hudT = 0.5; refresh(); }
-    if (!PS.ui.menuOpen && PS.S.totals) PS.S.totals.playSec = (PS.S.totals.playSec || 0) + dt; // time played (parent tools; stays on the device)
-    if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').style.opacity = 0; }
+    if (sc && sc.frame && mounted[current] && !PS.ui.menuOpen) { try { sc.frame(dt, t); } catch (e) { console.error(e); reportError(e, current); } } // the main menu covers the screen: don't draw it twice
+    // (the loop must never stop: one bad frame would freeze every screen on its last picture)
+    try {
+      hudT -= dt; if (hudT <= 0) { hudT = 0.5; refresh(); }
+      if (!PS.ui.menuOpen && PS.S.totals) PS.S.totals.playSec = (PS.S.totals.playSec || 0) + dt; // time played (parent tools; stays on the device)
+      if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').style.opacity = 0; }
+    } catch (e) { console.error(e); reportError(e, 'hud'); }
     requestAnimationFrame(frame);
   }
   document.addEventListener('visibilitychange', () => { last = performance.now(); });
 
+  // ---------------- errors: shown on screen (briefly, once per kind) so a grown-up can screenshot them for fixing ----------------
+  // PS.ui.reportError(error, where): a dark bar above the bottom tabs for 15 s (tap to hide); the same message at most once a minute.
+  const errSeen = {};
+  function reportError(e, where) {
+    try {
+      const msg = String((e && (e.message || e.reason)) || e || 'error').slice(0, 160);
+      const at = e && e.stack ? (String(e.stack).split('\n').find(l => /\.js:\d+/.test(l)) || '').replace(/^.*\/([^/]+\.js:\d+):\d+\)?.*$/, '$1') : '';
+      const key = msg + at; if (errSeen[key] && Date.now() - errSeen[key] < 60000) return; errSeen[key] = Date.now();
+      let el = document.getElementById('errBar');
+      if (!el) { el = document.createElement('div'); el.id = 'errBar'; el.className = 'sv-err'; el.setAttribute('role', 'alert'); el.onclick = () => { el.hidden = true; }; document.body.appendChild(el); }
+      el.textContent = `Oops! Something went wrong (${where || 'game'}): ${msg}${at ? ' · ' + at : ''} · ${window.SOLUNAR_VERSION || 'dev'} · tap to hide`;
+      el.hidden = false; clearTimeout(el._t); el._t = setTimeout(() => { el.hidden = true; }, 15000);
+    } catch (x) { /* never let the reporter break anything */ }
+  }
+  window.addEventListener('error', ev => { if (ev && ev.target && ev.target !== window && !ev.error && !ev.message) return; reportError(ev.error || ev.message, 'page'); }); // (not a picture or font that failed to load)
+  window.addEventListener('unhandledrejection', ev => reportError(ev.reason, 'page'));
+
+  // boot(): the "Loading…" splash (index.html) goes first, whatever happens next; a step that fails is reported on screen and the
+  // game keeps going (the frame loop always starts). Boot never waits for fonts or pictures.
   function boot() {
+    const splash = document.getElementById('bootSplash'); if (splash) splash.remove();
+    try { bootSteps(); }
+    catch (e) { console.error(e); reportError(e, 'boot'); try { booted = true; bootDone = true; if (!current) go('garden'); } catch (x) { console.error(x); } }
+    if (!looping) { looping = true; requestAnimationFrame(frame); }
+  }
+  function bootSteps() {
     watchCanvases();
+    document.getElementById('nav').style.setProperty('--nav-n', document.querySelectorAll('#nav button').length); // (one column per tab: app.css)
     document.querySelectorAll('#nav button').forEach(b => { paint(b.querySelector('canvas'), icon(b.dataset.go)); b.onclick = () => { PX.Sound.unlock(); PX.Sound.play('tick'); go(b.dataset.go); }; });
     paint($('coinIcon'), icon('coin'));
     document.addEventListener('pointerdown', () => PX.Sound.unlock()); // every tap: iOS can stop the audio after a call or a trip to another app
     $('coinPill').addEventListener('click', () => toast(`You have ${PS.S.coins.toLocaleString()} coins. Earn more in races and battles.`));
     $('clockPill').addEventListener('click', () => toast('Day and night switch every 15 minutes. Some creatures only come out at night.', 3200));
+    const gc = $('goalChip'); if (gc) gc.onclick = () => { PX.Sound.unlock(); PX.Sound.play('tick'); if (goalNow) goalNow.go(); };
+    booted = true;
     refresh();
     go('garden');
-    requestAnimationFrame(frame);
+    if (!looping) { looping = true; requestAnimationFrame(frame); }
     registerServiceWorker();
     document.addEventListener('pointerdown', askPersistentStorage, { once: true });
     // sound: a device-wide on/off (iPads have no mute switch), and the audio sleeps while the app is put away
@@ -438,12 +677,457 @@
         buttons: [{ label: 'Start', kind: 'primary' }] });
     };
     PS.ui.welcome = welcome;
+    // the title menu: a Music button beside Sound (added each time it opens; see addMusicButton), and its own tune
+    if (PS.ui.mainMenu && !PS.ui.mainMenu._sv) { const mm = PS.ui.mainMenu; PS.ui.mainMenu = function () { const r = mm.apply(this, arguments); try { addMusicButton(); menuMusic(); } catch (e) { console.error(e); } return r; }; PS.ui.mainMenu._sv = true; }
     let skipMenu = false;
     try { skipMenu = sessionStorage.getItem('solunar:skipMenu') === '1'; sessionStorage.removeItem('solunar:skipMenu'); } catch (e) { /* blocked */ }
     if (PS.players.isTesting() || skipMenu || !PS.ui.mainMenu) { PS.players.touch && PS.players.touch(); welcome(); }
     else PS.ui.mainMenu({ launch: true });
     $('playerChip').onclick = () => { PX.Sound.play('tick'); PS.ui.mainMenu(); };
+    bootDone = true; // (after the title menu had its chance to open: the daily gift waits for it to close)
   }
 
-  PS.ui = { boot, go, toast, modal, closeModal, pickSprout, pickMoves, chrome, hold, refresh, devPanel, playersPanel: () => PS.ui.mainMenu(), backupPanel, parentGate, icon, paint, drawSproutTo, freezeCoins, setMuted, isMuted: () => !!PX.Sound.muted, get current() { return current; }, get modalOpen() { return !!open || queue.length > 0; } };
+  // ---------------- shared moments: celebrate, wipe, fx, hub music ----------------
+  // Every screen uses these (callers guard them: `PS.ui.celebrate ? PS.ui.celebrate(o) : PS.ui.modal(…)`), so big moments look
+  // and sound the same everywhere. Everything is made per moment and thrown away after (no caches), nothing here delays the boot,
+  // and prefers-reduced-motion is kept: fades and count-ups stay, big motion (rays, petals, bars, flying coins) goes.
+  const reduced = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
+  const audio = fn => { try { if (window.PX && PX.Music) fn(PX.Music, PX.Cry); } catch (e) { /* sound is optional */ } };
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  // a pixel-art canvas shown crisp: its CSS size is the bitmap times a whole number, as close to `want` CSS px tall as fits
+  function crispScale(c, want, dev) {
+    const dpr = dev ? window.devicePixelRatio || 1 : 1, w = Math.max(1, c.width), h = Math.max(1, c.height), n = Math.max(1, Math.floor(want * dpr / h));
+    c.style.width = (w * n / dpr) + 'px'; c.style.height = (h * n / dpr) + 'px'; c.dataset.nosnap = '';
+  }
+  // hub music for the screen being shown: the title menu has its own tune, the Garden follows the game clock, the Arcade has its
+  // own, every other hub plays the town theme. Scenes call PS.ui.music() when they come back to their menu after a race, battle or
+  // match; go() calls it on every screen change (before the scene's show(), which may start its own track).
+  function music() {
+    audio(M => {
+      if (PS.ui.menuOpen) { M.play('title'); return; }
+      M.play(current === 'garden' ? (PS.clock.isNight() ? 'garden-night' : 'garden-day') : current === 'arcade' ? 'arcade' : 'town');
+    });
+  }
+  let menuWas = null; // (the title menu opening or closing changes the music: checked with the top bar, twice a second)
+  function menuMusic() { const m = !!PS.ui.menuOpen; if (m !== menuWas) { const first = menuWas === null; menuWas = m; if (!first || m) music(); } }
+
+  // PS.ui.celebrate(o) -> Promise, resolved when it closes. A full-screen reward moment: a twilight sky, slowly turning sun rays,
+  // petals, leaves and star sparkles, a big Sprout or icon popping in on a little grassy hill, a Pixelify title, up to 4 reward
+  // tiles and one button.
+  // o = { kind:'trophy'|'unlock'|'hatch'|'evolve'|'legend'|'gift'|'star'|'levelup'|'generic', eyebrow, title, sub (plain text),
+  //       sprite: a Sprout or a look (PX.sprig), icon:<canvas>, jingle (id, or false for none; a default per kind), cry:true,
+  //       tiles:[{icon:<canvas>|null, value:'+200', label:'Coins'}], button:'Great!', hold:800 (taps ignored that long),
+  //       wait:true (wait for hold(false) like a normal pop-up), onClose }
+  // It queues behind an open pop-up but not behind hold(): a scene that calls it (race or battle results) wants it now. It sits
+  // above every scene canvas (z-index 9000).
+  const CEL_JINGLE = { trophy: 'trophy', unlock: 'unlock', hatch: 'hatch', evolve: 'evolved', legend: 'rare', gift: 'daily', star: 'star', levelup: 'levelup', generic: 'item' };
+  function celebrate(o) {
+    o = Object.assign({}, o);
+    return new Promise(done => { queue.push({ cel: o, force: !o.wait, done }); pumpModals(); });
+  }
+  function heroCanvas(o, want) {
+    if (o.sprite && typeof o.sprite === 'object' && !o.sprite.getContext) { const c = document.createElement('canvas'); c.className = 'px'; drawSproutTo(c, o.sprite, o.pose || { eyes: 'happy', mouth: 'open', arms: 'up' }); crispScale(c, want, true); return c; }
+    if (o.icon && o.icon.getContext) { const c = document.createElement('canvas'); c.className = 'px'; fitCanvas(c, o.icon); paint(c, o.icon); crispScale(c, Math.min(want, 168), !!o.icon.k); return c; }
+    return null;
+  }
+  function showCelebrate(item) {
+    const o = item.cel, root = $('modalRoot'), rm = reduced(), kind = CEL_JINGLE[o.kind] ? o.kind : 'generic';
+    const tiles = Array.isArray(o.tiles) ? o.tiles.filter(Boolean).slice(0, 4) : [];
+    root.innerHTML = `<div class="sv-cel k-${kind}${rm ? ' rm' : ''}" role="dialog" aria-modal="true">
+      <div class="sv-cel-rays" aria-hidden="true"></div><canvas class="sv-cel-fx" aria-hidden="true"></canvas>
+      <div class="sv-cel-box"><div class="sv-cel-hero"></div>
+        ${o.eyebrow ? `<div class="sv-cel-eb">${E(o.eyebrow)}</div>` : ''}
+        ${o.title ? `<h1 class="sv-cel-title">${E(o.title)}</h1>` : ''}${o.sub ? `<p class="sv-cel-sub">${E(o.sub)}</p>` : ''}
+        ${tiles.length ? `<div class="sv-res-tiles">${tiles.map(tl => `<div class="sv-res-tile">${tl.icon ? '<canvas class="px"></canvas>' : ''}<b class="num">${E(tl.value == null ? '' : tl.value)}</b><small>${E(tl.label || '')}</small></div>`).join('')}</div>` : ''}
+        <button class="btn go sv-cel-ok" type="button">${E(o.button || 'Great!')}</button></div></div>`;
+    const layer = root.firstElementChild, hero = layer.querySelector('.sv-cel-hero'), okBtn = layer.querySelector('.sv-cel-ok');
+    const want = Math.max(96, Math.min(window.innerHeight * 0.3, 288));
+    try { const c = heroCanvas(o, want); if (c) hero.appendChild(c); else hero.remove(); } catch (e) { console.error(e); hero.remove(); }
+    // the tile icons share one zoom (one level of detail): about 3 CSS px per art pixel with whole device pixels per fine pixel,
+    // a step smaller while the tallest would pass 48 CSS px; each sits on the same line so the numbers below line up
+    const tIc = tiles.map(tl => (tl && tl.icon && tl.icon.getContext ? tl.icon : null)), dpr = window.devicePixelRatio || 1;
+    const tallest = Math.max(0, ...tIc.map(ic => (ic ? PX.artH(ic) : 0)));
+    let A = Math.max(2, 2 * Math.round(1.5 * dpr)); while (A > 2 && tallest * A / dpr > 48) A -= 2; // (device px per art pixel)
+    layer.querySelectorAll('.sv-res-tile').forEach((el, i) => {
+      const tl = tiles[i], c = el.querySelector('canvas'), b = el.querySelector('b'), ic = tIc[i];
+      if (c && ic) {
+        fitCanvas(c, ic); paint(c, ic); c.dataset.nosnap = '';
+        const w = PX.artW(ic) * A / dpr, h = PX.artH(ic) * A / dpr;
+        c.style.width = w + 'px'; c.style.height = h + 'px'; c.style.marginTop = (tallest * A / dpr - h) + 'px';
+      }
+      const m = /^([+]?)(\d[\d,]*)$/.exec(String(tl.value == null ? '' : tl.value).trim()), to = m ? +m[2].replace(/,/g, '') : 0;
+      if (to > 0) { b.textContent = m[1] + '0'; setTimeout(() => countUp(b, 0, to, 700, { prefix: m[1], sound: /coin/i.test(tl.label || '') }), 450 + i * 140); }
+    });
+    const jg = o.jingle === undefined ? CEL_JINGLE[kind] : o.jingle;
+    if (jg) audio(M => M.jingle(jg));
+    if (o.cry && o.sprite && typeof o.sprite === 'object') setTimeout(() => audio((M, C) => { if (C) C.play(o.sprite, { stage: o.sprite.stage | 0 }); }), rm ? 0 : 320);
+    let fx = null, closed = false;
+    const close = () => {
+      if (closed) return; closed = true; if (fx) fx.stop();
+      if (layer.isConnected) root.innerHTML = '';
+      if (open === item) open = null;
+      try { if (o.onClose) o.onClose(); } catch (e) { console.error(e); }
+      item.done(); pumpModals();
+    };
+    const holdMs = o.hold == null ? 800 : Math.max(0, +o.hold || 0), t0 = performance.now();
+    if (holdMs) { okBtn.classList.add('wait'); setTimeout(() => okBtn.classList.remove('wait'), holdMs); }
+    // a tap anywhere continues, once the first moment has played (so a mashed button doesn't skip it)
+    layer.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); if (performance.now() - t0 < holdMs) return; PX.Sound.play('pop'); close(); });
+    item.kill = close;
+    if (!rm) fx = celFx(layer, hero.isConnected ? hero : okBtn, close);
+  }
+  // petals, little leaves and stars bursting from the picture, and star sparkles twinkling round it, on the moment's own canvas
+  // while they last (then it's emptied). Returns { stop }. onGone runs if the moment was taken off the page from outside.
+  function celFx(layer, anchor, onGone) {
+    const cv = layer.querySelector('.sv-cel-fx'); let raf = 0;
+    const stop = () => { if (raf) cancelAnimationFrame(raf); raf = 0; cv.width = 0; cv.height = 0; };
+    const dpr = Math.min(2, window.devicePixelRatio || 1), W = layer.clientWidth, H = layer.clientHeight;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const x = cv.getContext('2d'), lr = layer.getBoundingClientRect(), hr = anchor.getBoundingClientRect();
+    const cx = hr.left - lr.left + hr.width / 2, cy = hr.top - lr.top + hr.height / 2, R = Math.max(hr.width, hr.height) * 0.62 + 10;
+    const COLS = ['#ffd65a', '#f7b6c8', '#fff8e6', '#8fc8f0', '#c9a2f0', '#ff9a6a', '#99e550'];
+    const bits = Array.from({ length: 40 }, (_, i) => { const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, v = 400 + Math.random() * 460; return { x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: Math.random() * 6.28, vr: (Math.random() - 0.5) * 12, s: 4 + Math.random() * 3, c: COLS[i % COLS.length], k: i % 5 === 0 ? 2 : i % 4 === 0 ? 1 : 0, d: 0.08 + Math.random() * 0.25 }; });
+    const sparks = Array.from({ length: 12 }, (_, i) => ({ a: i / 12 * 6.283 + Math.random() * 0.3, r: R * (0.8 + Math.random() * 0.35), p: Math.random(), s: 3 + Math.random() * 3 }));
+    let lastT = performance.now(), age = 0;
+    const tick = now => {
+      raf = 0;
+      if (!layer.isConnected) { stop(); if (onGone) onGone(); return; }
+      const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now; age += dt;
+      x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
+      let alive = 0;
+      for (const b of bits) {
+        if (age < b.d) { alive++; continue; }
+        b.vy += 760 * dt; b.vx *= 1 - 1.1 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.r += b.vr * dt;
+        if (b.y > H + 20) continue;
+        alive++; x.save(); x.translate(b.x, b.y); x.rotate(b.r);
+        if (b.k === 1) { x.scale(Math.cos(b.r * 1.7), 1); x.fillStyle = '#6abe30'; x.beginPath(); x.ellipse(0, 0, 3.5, 7, 0, 0, 6.283); x.fill(); x.fillStyle = '#37946e'; x.fillRect(-0.6, -6, 1.2, 12); }
+        else if (b.k === 2) { const z = b.s + 1; x.fillStyle = '#ffd65a'; x.fillRect(-z, -1.5, z * 2, 3); x.fillRect(-1.5, -z, 3, z * 2); x.fillStyle = '#fff8e6'; x.fillRect(-1.5, -1.5, 3, 3); } // a little star
+        else { x.scale(1, Math.cos(b.r * 1.3)); x.fillStyle = b.c; x.beginPath(); x.ellipse(0, 0, b.s, b.s * 0.62, 0, 0, 6.283); x.fill(); } // a petal
+        x.restore();
+      }
+      if (age < 2.4) { // four-point star sparkles twinkling round the picture
+        alive++; x.fillStyle = '#fff6c8';
+        for (const s of sparks) { const k = Math.sin(Math.max(0, age * 5 - s.p * 6)); if (k <= 0) continue; const sx = cx + Math.cos(s.a) * s.r, sy = cy + Math.sin(s.a) * s.r, z = s.s * k; x.fillRect(sx - z, sy - 1, z * 2, 2); x.fillRect(sx - 1, sy - z, 2, z * 2); }
+      }
+      if (alive) raf = requestAnimationFrame(tick); else { cv.width = 0; cv.height = 0; }
+    };
+    raf = requestAnimationFrame(tick);
+    return { stop };
+  }
+
+  // PS.ui.wipe(kind, mid) -> Promise. Covers the whole game, calls mid() once it's fully covered (swap scenes there; it may return
+  // a promise, waited for up to 3 s), then reveals. kind: 'plain' (a round sunset iris closing to the middle and opening again),
+  // 'battle' / 'race' (8 sliding bars), 'boss' (two berry flashes, then a swirl of wedges), 'arcade' (pixel tiles popping in, corner
+  // to corner). PS.ui.wipe(mid) = plain. Wipes asked for together run one after another.
+  let wipeChain = Promise.resolve();
+  function wipe(kind, mid) {
+    if (typeof kind === 'function') { mid = kind; kind = 'plain'; }
+    const run = () => runWipe(String(kind || 'plain'), mid), p = wipeChain.then(run, run);
+    wipeChain = p.catch(() => {});
+    return p;
+  }
+  async function runWipe(kind, mid) {
+    const rm = reduced(), app = $('app'), el = document.createElement('canvas'), INK = '#2a2440', GOLD = '#ffcc44';
+    const W = Math.max(1, app.clientWidth), H = Math.max(1, app.clientHeight), dpr = Math.min(2, window.devicePixelRatio || 1);
+    el.className = 'sv-wipe'; el.setAttribute('aria-hidden', 'true'); el.width = Math.round(W * dpr); el.height = Math.round(H * dpr);
+    app.appendChild(el);
+    const x = el.getContext('2d'), ease = k => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
+    const TS = 48, cols = Math.ceil(W / TS), rows = Math.ceil(H / TS), RR = Math.hypot(W, H) / 2 + 8;
+    const draw = (p, fade) => {
+      x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H); x.fillStyle = INK;
+      if (fade) { x.globalAlpha = Math.max(0, Math.min(1, p)); x.fillRect(0, 0, W, H); x.globalAlpha = 1; return; }
+      if (kind === 'boss') { // six wedges that grow while the whole thing turns
+        const rot = p * Math.PI * 1.5, sw = p * Math.PI / 3 + (p >= 1 ? 0.02 : 0);
+        for (let j = 0; j < 6; j++) { const a = rot + j * Math.PI / 3; x.beginPath(); x.moveTo(W / 2, H / 2); x.arc(W / 2, H / 2, RR, a, a + sw); x.closePath(); x.fill(); }
+      } else if (kind === 'battle' || kind === 'race') { // 8 bars, from the left and the right in turn
+        const bh = Math.ceil(H / 8);
+        for (let i = 0; i < 8; i++) { const q = Math.max(0, Math.min(1, p * 1.25 - i * 0.03)), w = W * q; x.fillRect(i % 2 ? W - w : 0, i * bh, w, bh + 1); }
+      } else if (kind === 'arcade') { // square tiles that grow from the top-left corner to the bottom-right
+        const span = cols + rows;
+        for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+          const q = Math.max(0, Math.min(1, p * 1.7 - (r + c) / span * 0.7)); if (!q) continue;
+          const s = Math.ceil(TS * q) + (q >= 1 ? 1 : 0); x.fillRect(c * TS + (TS - s) / 2, r * TS + (TS - s) / 2, s, s);
+        }
+      } else { // a round iris closing to the middle with a sunny rim, like the sun going down
+        const r = RR * (1 - p);
+        x.fillRect(0, 0, W, H);
+        if (r > 0.5) { x.globalCompositeOperation = 'destination-out'; x.beginPath(); x.arc(W / 2, H / 2, r, 0, 6.2832); x.fill(); x.globalCompositeOperation = 'source-over'; x.strokeStyle = GOLD; x.lineWidth = 6; x.beginPath(); x.arc(W / 2, H / 2, r + 3, 0, 6.2832); x.stroke(); }
+      }
+    };
+    const anim = (ms, f) => new Promise(res => { const a0 = performance.now(); const step = now => { const k = Math.min(1, (now - a0) / ms); try { f(k); } catch (e) { /* keep going */ } if (k < 1) requestAnimationFrame(step); else res(); }; requestAnimationFrame(step); });
+    try {
+      if (rm) await anim(160, k => draw(k, true));
+      else {
+        if (kind === 'boss') await anim(330, k => { x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, el.width, el.height); if (k < 0.25 || (k > 0.5 && k < 0.75)) { x.fillStyle = 'rgba(229,83,95,.85)'; x.fillRect(0, 0, el.width, el.height); } });
+        await anim(kind === 'battle' || kind === 'race' || kind === 'arcade' ? 380 : kind === 'boss' ? 560 : 300, k => draw(ease(k)));
+      }
+      draw(1, rm);
+      try { const r = typeof mid === 'function' ? mid() : null; if (r && typeof r.then === 'function') await Promise.race([r, sleep(3000)]); } catch (e) { console.error(e); reportError(e, 'wipe'); }
+      await sleep(rm ? 40 : 90);
+      if (rm) await anim(180, k => draw(1 - k, true));
+      else await anim(kind === 'boss' ? 340 : 300, k => draw(1 - ease(k)));
+    } finally { el.width = 0; el.height = 0; el.remove(); }
+  }
+
+  // ---- PS.ui.fx: small reward helpers ----
+  // countUp(el, from, to, ms=700, {prefix, sound}) -> Promise: the number in el rolls up (a coin tick every 80 ms unless sound:false)
+  function countUp(el, from, to, ms, o) {
+    o = o || {};
+    return new Promise(res => {
+      if (!el) { res(); return; }
+      from = +from || 0; to = +to || 0; ms = ms == null ? 700 : Math.max(0, +ms || 0);
+      const pre = o.prefix || '', fmt = n => pre + Math.round(n).toLocaleString(), a0 = performance.now();
+      if (!ms || from === to) { el.textContent = fmt(to); res(); return; }
+      let tk = 0;
+      const step = now => {
+        const k = Math.min(1, (now - a0) / ms);
+        el.textContent = fmt(from + (to - from) * (1 - Math.pow(1 - k, 3)));
+        if (o.sound !== false && k < 1 && now - tk > 80) { tk = now; PX.Sound.play('coin'); }
+        if (k < 1 && el.isConnected) requestAnimationFrame(step); else { el.textContent = fmt(to); res(); }
+      };
+      requestAnimationFrame(step);
+    });
+  }
+  // coinsFly(fromElOrXY, n=8) -> Promise: coins fly from an element (or {x,y} / [x,y] in page px) to the top bar's coin pill, which
+  // bumps. With the top bar hidden (a race or battle) it does nothing; with reduced motion the pill just bumps.
+  function coinsFly(from, n) {
+    n = Math.max(1, Math.min(12, n == null ? 8 : n | 0));
+    return new Promise(res => {
+      const pill = $('coinPill'), app = $('app'), pr = pill ? pill.getBoundingClientRect() : null;
+      if (!pr || !pr.width || !chromeOn) { res(); return; }
+      if (reduced()) { bumpCoins(); res(); return; }
+      const ar = app.getBoundingClientRect();
+      let fx0 = ar.left + ar.width / 2, fy0 = ar.top + ar.height / 2;
+      if (from && from.getBoundingClientRect) { const r = from.getBoundingClientRect(); fx0 = r.left + r.width / 2; fy0 = r.top + r.height / 2; }
+      else if (Array.isArray(from)) { fx0 = +from[0]; fy0 = +from[1]; }
+      else if (from && typeof from.x === 'number') { fx0 = from.x; fy0 = from.y; }
+      fx0 -= ar.left; fy0 -= ar.top;
+      const src = icon('coin'), S = PX.artW(src) * 2, tx = pr.left - ar.left + 14 - S / 2, ty = pr.top - ar.top + pr.height / 2 - S / 2;
+      const layer = document.createElement('div'); layer.className = 'sv-fly'; app.appendChild(layer);
+      const coins = Array.from({ length: n }, (_, i) => {
+        const c = document.createElement('canvas'); c.className = 'px'; c.width = src.width; c.height = src.height; c.dataset.nosnap = '';
+        c.getContext('2d').drawImage(src, 0, 0, src.width, src.height); c.style.width = c.style.height = S + 'px'; c.style.opacity = 0; layer.appendChild(c);
+        const sx = fx0 - S / 2 + (Math.random() - 0.5) * 40, sy = fy0 - S / 2 + (Math.random() - 0.5) * 26;
+        return { c, d: i * 40, sx, sy, mx: (sx + tx) / 2 + (Math.random() - 0.5) * 80, my: Math.min(sy, ty) - 60 - Math.random() * 60 };
+      });
+      const a0 = performance.now(); let landed = 0;
+      const step = now => {
+        let busy = 0;
+        for (const k of coins) {
+          if (k.done) continue;
+          const u = (now - a0 - k.d) / 500;
+          if (u < 0) { busy++; continue; }
+          if (u >= 1) { k.done = true; k.c.remove(); landed++; if (landed === 1 || landed === n) bumpCoins(); continue; }
+          busy++;
+          const e = u * (0.55 + 0.45 * u), a = (1 - e) * (1 - e), b = 2 * (1 - e) * e, c2 = e * e;
+          k.c.style.opacity = 1; k.c.style.transform = `translate3d(${a * k.sx + b * k.mx + c2 * tx}px,${a * k.sy + b * k.my + c2 * ty}px,0)`;
+        }
+        if (busy && layer.isConnected) requestAnimationFrame(step); else { layer.remove(); res(); }
+      };
+      requestAnimationFrame(step);
+    });
+  }
+  // banner(text, {tone:'go'|'info'|'warn'|'moon', ms:1300}) -> Promise: a big band across the middle ("GO!", "Round 2!")
+  function banner(text, o) {
+    o = o || {};
+    return new Promise(res => {
+      const el = document.createElement('div'), tone = ['go', 'info', 'warn', 'moon'].includes(o.tone) ? o.tone : 'go';
+      el.className = `sv-bnr t-${tone}${/\d/.test(String(text)) ? ' num' : ''}${reduced() ? ' rm' : ''}`; el.setAttribute('role', 'status'); // (.num: Pixelify's 2 and 8 look alike)
+      el.innerHTML = `<b>${E(text)}</b>`; $('app').appendChild(el);
+      setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); res(); }, 280); }, Math.max(300, +o.ms || 1300));
+    });
+  }
+
+  // ---------------- evolution: a scene of its own (replaces the old "became a …" pop-up) ----------------
+  // "Whoa! Sprig is changing!" -> glowing silhouettes of the old and new forms swap faster and faster (2 to 12 a second) -> a warm
+  // flash -> the new form in colour with petals, its voice and a jingle -> why it changed that way, and its new moves. Queued like a
+  // pop-up (it waits until a race or battle is over). A tap skips ahead after 1.5 s once this player has seen that change before
+  // (remembered in the optional PS.S.journey.evo).
+  function showEvolution(item) {
+    // (one feed can grow a seedling straight into a bloom: two scenes, so each is drawn and named for its own stage, not today's)
+    const e = item.evo, s = e.s, rm = reduced(), root = $('modalRoot'), stg = e.stage == null ? s.stage : e.stage | 0, nk = state.natureKind(s);
+    const fi = state.formInfo(stg >= 2 ? s : Object.assign({}, s, { stage: 1, form: s.stage === 1 ? s.form : nk + 'bud' }));
+    const newL = state.lookOf(s); if (stg < 2) { delete newL.bloom; newL.bud = nk; }
+    const oldL = Object.assign({}, newL);
+    if (stg >= 2) { delete oldL.bloom; oldL.bud = nk; } else delete oldL.bud; // (the form it had before: a bud, or a seedling)
+    const J = journey(), seenEvo = J.evo && typeof J.evo === 'object' ? J.evo : (J.evo = {}), key = stg + ':' + (s.form || '') + ':' + (s.flower || ''), seen = !!seenEvo[key];
+    seenEvo[key] = 1; PS.save();
+    const oldName = e.name || s.name, why = evoWhy(s, stg);
+    const sayDone = `${oldName} became a ${fi.name}!${stg >= 2 ? ' It is fully grown!' : ''}${why ? ' ' + why : ''}`;
+    const moves = (fi.moves || []).map(id => D.MOVES[id]).filter(Boolean).map(m => `<span class="chip-el" style="background:${(D.ELEMENTS[m.el] || D.ELEMENTS.normal).color}">${E(m.name)}</span>`).join('');
+    root.innerHTML = `<div class="sv-cel sv-evo${rm ? ' rm' : ''}" role="dialog" aria-modal="true">
+      <div class="sv-cel-rays" aria-hidden="true"></div><canvas class="sv-cel-fx" aria-hidden="true"></canvas><div class="sv-evo-flash" aria-hidden="true"></div>
+      <div class="sv-cel-box"><div class="sv-cel-hero sv-evo-hero"><canvas class="px"></canvas></div>
+        <h1 class="sv-cel-title" hidden>${E(fi.name)}!</h1>
+        <p class="sv-evo-say">Whoa! ${E(oldName)} is changing!</p>
+        <div class="sv-evo-moves" hidden>${moves ? `<small>New moves</small>${moves}` : ''}</div>
+        <button class="btn go sv-cel-ok" type="button" hidden>Wonderful!</button></div></div>`;
+    const layer = root.firstElementChild, hero = layer.querySelector('.sv-evo-hero'), cv = hero.querySelector('canvas'), say = layer.querySelector('.sv-evo-say');
+    let A = null, B = null;
+    try { A = PX.sprig(oldL, { eyes: 'happy' }); B = PX.sprig(newL, { eyes: 'happy', mouth: 'open', arms: 'up' }); } catch (err) { console.error(err); }
+    const W = Math.max(A ? A.width : 64, B ? B.width : 64), H = Math.max(A ? A.height : 64, B ? B.height : 64); // (fine pixels: the sprites are hi-res)
+    cv.width = W; cv.height = H; crispScale(cv, Math.max(96, Math.min(window.innerHeight * 0.32, 300)), true);
+    const x = cv.getContext('2d'); x.imageSmoothingEnabled = false;
+    const drawForm = (src, glow) => {
+      x.globalCompositeOperation = 'source-over'; x.clearRect(0, 0, W, H); if (!src) return;
+      try { x.drawImage(src, 0, 0, src.width, src.height, Math.round((W - src.width) / 2), H - src.height, src.width, src.height); } catch (err) { return; }
+      if (glow) { x.globalCompositeOperation = 'source-atop'; x.fillStyle = '#fff6c8'; x.fillRect(0, 0, W, H); x.globalCompositeOperation = 'source-over'; }
+    };
+    audio(M => M.play('evolve'));
+    let raf = 0, fx = null, phase = 0, closed = false, endT = 0;
+    const t0 = performance.now(), FLASH = rm ? 1200 : 4000;
+    const finish = () => { // the new form, in colour
+      if (phase >= 2) return; phase = 2; endT = performance.now();
+      layer.querySelector('.sv-evo-flash').classList.add('on');
+      PX.Sound.play('evolve');
+      audio((M, C) => { music(); M.jingle('evolved'); if (C) setTimeout(() => { try { C.play(s, { stage: s.stage }); } catch (err) { /* optional */ } }, 250); });
+      say.textContent = sayDone;
+      layer.classList.add('done'); layer.querySelector('.sv-cel-title').hidden = false; layer.querySelector('.sv-evo-moves').hidden = !moves;
+      const ok = layer.querySelector('.sv-cel-ok'); ok.hidden = false; ok.classList.add('wait'); setTimeout(() => ok.classList.remove('wait'), 700);
+      if (!rm) fx = celFx(layer, hero, close);
+    };
+    const close = () => {
+      if (closed) return; closed = true; if (raf) cancelAnimationFrame(raf); raf = 0; if (fx) fx.stop();
+      cv.width = 0; cv.height = 0;
+      if (layer.isConnected) root.innerHTML = '';
+      if (open === item) open = null;
+      if (phase < 2) music();
+      pumpModals();
+    };
+    const tick = now => {
+      raf = 0;
+      if (!layer.isConnected) { close(); return; }
+      const tt = now - t0;
+      if (phase < 2) {
+        if (tt >= FLASH) finish();
+        else if (tt < 1000 || rm) drawForm(A, false);
+        else { if (!phase) { phase = 1; layer.classList.add('glow'); } const u = (tt - 1000) / 3000, cyc = 6 * u + 15 * u * u; drawForm(Math.floor(cyc * 2) % 2 ? B : A, true); }
+      }
+      if (phase >= 2) { drawForm(B, false); return; } // (the last picture stays: no need to keep drawing it)
+      raf = requestAnimationFrame(tick);
+    };
+    item.kill = close;
+    raf = requestAnimationFrame(tick);
+    layer.addEventListener('click', ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      const now = performance.now();
+      if (phase < 2) { if (seen && now - t0 > 1500) finish(); return; }
+      if (now - endT < 700) return;
+      PX.Sound.play('pop'); close();
+    });
+  }
+
+  // ---------------- next goal: a small pill in the top bar (icon only on a phone); tap it to go there ----------------
+  // A short script first (the first-session loop), then the next challenge from the Battle screen (PS.battle.nextChallenge). Each
+  // scripted goal pays a few coins once (coins fly from the chip). Saved in the optional PS.S.journey = { done:{id:time}, pet, fed,
+  // evo, hatched } (made when first needed; a game from before this update starts with the goals it already reached marked done, unpaid).
+  const nextCh = () => { try { return PS.battle && typeof PS.battle.nextChallenge === 'function' ? PS.battle.nextChallenge() : null; } catch (e) { return null; } };
+  function firstTrophy() {
+    try { if (PS.battle && typeof PS.battle.trophies === 'function') { const list = PS.battle.trophies(); if (Array.isArray(list)) return list.some(tr => tr && tr.got); } } catch (e) { /* the league list below */ }
+    const L = D.LEAGUES && D.LEAGUES[0]; return !!(L && (PS.S.progress.leagues[L.id] || {}).cleared);
+  }
+  const GOALS = [
+    { id: 'hatch', label: 'Hatch your egg!', ic: 'egg', to: 'garden', coins: 50, done: () => PS.S.sprouts.length > 0 },
+    { id: 'pet', label: 'Pet your Sprout!', ic: 'heart', to: 'garden', coins: 30, done: J => !!J.pet },
+    { id: 'feed', label: 'Feed it a fruit!', ic: 'fruit', to: 'garden', coins: 30, done: J => !!J.fed },
+    { id: 'race', label: 'Win a race!', ic: 'race', to: 'race', coins: 80, done: () => (PS.S.totals.raceWins || 0) > 0 },
+    { id: 'battle', label: 'Win a battle!', ic: 'battle', to: 'battle', coins: 80, ch: true, done: () => (PS.S.totals.battleWins || 0) > 0 },
+    { id: 'bud', label: 'Grow a bud!', ic: 'garden', to: 'garden', coins: 120, done: () => PS.S.sprouts.some(s => s.stage > 0) },
+    { id: 'trophy', label: 'Win a trophy!', ic: 'trophy', to: 'battle', coins: 150, ch: true, done: () => firstTrophy() },
+  ];
+  const goalDone = (g, J) => { try { return !!g.done(J); } catch (e) { return false; } };
+  function journey() {
+    let J = PS.S.journey;
+    if (!J || typeof J !== 'object' || Array.isArray(J)) {
+      J = PS.S.journey = { done: {} };
+      const T = PS.S.totals || {}, old = PS.S.sprouts.length > 1 || (T.battles || 0) + (T.races || 0) > 0;
+      if (old) for (const g of GOALS) if (g.id === 'pet' || g.id === 'feed' || goalDone(g, J)) J.done[g.id] = 1;
+      PS.save();
+    }
+    if (!J.done || typeof J.done !== 'object' || Array.isArray(J.done)) J.done = {};
+    return J;
+  }
+  PS.on('sprout:pet', () => { try { const J = journey(); if (!J.pet) { J.pet = 1; PS.save(); } } catch (e) { /* optional */ } });
+  PS.on('sprout:fed', () => { try { const J = journey(); if (!J.fed) { J.fed = 1; PS.save(); } } catch (e) { /* optional */ } });
+  const chLabel = c => { const l = String(c && c.label || '').trim(); return !l ? '' : /[!?.]$/.test(l) ? l : `${l}!`; };
+  function goalIcon(ic) {
+    try { if (ic === 'egg') return PX.item('egg', (PS.S.eggs[0] || {}).kind || 'meadow'); if (ic === 'fruit') return PX.item('fruit', 'apple'); } catch (e) { /* the shell's own */ }
+    return icon(ic === 'egg' || ic === 'fruit' ? 'garden' : ic);
+  }
+  let goalNow = null, goalKey = '', goalT = 0;
+  function goalTick(force) {
+    const el = $('goalChip'); if (!el || !PS.S || !PS.S.totals) return;
+    if (!force && performance.now() < goalT) return; goalT = performance.now() + 1500;
+    const J = journey(); let g = GOALS.find(q => !J.done[q.id]) || null;
+    // a goal reached: pay it once, then move on (not under a pop-up or the title menu, so the moment is seen)
+    if (g && goalDone(g, J) && chromeOn && !held && !open && !queue.length && !PS.ui.menuOpen) {
+      J.done[g.id] = Date.now(); PS.save();
+      if (g.coins) { state.addCoins(g.coins, 'goal'); coinsFly(el, 6); }
+      toast(`Goal done! +${g.coins} coins`, 2600); PX.Sound.play('chime');
+      g = GOALS.find(q => !J.done[q.id]) || null;
+    }
+    let show = null;
+    if (g) { const c = g.ch ? nextCh() : null; show = { label: (c && chLabel(c)) || g.label, ic: g.ic, go: c && typeof c.go === 'function' ? () => c.go() : () => go(g.to) }; }
+    else { const c = nextCh(); if (c && chLabel(c)) show = { label: chLabel(c), ic: 'battle', go: () => c.go() }; }
+    goalNow = show;
+    const k = show ? show.label + '|' + show.ic : '';
+    if (k === goalKey) return; goalKey = k;
+    el.hidden = !show; if (!show) return;
+    el.querySelector('span').textContent = show.label; el.setAttribute('aria-label', 'Next goal: ' + show.label);
+    try { const src = goalIcon(show.ic), c = el.querySelector('canvas'); fitCanvas(c, src); paint(c, src); } catch (e) { /* no icon */ }
+    el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+  }
+
+  // ---------------- welcome back + a daily gift ----------------
+  // The first time the game is opened on a new day: "Welcome back, NAME!" with a gift from the partner Sprout that takes turns
+  // (coins, an egg, a Golden Fruit). After 6 hours away on the same day, just a hello. No streaks, no "you missed a day". Saved in the
+  // optional PS.S.daily = { gift: time, at: time, n }. (Not for test saves, so test runs start clean; &daily forces it there.)
+  // It waits until the game is really being played: boot finished (the title menu opens at the end of boot), the title menu is closed
+  // and a player is picked, the Garden is on screen, and nothing else is up (no pop-up; no race or battle holding pop-ups). One gift
+  // however many days were missed; it checks again when the app comes back after an hour away.
+  let dailyDone = false, bootDone = false;
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && hiddenAt && Date.now() - hiddenAt > 3600e3) dailyDone = false; });
+  function dailyTick() {
+    if (dailyDone || !bootDone || PS.ui.menuOpen || current !== 'garden' || open || queue.length || held || !chromeOn || !PS.players.current()) return;
+    dailyDone = true;
+    if (!PS.S.sprouts.length || (PS.players.isTesting() && !/[?&]daily\b/.test(location.search))) return;
+    const now = Date.now(), d = PS.S.daily && typeof PS.S.daily === 'object' && !Array.isArray(PS.S.daily) ? PS.S.daily : (PS.S.daily = {});
+    const day = ts => new Date(ts || 0).toDateString(), away = now - (+d.at || 0), gift = day(d.gift) !== day(now);
+    d.at = now; PS.save();
+    const who = PS.players.isTesting() ? 'friend' : ((PS.players.current() || {}).name || 'friend');
+    if (!gift) { if (away > 6 * 3600e3) toast(`Welcome back, ${who}!`, 2800); return; }
+    const n = (+d.n || 0) % 3; d.gift = now; d.n = n + 1;
+    let tile;
+    if (n === 1) { const egg = state.addEgg(D.AREAS[PS.S.area] ? PS.S.area : 'meadow', 'Daily gift'); let ic = null; try { ic = PX.item('egg', egg.kind); } catch (e) { /* no icon */ } tile = { icon: ic, value: '+1', label: (D.EGGS[egg.kind] || D.EGGS.meadow).name }; }
+    else if (n === 2 && D.FRUITS.goldfruit) { state.addFruit('goldfruit', 1); let ic = null; try { ic = PX.item('fruit', 'goldfruit'); } catch (e) { /* no icon */ } tile = { icon: ic, value: '+1', label: D.FRUITS.goldfruit.name }; }
+    else { state.addCoins(150, 'daily'); tile = { icon: icon('coin'), value: '+150', label: 'Coins' }; }
+    PS.save();
+    const eggs = PS.S.eggs.length, partner = state.active();
+    celebrate({ kind: 'gift', wait: true, eyebrow: 'Daily gift', title: `Welcome back, ${who}!`,
+      sub: eggs ? `${eggs === 1 ? 'An egg is' : eggs + ' eggs are'} waiting in the Garden. Here's a present!` : `${partner ? partner.name : 'Your garden'} missed you! Here's a present!`,
+      sprite: partner || null, icon: partner ? null : icon('gift'), tiles: [tile], button: 'Thank you!', hold: 900 });
+  }
+
+  // ---------------- music on/off (the title menu shows it beside Sound; PX.Music.muted is kept per device by audio.js) ----------------
+  function setMusic(on) { try { if (window.PX && PX.Music) { PX.Music.muted = !on; if (on) music(); } } catch (e) { /* optional */ } }
+  const musicOn = () => { try { return !(window.PX && PX.Music && PX.Music.muted); } catch (e) { return true; } };
+  // the title menu (menu.js) has a Sound button; a Music button is added beside it here, unless menu.js already has one
+  function addMusicButton() {
+    const snd = document.querySelector('.mm-sound'); if (!snd || !snd.parentElement) return;
+    let b = snd.parentElement.querySelector('.mm-music, [data-a="music"]');
+    if (!b) {
+      b = snd.cloneNode(true); b.classList.remove('mm-sound'); b.classList.add('mm-music', 'sv-music'); b.removeAttribute('data-a'); b.dataset.sv = 'music';
+      snd.after(b);
+      b.addEventListener('click', ev => { ev.stopPropagation(); setMusic(!musicOn()); PX.Sound.play('tick'); paintMusic(b); toast(musicOn() ? 'Music on' : 'Music off', 1400); });
+    }
+    if (b.dataset.sv === 'music') paintMusic(b);
+  }
+  function paintMusic(b) {
+    const on = musicOn(), c = b.querySelector('canvas'), sp = b.querySelector('span');
+    if (c) paint(c, icon(on ? 'music' : 'nomusic'));
+    if (sp) sp.textContent = on ? 'Music on' : 'Music off';
+    b.setAttribute('aria-label', on ? 'Music is on. Tap to turn it off' : 'Music is off. Tap to turn it on');
+  }
+
+  PS.ui = { reportError, boot, go, toast, modal, celebrate, wipe, music, setMusic, musicOn, fx: { countUp, coinsFly, banner }, closeModal, pickSprout, pickMoves, chrome, hold, refresh, devPanel, playersPanel: () => PS.ui.mainMenu(), backupPanel, parentGate, icon, paint, drawSproutTo, fitCanvas, freezeCoins, setMuted, isMuted: () => !!PX.Sound.muted, get current() { return current; }, get modalOpen() { return !!open || queue.length > 0; } };
 })();

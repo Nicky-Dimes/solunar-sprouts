@@ -8,6 +8,7 @@
 //       events: 'coins' {n, why} · 'sprout:update' {s} · 'levelup' {s, stat, lv} · 'sprout:evolve' {s, from, to, name}
 //               'egg:new' {egg} · 'egg:hatch' {egg, s} · 'pouch' {} · 'area' {area} · 'night' {isNight}
 //               'sprout:sold' {s, price} · 'items' {} (paints / pattern stickers / hats changed)
+//               'sprout:pet' {s} · 'sprout:fed' {s, fruit} · 'unlock' {title, sub, eyebrow, icon, sprite, tiles} (app.js celebrates it)
 //   PS.clock.isNight() · PS.clock.night() -> 0..1 (smooth, fades at the switch) · PS.clock.msToSwitch()
 //   PS.state.*  (see bottom of file)
 (function () {
@@ -74,6 +75,7 @@
     s.progress.races = isObj(s.progress.races) ? s.progress.races : {}; s.progress.leagues = isObj(s.progress.leagues) ? s.progress.leagues : {};
     for (const k of ['raceExtra', 'battleExtra']) if (s.progress[k] != null && !isObj(s.progress[k])) { repairs.push(k); delete s.progress[k]; }
     if (s.garden != null && !isObj(s.garden)) { repairs.push('garden'); delete s.garden; }
+    fixShell(s, repairs);
     fixBattleExtra(s.progress.battleExtra, repairs);
     fixRaceExtra(s.progress.raceExtra, repairs);
     if (s.garden) for (const k of ['trees', 'ground']) {
@@ -101,6 +103,21 @@
     if (!s.v || s.v < SAVE_VERSION) s.v = SAVE_VERSION;
     return s;
   }
+  // the shell (app.js) keeps two optional fields, made when first needed: journey = { done:{goalId:time}, pet, fed, evo:{key:1},
+  // hatched:{eggKind:1} } (first-session goals, evolutions and special eggs already seen) and daily = { gift, at, n } (the daily gift).
+  // A wrong type starts that field over (it only drives goals and gifts; nothing is lost).
+  function fixShell(s, repairs) {
+    for (const k of ['journey', 'daily']) if (s[k] != null && !isObj(s[k])) { repairs.push(k); delete s[k]; }
+    if (s.bookPrize != null && (typeof s.bookPrize !== 'number' || !isFinite(s.bookPrize))) { repairs.push('bookPrize'); delete s.bookPrize; } // (Sprout Book prizes claimed)
+    for (const k of ['gardenFun', 'arcade']) if (s[k] != null && !isObj(s[k])) { repairs.push(k); delete s[k]; } // (optional: garden finds, Arcade)
+    const J = s.journey;
+    if (J) {
+      if (J.done != null && !isObj(J.done)) { repairs.push('journey.done'); J.done = {}; }
+      for (const k of ['evo', 'hatched']) if (J[k] != null && !isObj(J[k])) { repairs.push('journey.' + k); delete J[k]; }
+    }
+    const d = s.daily;
+    if (d) for (const k of ['gift', 'at', 'n']) if (d[k] != null && typeof d[k] !== 'number') { repairs.push('daily.' + k); delete d[k]; }
+  }
   // battle.js keeps its own progress in progress.battleExtra (bosses, tower, friend, snack, seen, wild). Only wrong types are fixed;
   // missing parts are fine (battle.js fills them in when it needs them).
   function fixBattleExtra(bx, repairs) {
@@ -122,6 +139,7 @@
       for (const [id, v] of Object.entries(bx.wild.animals || {})) if (!Array.isArray(v) || v.length !== 3 || v.some(x => typeof x !== 'number')) { bad('wild'); delete bx.wild.animals[id]; }
     }
     if (bx.snack != null && typeof bx.snack !== 'string') delete bx.snack;
+    for (const k of ['trophies', 'trophyNew']) if (bx[k] != null && !isObj(bx[k])) { bad(k); delete bx[k]; } // battle.js remakes them lazily
   }
   // race.js keeps the extra/wild series, time trials (with ghost runs), the Daily Cup and hint counters in progress.raceExtra.
   function fixRaceExtra(rx, repairs) {
@@ -548,9 +566,11 @@
     s.happy = clamp(s.happy + (f.happy || 4), 0, 100);
     s.energy = clamp(s.energy + 15, 0, 100);
     if (f.nature) s.nature = clamp(s.nature + f.nature, -100, 100);
-    return gain(s, f.gives);
+    const out = gain(s, f.gives);
+    if (!s.npc) emit('sprout:fed', { s, fruit: fruitId }); // (the shell's first-session goals)
+    return out;
   }
-  function pet(s) { s.happy = clamp(s.happy + D.GROWTH.petHappy, 0, 100); s.nature = clamp(s.nature + 0.6, -100, 100); save(); }
+  function pet(s) { s.happy = clamp(s.happy + D.GROWTH.petHappy, 0, 100); s.nature = clamp(s.nature + 0.6, -100, 100); save(); if (s && !s.npc) emit('sprout:pet', { s }); }
   function roughHandle(s) { s.happy = clamp(s.happy - 4, 0, 100); s.nature = clamp(s.nature - 3, -100, 100); save(); }
 
   // ---------------- pouch (caught animals + bought rares) ----------------

@@ -1,6 +1,8 @@
-// sprouts.js -- Solunar Sprouts roster: every Sprout and waiting egg, plus a detail page per Sprout
-// (stats, nature, evolution path, moves, bonded animals, body parts, battle stats, race ratings, records).
-// Scene: PS.scenes.sprouts = { mount, show({id}), hide, frame }. Styles are injected below (prefix .sp-).
+// sprouts.js -- Solunar Sprouts: the Sprout Book. Tabs: My Sprouts (every Sprout and waiting egg, plus a detail page per Sprout:
+// stats, nature, evolution path, moves, style, bonded animals, body parts, battle stats, race ratings, records, sell), and the
+// collection shelves Eggs, Animals and Looks (paint, stickers, hats), each entry with its own page: found in colour with a fun
+// fact, or a silhouette with how to find it. Every 10 entries gives a prize. Exposes PS.book (counts, icon, open) for the title.
+// Scene: PS.scenes.sprouts = { mount, show({id} | {tab} | {entry: 'a:hare'}), hide, frame }. Styles are injected below (prefix .sp-).
 (function () {
   'use strict';
   const { D, state } = PS;
@@ -235,18 +237,107 @@
 .modal-btns .btn.sp-sell-yes{font-size:15px;padding:9px 12px}
 .modal-btns .btn.sp-sell-yes[disabled]{opacity:.45;cursor:default}
 .modal-btns .btn.sp-sell-yes[disabled]:active{transform:none;border-bottom-width:5px;margin-bottom:0}
+
+/* ---- the Sprout Book: a pinned header (progress, prize bar, tabs); the roster, the shelves and the pages scroll below ---- */
+.sp-page{position:absolute;inset:0;display:flex;flex-direction:column;container-type:inline-size}
+.sp-pin{flex:0 0 auto;width:100%;max-width:484px;margin:0 auto;padding:12px 12px 0;display:grid;gap:10px}
+.sp-box{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 12px}
+.sp-box>.sp-wrap{padding:12px 0 28px}
+@container (min-width:640px){.sp-pin{max-width:760px}.sp-box>.sp-wrap.sp-wide{max-width:736px}}
+@media (max-height:560px){.sp-pin .sp-bookh{display:none}}
+.sp-bookh{flex-wrap:wrap;border-left:10px solid #62a855;padding:10px 12px 10px 10px;row-gap:8px}
+.sp-bicon{width:48px;height:48px;flex:0 0 auto}
+.sp-hmain{flex:1 1 170px;min-width:0}
+.sp-pg{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+.sp-pchip{display:inline-flex;align-items:center;gap:5px;background:var(--slot);border:2px solid var(--line);border-radius:10px;padding:2px 8px 2px 4px;font:600 14px var(--f-ui);color:var(--ink-soft)}
+.sp-pchip b{color:var(--ink);font-size:15px}
+.sp-pchip canvas{width:22px;height:22px;object-fit:contain}
+.sp-bookh .sp-count{align-self:flex-start;background:#e9f6dc;border-color:#9ccf7a;color:#2f5a24;font-size:18px}
+.sp-prize{display:flex;align-items:center;gap:6px;flex:1 1 100%;background:#fff4c2;border:2px solid #e0b040;border-radius:12px;padding:5px 8px}
+.sp-p10{display:flex;gap:3px;flex:1}
+.sp-p10 i{flex:1;max-width:26px;height:15px;border-radius:5px;background:#f3e2b0;border:2px solid #d8b860}
+.sp-p10 i.on{background:#7ccc4e;border-color:#3f8a2a}
+.sp-prize canvas{width:22px;height:22px}
+.sp-prize small{font:700 14px var(--f-ui);color:#8a5a10;white-space:nowrap}
+.sp-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.sp-tabs button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:62px;border:2px solid var(--line);border-bottom-width:4px;border-radius:14px;background:var(--slot);
+  padding:5px 2px;font:600 15px/1.1 var(--f-ui);color:var(--ink-soft);min-width:0}
+.sp-tabs button canvas{width:30px;height:30px;object-fit:contain}
+.sp-tabs button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.sp-tabs button[aria-selected="true"]{background:var(--panel);border-color:var(--sun-edge);color:var(--ink);box-shadow:inset 0 -4px 0 var(--sun)}
+.sp-tabs button:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.sp-sect{display:flex;align-items:center;gap:8px;margin:8px 2px -2px;font:700 18px var(--f-px);color:var(--ink)}
+.sp-sect canvas{width:26px;height:26px;object-fit:contain}
+.sp-sect .n{margin-left:auto;font:700 14px var(--f-ui);background:var(--slot);border:2px solid var(--line);border-radius:10px;padding:0 8px;color:var(--ink)}
+.sp-sect .n.all{background:#e9f6dc;border-color:#9ccf7a;color:#2f5a24}
+.sp-coll{display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:8px}
+.sp-ctile{position:relative;display:grid;justify-items:center;align-content:start;gap:3px;min-height:120px;background:var(--panel);border:2px solid var(--line);border-bottom:4px solid var(--edge);
+  border-radius:16px;padding:8px 4px 7px;text-align:center;color:var(--ink);min-width:0}
+.sp-ctile:active{transform:translateY(2px);border-bottom-width:2px;margin-bottom:2px}
+.sp-ctile:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.sp-ctile.seen,.sp-ctile.unknown{background:var(--slot);border-style:dashed;border-bottom-style:solid}
+.sp-ctile b{font:600 14.5px/1.1 var(--f-ui);max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.sp-ctile.unknown b{color:var(--ink-soft)}
+.sp-cpic{height:74px;display:flex;align-items:flex-end;justify-content:center}
+.sp-cpic canvas{display:block}
+.sp-no{position:absolute;top:4px;left:7px;font:700 11px var(--f-ui);font-style:normal;color:var(--ink-soft);opacity:.75}
+.sp-ctile .cnt{position:absolute;top:-7px;right:-5px;min-width:24px;height:22px;padding:0 5px;display:grid;place-items:center;border-radius:11px;background:var(--sun);border:2px solid var(--sun-edge);
+  font:700 13.5px var(--f-ui);color:#4a3210}
+.sp-sil{filter:brightness(0) opacity(.3)}
+.sp-ghost{filter:saturate(.55) opacity(.42)}
+.unknown .sp-sil,.sp-sil.deep{filter:brightness(0) opacity(.15)}
+.sp-pnav{display:flex;align-items:center;gap:8px}
+.sp-pno{margin-left:auto;font:700 16px var(--f-ui);color:var(--ink-soft)}
+.sp-arrow{min-width:58px;min-height:52px;font:700 32px/1 var(--f-ui);padding:2px 10px 6px}
+.sp-paper{padding:14px;display:grid;gap:10px;justify-items:center;text-align:center;background:#fffdf3;box-shadow:inset 10px 0 0 #efe3c0}
+.sp-paper.turn-n{animation:spTurnN .3s ease-out}
+.sp-paper.turn-p{animation:spTurnP .3s ease-out}
+@keyframes spTurnN{from{transform:perspective(900px) translateX(30px) rotateY(-14deg);opacity:.3}}
+@keyframes spTurnP{from{transform:perspective(900px) translateX(-30px) rotateY(14deg);opacity:.3}}
+.sp-stagebox.rare{background:linear-gradient(#e9dcff 0 58%, #f7c6e0 58% 100%)}
+.sp-stagebox.look{background:linear-gradient(#fff1c9 0 58%, #e8dcb8 58% 100%)}
+.sp-stagebox .sp-item{margin:0 14px 22px 0}
+.sp-stagebox canvas.sp-hop{animation:spHop .45s ease-out}
+@keyframes spHop{40%{transform:translateY(-16px)}}
+@media (prefers-reduced-motion: reduce){.sp-paper.turn-n,.sp-paper.turn-p,.sp-stagebox canvas.sp-hop{animation:none}}
+.sp-ptitle{margin:0;font-size:30px;color:var(--ink);line-height:1.1}
+.sp-ichips{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+.sp-ichip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px 3px 6px;border-radius:10px;background:var(--field);border:2px solid var(--line);font:600 15px var(--f-ui);color:var(--ink)}
+.sp-ichip canvas{width:20px;height:20px;object-fit:contain}
+.sp-ichip.gold{background:#fff1c9;border-color:#e0b040;color:#6a4a10}
+.sp-fact{width:100%;text-align:left;background:#fff4c2;border:2px solid #e0b040;border-radius:16px;padding:8px 12px}
+.sp-fact b{font:700 13.5px var(--f-ui);letter-spacing:.05em;text-transform:uppercase;color:#8a5a10}
+.sp-fact p{margin:2px 0 0;font-size:18px;font-weight:600;line-height:1.35;color:#4a3210}
+.sp-fact.locked{background:var(--slot);border-color:var(--line)}
+.sp-fact.locked b,.sp-fact.locked p{color:var(--ink-soft)}
+.sp-gives{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;width:100%}
+.sp-give{border-radius:9px;padding:3px 10px;font:700 15px var(--f-ui);color:#fff;border:2px solid rgba(0,0,0,.15)}
+.sp-give.neg{background:var(--slot)!important;color:var(--ink-soft);border-color:var(--line)}
+.sp-pbtns{display:grid;gap:8px;width:100%}
+.sp-pbtns .btn{min-height:52px;font-size:17px;display:flex;align-items:center;justify-content:center;gap:8px}
+.sp-pbtns .btn canvas{width:26px;height:26px;object-fit:contain}
+.sp-minelist{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.sp-mine{display:grid;justify-items:center;align-content:end;gap:2px;min-width:86px;min-height:88px;background:var(--field);border:2px solid var(--line);border-bottom-width:4px;border-radius:14px;padding:6px 8px;color:var(--ink)}
+.sp-mine b{font:600 14px var(--f-ui);max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-mine:active{transform:translateY(2px);border-bottom-width:2px;margin-bottom:2px}
+@media (max-width:440px){.sp-pchip .lbl{display:none}.sp-pchip{padding:2px 8px 2px 3px}.sp-bookh{padding:8px 10px 8px 8px}.sp-bookh h1{font-size:23px}}
+@media (max-width:400px){.sp-bookh{border-left-width:7px}.sp-bicon{width:40px;height:40px}.sp-pchip{font-size:13px;padding:1px 6px 1px 3px}.sp-tabs button{font-size:14px}.sp-coll{grid-template-columns:repeat(auto-fill,minmax(92px,1fr))}}
 `;
   function injectCSS() { if (document.getElementById('sp-css')) return; const st = document.createElement('style'); st.id = 'sp-css'; st.textContent = CSS; document.head.appendChild(st); }
 
   // ---------- helpers ----------
-  function put(cv, src, scale) {
+  // A canvas sized to its picture. Hi-res pictures (src.k: 2 fine pixels per art pixel) keep their fine bitmap; the CSS size is
+  // art px x scale. With no scale, a canvas that no stylesheet sizes is pinned to the art size (pin), so it doesn't show twice as big.
+  function put(cv, src, scale, pin) {
     if (cv.width !== src.width) cv.width = src.width;
     if (cv.height !== src.height) cv.height = src.height;
-    const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, cv.width, cv.height); x.drawImage(src, 0, 0);
-    if (scale) { cv.style.width = src.width * scale + 'px'; cv.style.height = src.height * scale + 'px'; }
+    cv._pk = src.k || 1; // (app.js snaps it to whole device pixels)
+    const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, cv.width, cv.height); x.drawImage(src, 0, 0, src.width, src.height);
+    if (scale || pin) { const s = scale || 1; cv.style.width = PX.artW(src) * s + 'px'; cv.style.height = PX.artH(src) * s + 'px'; }
     cv.classList.add('px');
   }
   function hydrate(root) {
+    const jobs = [];
     root.querySelectorAll('canvas[data-sp]').forEach(cv => {
       const [k, id] = cv.dataset.sp.split(':');
       let src = null;
@@ -254,10 +345,15 @@
       else if (k === 'egg') src = PX.item('egg', id);
       else if (k === 'flower') src = PX.item('flower', id);
       else if (k === 'icon') src = PS.ui.icon(id);
+      else if (k === 'book') src = bookIcon();
       else if (STYLE_KINDS.includes(k)) src = styleArt(k, id);
-      if (src) put(cv, src, +cv.dataset.scale || 0);
-      delete cv.dataset.sp;
+      if (!src) { jobs.push([cv]); return; }
+      const scale = +cv.dataset.scale || 0;
+      // (no scale and no stylesheet size: the canvas's CSS size is its bitmap, so pin the art size; read before any canvas changes)
+      const pin = !scale && !!src.k && !cv.style.width && cv.isConnected && Math.abs(parseFloat(getComputedStyle(cv).width) - cv.width) < 0.5;
+      jobs.push([cv, src, scale, pin]);
     });
+    for (const [cv, src, scale, pin] of jobs) { delete cv.dataset.sp; if (src) put(cv, src, scale, pin); }
   }
   // paint tins, pattern stickers, hats, skins and gumballs come from shop.js (PS.styleArt), which falls back to stand-ins until pixel.js has them
   const STYLE_KINDS = ['gumball', 'paint', 'pattern', 'hat', 'skin'];
@@ -299,8 +395,9 @@
   const hasWings = s => Object.keys(s.parts || {}).some(p => /wings$/.test(p) && s.parts[p] > 0);
 
   // ---------- list ----------
-  let root, view = 'list', curId = null, visible = false, dirty = false, clock = 0;
-  function listHTML() {
+  // view: 'list' (a tab of the book), 'page' (one book entry) or 'detail' (one of your Sprouts)
+  let root, view = 'list', curId = null, visible = false, dirty = false, clock = 0, listTab = 'mine', listTop = 0, backTo = 'list';
+  function mineHTML() {
     const S = PS.S, list = S.sprouts.slice().sort((a, b) => (b.id === S.activeId) - (a.id === S.activeId) || (a.born || 0) - (b.born || 0));
     const rows = list.map(s => {
       const fi = state.formInfo(s), tl = state.totalLevels(s), partner = s.id === S.activeId;
@@ -318,15 +415,385 @@
         <div><b>${esc(E.name)}</b><small>In the ${esc(areaName(e.area))}${e.source ? ' \u00b7 ' + esc(e.source) : ''}</small><small>${left} ${left === 1 ? 'tap' : 'taps'} to hatch</small></div>
         <button class="btn primary" data-hatch="${e.id}">Go hatch</button></div>`;
     }).join('');
-    return `<div class="sp-scroll"><div class="sp-wrap">
-      <header class="panel sp-head"><canvas data-sp="icon:sprouts" data-scale="0" style="width:44px;height:44px"></canvas>
-        <div><h1 class="px-title">Your Sprouts</h1><div class="sp-sub">Tap a Sprout to see everything about it</div></div>
-        <span class="sp-count">${S.sprouts.length}</span></header>
-      ${S.sprouts.length ? `<div class="sp-list">${rows}</div>` : `<div class="panel sp-empty"><b class="px-title" style="font-size:20px">No Sprouts yet</b><p>Your first egg is waiting in the Garden. Tap it until it hatches.</p><button class="btn primary" data-go-garden>Go to the Garden</button></div>`}
-      ${S.eggs.length ? `<div class="sp-lbl">Eggs waiting <span class="n">${S.eggs.length}</span></div><div class="sp-list">${eggs}</div>` : ''}
-      <div class="sp-acct"><button class="btn" data-players>Switch player</button><button class="btn" data-backup>Backups</button></div>
-      <button class="sp-dev" data-dev>Parent tools</button>
-    </div></div>`;
+    return `${S.sprouts.length ? `<div class="sp-list">${rows}</div>` : `<div class="panel sp-empty"><b class="px-title" style="font-size:20px">No Sprouts yet</b><p>Your first egg is waiting in the Garden. Tap it until it hatches.</p><button class="btn primary" data-go-garden>Go to the Garden</button></div>`}
+      ${S.eggs.length ? `<div class="sp-lbl">Eggs waiting <span class="n">${S.eggs.length}</span></div><div class="sp-list">${eggs}</div>` : ''}`;
+  }
+
+  // ---------- the Sprout Book: every egg, garden animal and look, found (in colour) or still to find (a silhouette) ----------
+  // A "found" entry is remembered in PS.S.seen as 'bk:<kind>:<id>' (beside the 'animal:' / 'rare:' keys the game already writes),
+  // so selling a Sprout or using up a paint tin never takes a page away. "Seen" entries (a named silhouette) are ones you can
+  // already go and get: shop things, gumball prizes, and animals of the areas you have been to; the rest show as "???".
+  // Every PRIZE_EVERY entries pays PRIZE_COINS once; PS.S.bookPrize (optional number) remembers how many prizes were given.
+  const PRIZE_EVERY = 10, PRIZE_COINS = 100;
+  let IDS = null;
+  function ids() {
+    if (IDS) return IDS;
+    const area = D.AREA_ORDER.filter(k => D.EGGS[k]), e = area.concat(Object.keys(D.EGGS).filter(k => !area.includes(k)));
+    const a = [];
+    for (const ar of D.AREA_ORDER) {
+      const here = Object.keys(D.ANIMALS).filter(id => D.ANIMALS[id].area === ar);
+      a.push(...here.filter(id => D.ANIMALS[id].kind !== 'plant'), ...here.filter(id => D.ANIMALS[id].kind === 'plant'));
+    }
+    a.push(...Object.keys(D.ANIMALS).filter(id => !a.includes(id)), ...Object.keys(D.RARES));
+    const p = Object.keys(D.COLORS), s = Object.keys(D.PATTERNS).filter(k => k !== 'plain');
+    const h = Object.keys(D.HATS).sort((x, y) => (D.HATS[x].slot === 'extra') - (D.HATS[y].slot === 'extra'));
+    return (IDS = { e, a, p, s, h, eggs: e.map(i => 'e:' + i), animals: a.map(i => 'a:' + i), looks: p.map(i => 'p:' + i).concat(s.map(i => 's:' + i), h.map(i => 'h:' + i)) });
+  }
+  const validEntry = (k, id) => !!(ids()[k] && ids()[k].includes(id));
+  const tabOf = k => (k === 'e' ? 'eggs' : k === 'a' ? 'animals' : 'looks');
+  function entryName(k, id) {
+    if (k === 'e') return (D.EGGS[id] || {}).name || id;
+    if (k === 'a') return (creature(id) || {}).name || id;
+    if (k === 'p') return D.COLORS[id] || id;
+    if (k === 's') return D.PATTERNS[id] || id;
+    return (D.HATS[id] || {}).name || id;
+  }
+  const artKey = (k, id) => (k === 'e' ? 'egg:' : k === 'a' ? 'critter:' : k === 'p' ? 'paint:' : k === 's' ? 'pattern:' : 'hat:') + id;
+  const artScale = (k, id) => (k === 'e' ? 3 : k === 'a' ? (D.RARES[id] ? 2 : 3) : 4);
+  // everything this player has found: remembered keys plus what they have right now
+  function scan() {
+    const S = PS.S || {}, seen = S.seen && typeof S.seen === 'object' ? S.seen : {}, it = S.items && typeof S.items === 'object' ? S.items : {};
+    const f = { e: new Set(), a: new Set(), p: new Set(), s: new Set(), h: new Set() }, now = [];
+    for (const k in seen) {
+      if (!seen[k]) continue;
+      if (k.startsWith('bk:')) { const kind = k.charAt(3); if (f[kind]) f[kind].add(k.slice(5)); }
+      else if (k.startsWith('animal:')) f.a.add(k.slice(7));
+      else if (k.startsWith('rare:')) f.a.add(k.slice(5));
+    }
+    const add = (kind, id) => { if (!f[kind].has(id)) { f[kind].add(id); now.push(kind + ':' + id); } };
+    for (const s of Array.isArray(S.sprouts) ? S.sprouts : []) {
+      if (!s || typeof s !== 'object') continue;
+      if (D.EGGS[s.kind]) add('e', s.kind);
+      for (const id in (s.absorbed && typeof s.absorbed === 'object' ? s.absorbed : {})) if (creature(id)) add('a', id);
+      if (s.bornWith && creature(s.bornWith)) add('a', s.bornWith);
+      const L = s.look && typeof s.look === 'object' ? s.look : {};
+      if (!L.skin && D.COLORS[L.body]) add('p', L.body);
+      if (L.pattern && L.pattern !== 'plain' && D.PATTERNS[L.pattern]) add('s', L.pattern);
+      for (const sl of ['hat', 'extra']) if (D.HATS[L[sl]]) add('h', L[sl]);
+    }
+    for (const id of Array.isArray(S.pouch) ? S.pouch : []) if (creature(id)) add('a', id);
+    for (const id in (it.paints || {})) if (D.COLORS[id]) add('p', id);
+    for (const id in (it.patterns || {})) if (id !== 'plain' && D.PATTERNS[id]) add('s', id);
+    for (const id in (it.hats || {})) if (it.hats[id] && D.HATS[id]) add('h', id);
+    return { f, now };
+  }
+  // note down newly found entries, so they stay found
+  function sync() {
+    const S = PS.S; if (!S || !S.seen || typeof S.seen !== 'object' || Array.isArray(S.seen)) return false;
+    const { now } = scan(); if (!now.length) return false;
+    for (const k of now) S.seen['bk:' + k] = true;
+    PS.save(); return true;
+  }
+  function visitedAreas() {
+    const S = PS.S || {}, v = new Set(['meadow']); if (D.AREAS[S.area]) v.add(S.area);
+    for (const s of S.sprouts || []) if (s && s.area) v.add(s.area);
+    for (const e of S.eggs || []) if (e && e.area) v.add(e.area);
+    return v;
+  }
+  function seenOf(k, id, vis) {
+    if (k === 'a') { const A = D.ANIMALS[id]; return !A || vis.has(A.area); } // (rares sit in the Shop)
+    if (k === 'e') return !D.AREAS[id] || vis.has(id) || (PS.S.eggs || []).some(e => e && e.kind === id);
+    return true; // paint and stickers are in the Shop, hats in the Gumball machine
+  }
+  function counts(sc) {
+    const I = ids(), f = (sc || scan()).f, n = k => I[k].filter(id => f[k].has(id)).length;
+    const c = { eggs: n('e'), eggsAll: I.e.length, animals: n('a'), animalsAll: I.a.length, paints: n('p'), paintsAll: I.p.length, stickers: n('s'), stickersAll: I.s.length, hats: n('h'), hatsAll: I.h.length };
+    c.looks = c.paints + c.stickers + c.hats; c.looksAll = c.paintsAll + c.stickersAll + c.hatsAll;
+    c.entries = c.eggs + c.animals + c.looks; c.total = Math.max(1, c.eggsAll + c.animalsAll + c.looksAll);
+    c.pct = Math.floor(c.entries / c.total * 100);
+    return c;
+  }
+  const prizeGot = () => Math.max(0, Math.floor(+(PS.S && PS.S.bookPrize) || 0));
+  const prizeDue = c => Math.floor((c || counts()).entries / PRIZE_EVERY) > prizeGot();
+  // the book on the nav bar gets a dot while a prize is waiting
+  let badgeT = 0;
+  function badgeSoon() {
+    if (badgeT) return;
+    badgeT = setTimeout(() => { badgeT = 0; try { const b = document.querySelector('#nav [data-go="sprouts"] .badge'); if (b) b.hidden = !prizeDue(); } catch (e) { /* no nav */ } }, 1200);
+  }
+
+  // ---------- fun facts (our own short one-liners, easy to read aloud) ----------
+  const FACTS = {
+    e: { meadow: 'Meadow Eggs smell like fresh grass after rain.', beach: 'Hold a Beach Egg up to your ear. It sounds like waves!', moonlit: 'Moonlit Eggs glow a tiny bit in the dark.',
+      candy: "Candy Eggs smell sweet, but please don't lick them!", golden: 'A Golden Egg shines like a little piece of the sun.', rainbow: 'Every stripe on a Rainbow Egg is a different wish.',
+      crystal: 'Tap a Crystal Egg and it rings like a tiny bell.', pumpkin: 'Pumpkin Eggs grin a little wider every night.', ghost: 'A Ghost Egg is so light it floats when nobody looks.',
+      mummy: 'Mummy Eggs come wrapped up snug, like a present.', candycorn: 'Yellow, orange, white: Candy Corn Eggs have three stripes.', vampire: 'Vampire Eggs like to sleep all day long.',
+      witch: 'A Witch Egg hums a spooky little tune.', dragon: 'Dragon Eggs feel warm, like a cozy cup of cocoa.', eclipse: 'Half sun, half moon: the most Solunar egg of all!',
+      starry: 'Look closely: a Starry Egg has a whole night sky inside.', frost: 'A Frost Egg makes tiny snowflakes when it wiggles.', blossom: 'Blossom Eggs smell like spring flowers.',
+      pearl: 'Pearl Eggs come from the bottom of the sea.' },
+    a: { sparrow: 'Sparrows chirp good morning to the whole garden.', hare: 'A hare can hop farther than three Sprouts in a row.', ram: 'Rams bonk heads to say hello. Bonk!',
+      tortoise: 'Tortoises carry their house everywhere they go.', fox: 'Foxes tiptoe so quietly that even the moon can\'t hear them.', bee: 'Bees do a wiggle dance to show friends where flowers are.',
+      duck: 'Ducks have waterproof feathers. Rain just rolls off!', koi: 'Some koi grow longer than your arm.', owl: 'Owls can turn their heads almost all the way round.',
+      firefly: 'Fireflies blink their lights to say hi to each other.', crab: 'Crabs walk sideways, and they are very good at it.', seagull: 'Seagulls love snacks. Hold on to yours!',
+      otter: "Otters hold paws so they don't float apart while they nap.", seal: 'Seals can sleep in the water, floating like a log.', dolphin: 'Dolphins call each other with whistles, like names.',
+      starfish: 'A starfish can grow a new arm if it loses one.', seaturtle: 'Sea turtles swim across whole oceans.', bat: 'Bats sleep upside down, holding on with their feet.',
+      wolf: 'Wolves howl together like a big singing family.', moth: 'Moths smell things with their fuzzy feelers.', hedgehog: 'Baby hedgehogs are called hoglets!',
+      jellyfish: 'Jellyfish have no bones at all. Wobble, wobble!', gummybear: 'Gummy Bears bounce when they fall over.', cottonsheep: 'Cotton Sheep get a little smaller when it rains.',
+      lollisnail: 'A Lolli Snail leaves a sticky, sweet trail.', sugarfinch: 'Sugar Finches sneeze sprinkles. Achoo!', sodafish: 'Soda Fish blow fizzy bubbles that go pop!',
+      jellyocto: 'A Jelly Octopus can give eight wobbly hugs at once.', frog: 'Frogs drink water through their skin.', squirrel: 'Squirrels hide nuts and forget where some of them are.',
+      butterfly: 'Butterflies taste with their feet!', pelican: "A pelican's beak has a stretchy pouch, like a net.", seahorse: 'Seahorse dads carry the babies.',
+      pufferfish: 'Pufferfish puff up like a balloon to look big.', raccoon: 'Raccoons have clever little hands that can open lids.', anglerfish: 'An anglerfish has its own night light on its head.',
+      moondeer: 'Moon Deer only come out to play under a bright moon.', marshbunny: 'Marsh Bunnies turn toasty brown near a campfire.', chocomouse: 'Choco Mice leave tiny cocoa footprints.',
+      sunbuddy: 'Sunny Sunflower naps when clouds cover the sun.', shroomy: 'Shroomy loves rainy days the best.', puffball: 'Make a wish and blow! Dandelion Puff loves to fly.',
+      cloverkin: 'Finding a four-leaf clover is super lucky!', peapod: 'Pea Popper can pop five peas in one breath.', cactling: 'Cactlings drink one big gulp and stay full for weeks.',
+      kelpie: 'Kelp can grow taller than a house, way down under the sea.', coconut: 'Coconuts can float across the sea to brand new islands.', glowcap: 'Glowcaps light the path for night walkers.',
+      snapvine: 'Snapvine snaps at flies, never at friends.', moonlotus: 'Moon Lotus closes up tight when the sun comes out.', lollibloom: 'Lollibloom gets sweeter every time it rains.',
+      marshroom: 'A Marshroom is soft enough to use as a pillow.', licovine: 'Licorice Vine can tie itself into a bow.', sugarlily: 'Sugar Lily floats on soda bubbles.',
+      licoriceeel: 'Licorice Eels twist into loops just for fun.',
+      fairy: 'Fairies leave a trail of sparkles wherever they fly.', unicorn: "A unicorn's horn shines every color of the rainbow.", kitsune: 'A kitsune grows a new tail every hundred years.',
+      yeti: 'Yetis are big and fluffy, and they give the best hugs.', griffin: 'A griffin is half eagle and half lion.', dinosaur: 'Some real dinosaurs were as small as a chicken!',
+      kraken: 'The Kraken is shy. It hides way down in the deep sea.', phoenix: 'A phoenix is born again from warm, glowing embers.', dragon: 'Dragons keep their treasure warm by sleeping on it.' },
+    p: { mint: 'Fresh as a mint leaf.', leaf: 'The green of a happy garden.', sky: 'The blue of a sunny sky.', peach: 'Soft and fuzzy, like a peach.', rose: 'Pink like a rose petal.',
+      sun: 'Bright yellow, like sunshine.', berry: 'Juicy red, like a ripe berry.', plum: 'Deep purple, like a plum.', cloud: 'Fluffy white, like a cloud.', slate: 'Cool gray, like a river stone.',
+      night: 'Dark blue, like the night sky.', clay: 'Warm orange-brown, like a flower pot.', moss: 'Soft green, like moss on a log.', cocoa: 'Brown, like a mug of cocoa.',
+      lilac: 'Light purple, like lilac flowers.', teal: 'Blue-green, like a lagoon.', coral: 'Pinky orange, like coral in the sea.', lemon: 'Zesty yellow, like a lemon.',
+      lime: 'Zingy green, like a lime.', ocean: 'Deep blue, like the ocean.', cherry: 'Bright red, like a cherry.', cream: 'Smooth and pale, like vanilla cream.',
+      charcoal: 'Dark gray, like a storm cloud.', tangerine: 'Orange, like a tangerine.', bubblegum: 'Pink like bubblegum. Pop!', aqua: 'Clear blue, like a swimming pool.',
+      sand: 'Warm tan, like beach sand.', forest: 'Dark green, like a deep forest.', periwinkle: 'Blue with a little purple, like a periwinkle flower.', orchid: 'Pink-purple, like an orchid.',
+      blush: 'Soft pink, like rosy cheeks.', raspberry: 'Sweet red, like a raspberry.' },
+    s: { spots: 'No two spotty Sprouts have the very same spots.', stripes: 'Stripes make a Sprout look extra speedy.', twotone: 'Two colors are better than one!',
+      mask: 'A mask for a sneaky superhero Sprout.', star: 'A shiny star right on the tummy.', freckles: 'Freckles are little kisses from the sun.', heart: 'A big heart on the tummy, full of love.',
+      socks: 'Cozy socks that never get lost in the wash.', zigzag: 'Zig, zag, zig, zag, like a lightning bolt!', patches: 'Patches like a snuggly quilt.', tiger: 'Rawr! Stripes like a big jungle cat.',
+      moonmark: 'A little moon that shines on the forehead.' },
+    h: { bow: 'A big bow makes any Sprout look ready for a party.', flower: 'This flower clip never wilts.', leafcap: 'A leaf cap keeps the rain off. Drip, drop!',
+      beanie: 'Beanies keep ears cozy on chilly nights.', cap: 'Wear it backwards to look extra cool.', party: 'Party hats make every day feel like a birthday.',
+      sunhat: 'A sun hat makes a shady spot wherever you go.', tophat: 'Tip your top hat to say hello!', wizard: 'This hat is full of stars and tiny spells.',
+      witch: 'The pointy tip is great for catching moonbeams.', crown: 'Only the bravest Sprouts wear a crown.', star: 'A little star that follows you everywhere.',
+      moon: 'A tiny moon charm for night owls.', halo: 'A glowing ring for the kindest Sprouts.', flowercrown: 'Made from flowers picked in the Meadow.',
+      bandana: 'Ready for a big adventure!', headphones: 'Now your Sprout can hear the garden music.', propeller: 'Spin, spin! It almost makes you fly.', heart: 'A heart charm full of love.' },
+  };
+  const WHERE = { land: 'on the grass', air: 'in the air', water: 'in the water', coast: 'by the water' };
+  const WHEN = { day: 'by day', night: 'at night', any: 'day and night' };
+  function howTo(k, id) {
+    if (k === 'a') {
+      const A = D.ANIMALS[id];
+      if (A) return `Lives in the ${areaName(A.area)} ${WHEN[A.time] || ''}, ${WHERE[A.where] || 'outside'}. Catch it in the Garden!`;
+      const R = D.RARES[id]; return R ? `Buy it in the Shop for ${fmt(R.price)} coins. Gumballs can have one too!` : '';
+    }
+    if (k === 'e') {
+      const E = D.EGGS[id] || {}, gum = (D.FANCY_EGGS || []).includes(id) || (D.SPOOKY_EGGS || []).includes(id) || id === 'golden' || id === 'rainbow';
+      if (D.AREAS[id]) return `Win it in races, or get one from gumballs. It hatches in the ${areaName(id)}.`;
+      return `${E.price ? `Buy it in the Shop for ${fmt(E.price)} coins.` : 'Win it in a League.'}${gum ? ' Gumballs can have one too!' : ''}`;
+    }
+    if (k === 'p') return 'Buy paint in the Shop, or win it from gumballs.';
+    if (k === 's') return 'Buy stickers in the Shop, or win them from gumballs.';
+    return id === 'witch' ? 'Win it from the Gumball machine, or hatch a Witch Egg.' : 'Win it from the Gumball machine.';
+  }
+
+  // ---------- the book's shelves ----------
+  function tileCount(k, id, S) {
+    if (k === 'e') return S.sprouts.filter(s => s.kind === id).length;
+    if (k === 'a') return S.sprouts.reduce((n, s) => n + (+((s.absorbed || {})[id]) || 0), 0);
+    if (k === 'p') return +((S.items.paints || {})[id]) || 0;
+    if (k === 's') return +((S.items.patterns || {})[id]) || 0;
+    return 0;
+  }
+  function tileHTML(key, i, f, vis) {
+    const k = key.charAt(0), id = key.slice(2), ok = f[k].has(id), sn = ok || seenOf(k, id, vis), nm = entryName(k, id), cnt = ok ? tileCount(k, id, PS.S) : 0;
+    return `<button class="sp-ctile ${ok ? '' : sn ? 'seen' : 'unknown'}" data-entry="${key}" aria-label="${sn ? esc(nm) + (ok ? '' : ', not found yet') : 'Not found yet'}"><i class="sp-no">${i + 1}</i>${cnt ? `<span class="cnt">${cnt > 99 ? '99+' : cnt}</span>` : ''}
+      <span class="sp-cpic"><canvas data-sp="${artKey(k, id)}" data-scale="${artScale(k, id)}"${ok ? '' : ` class="${ghost(k, sn)}"`}></canvas></span><b>${sn ? esc(nm) : '???'}</b></button>`;
+  }
+  // not found yet: a silhouette, except paint and stickers you can buy, which show faintly so their colours and shapes can be told apart
+  const ghost = (k, sn) => (sn && (k === 'p' || k === 's') ? 'sp-ghost' : 'sp-sil');
+  function shelf(title, icon, keys, all, f, vis) {
+    const got = keys.filter(key => f[key.charAt(0)].has(key.slice(2))).length;
+    return `<h3 class="sp-sect"><canvas data-sp="${icon}" data-scale="0"></canvas>${esc(title)}<span class="n num${got === keys.length ? ' all' : ''}">${got}/${keys.length}</span></h3>
+      <div class="sp-coll">${keys.map(key => tileHTML(key, all.indexOf(key), f, vis)).join('')}</div>`;
+  }
+  function eggsHTML(f, vis) {
+    const all = ids().eggs, area = all.filter(k => D.AREAS[k.slice(2)]);
+    return shelf('Garden eggs', 'egg:meadow', area, all, f, vis) + shelf('Special eggs', 'egg:golden', all.filter(k => !area.includes(k)), all, f, vis);
+  }
+  function animalsHTML(f, vis) {
+    const all = ids().animals;
+    return D.AREA_ORDER.map(ar => shelf(areaName(ar), 'egg:' + ar, all.filter(k => (D.ANIMALS[k.slice(2)] || {}).area === ar), all, f, vis)).join('')
+      + shelf('Rare creatures', 'critter:fairy', all.filter(k => D.RARES[k.slice(2)]), all, f, vis);
+  }
+  function looksHTML(f, vis) {
+    const all = ids().looks;
+    return shelf('Paint colors', 'paint:rose', all.filter(k => k[0] === 'p'), all, f, vis) + shelf('Stickers', 'pattern:star', all.filter(k => k[0] === 's'), all, f, vis)
+      + shelf('Hats and charms', 'hat:party', all.filter(k => k[0] === 'h'), all, f, vis);
+  }
+  function headHTML(c) {
+    const done = c.entries >= c.total, left = PRIZE_EVERY - (c.entries % PRIZE_EVERY), fill = PRIZE_EVERY - left;
+    const chip = (ic, label, a, b) => `<span class="sp-pchip" aria-label="${label} ${a} of ${b}"><canvas data-sp="${ic}" data-scale="0"></canvas><span class="lbl">${label} </span><b class="num">${a}/${b}</b></span>`;
+    return `<header class="panel sp-head sp-bookh"><canvas class="sp-bicon" data-sp="book:0" data-scale="0"></canvas>
+        <div class="sp-hmain"><h1 class="px-title">Sprout Book</h1>
+          <div class="sp-pg">${chip('egg:meadow', 'Eggs', c.eggs, c.eggsAll)}${chip('critter:hare', 'Animals', c.animals, c.animalsAll)}${chip('hat:party', 'Looks', c.looks, c.looksAll)}</div></div>
+        <span class="sp-count num">${c.pct}%</span>
+        <div class="sp-prize" aria-label="${done ? 'You found everything!' : `${left} more for a prize`}"><span class="sp-p10">${Array.from({ length: PRIZE_EVERY }, (_, i) => `<i class="${done || i < fill ? 'on' : ''}"></i>`).join('')}</span><canvas data-sp="icon:coin" data-scale="0"></canvas><small>${done ? 'All found!' : `${left} more!`}</small></div>
+      </header>`;
+  }
+  const TABS = [['mine', 'icon:sprouts', 'My Sprouts'], ['eggs', 'egg:meadow', 'Eggs'], ['animals', 'critter:hare', 'Animals'], ['looks', 'hat:party', 'Looks']];
+  function listHTML() {
+    sync();
+    const sc = scan(), c = counts(sc), vis = visitedAreas(), book = listTab !== 'mine';
+    const body = listTab === 'eggs' ? eggsHTML(sc.f, vis) : listTab === 'animals' ? animalsHTML(sc.f, vis) : listTab === 'looks' ? looksHTML(sc.f, vis) : mineHTML();
+    const tab = ([id, icon, label]) => `<button role="tab" data-ltab="${id}" aria-selected="${listTab === id}"><canvas data-sp="${icon}" data-scale="0"></canvas><span>${label}</span></button>`;
+    return `<div class="sp-page"><div class="sp-pin">${headHTML(c)}
+        <div class="sp-tabs" role="tablist" aria-label="Sprout Book">${TABS.map(tab).join('')}</div></div>
+      <div class="sp-box"><div class="sp-wrap${book ? ' sp-wide' : ''}">
+      ${body}
+      ${book ? '' : `<div class="sp-acct"><button class="btn" data-players>Switch player</button><button class="btn" data-backup>Backups</button></div>
+      <button class="sp-dev" data-dev>Parent tools</button>`}
+    </div></div></div>`;
+  }
+
+  // prizes: every 10 entries; any already passed are given once, together, in one celebration
+  let prizeBusy = false;
+  function checkPrize() {
+    if (!PS.S || prizeBusy || !visible || view !== 'list') return;
+    sync();
+    const c = counts(), due = Math.floor(c.entries / PRIZE_EVERY), got = prizeGot();
+    if (due <= got) { badgeSoon(); return; }
+    const pages = due - got, coins = pages * PRIZE_COINS;
+    PS.S.bookPrize = due;
+    try { state.addCoins(coins, 'book'); } catch (e) { PS.S.coins = (PS.S.coins || 0) + coins; }
+    PS.save(); badgeSoon();
+    const title = pages === 1 ? 'A Sprout Book prize!' : `${pages} Sprout Book prizes!`, sub = `${c.entries} things found. Here are ${fmt(coins)} coins!`;
+    const art = (fn) => { try { return fn(); } catch (e) { return null; } };
+    const o = { kind: 'book', title, sub, sprite: null, icon: bookIcon(), jingle: 'newpage', button: 'Yay!',
+      tiles: [{ icon: art(() => PX.item('egg', 'meadow')), value: c.eggs, label: 'Eggs' }, { icon: art(() => PX.critter('hare')), value: c.animals, label: 'Animals' },
+        { icon: art(() => styleArt('hat', 'party')), value: c.looks, label: 'Looks' }, { icon: art(() => PS.ui.icon('coin')), value: '+' + fmt(coins), label: 'Coins' }] };
+    prizeBusy = true;
+    const done = () => { prizeBusy = false; if (visible && view === 'list') render(true); };
+    try { if (typeof PS.ui.celebrate === 'function') { Promise.resolve(PS.ui.celebrate(o)).then(done, done); return; } } catch (e) { /* fall back below */ }
+    try { if (PX.Music && PX.Music.jingle) PX.Music.jingle('newpage'); else PX.Sound.play('chime'); } catch (e) { /* audio optional */ }
+    PS.ui.modal({ eyebrow: 'Sprout Book', title, html: `<p>${esc(sub)}</p>`, buttons: [{ label: 'Yay!', kind: 'primary' }] });
+    done();
+  }
+
+  // ---------- a page of the book ----------
+  let pg = { kind: 'a', id: null }, turn = 0, pgHero = null, critHero = null;
+  // what a page's Sprout looks like: your partner trying the paint, sticker or hat on; or what an egg hatches into
+  function previewLook(k, id) {
+    const act = state.active(), base = act ? PX.cloneLook(state.lookOf(act)) : PX.cloneLook(PX.DEFAULT_LOOK);
+    if (k === 'e') {
+      const E = D.EGGS[id] || {}, L = PX.cloneLook(PX.DEFAULT_LOOK);
+      L.body = (E.bodies || [])[0] || L.body; if (E.skin) L.skin = E.skin; if (E.sparkle) L.eyes = 'sparkle';
+      if (E.hat && D.HATS[E.hat]) L[D.HATS[E.hat].slot] = E.hat;
+      return L;
+    }
+    delete base.shiny;
+    if (k === 'p') { base.body = id; delete base.skin; }
+    else if (k === 's') { base.pattern = id; base.noSpots = true; if (!base.patternColor || base.patternColor === '#fbf3dc' || base.patternColor === '#ffffff') base.patternColor = '#fff27a'; }
+    else if (k === 'h') { const H = D.HATS[id]; if (H) base[H.slot] = id; }
+    return base;
+  }
+  function mineFor(k, id) {
+    const L = s => s.look || {};
+    const pick = k === 'e' ? s => s.kind === id : k === 'a' ? s => (s.absorbed || {})[id] > 0 : k === 'p' ? s => L(s).body === id && !L(s).skin : k === 's' ? s => L(s).pattern === id : s => L(s).hat === id || L(s).extra === id;
+    return PS.S.sprouts.filter(pick);
+  }
+  function chipsHTML(k, id, ok) {
+    const ch = (inner, cls) => `<span class="sp-ichip${cls ? ' ' + cls : ''}">${inner}</span>`;
+    if (k === 'a') {
+      const A = D.ANIMALS[id], R = D.RARES[id], C = A || R; if (!C) return '';
+      const time = A ? (A.time === 'night' ? ch('<canvas data-sp="icon:moon"></canvas>Night') : A.time === 'day' ? ch('<canvas data-sp="icon:sun"></canvas>Day') : ch('<canvas data-sp="icon:sun"></canvas><canvas data-sp="icon:moon"></canvas>Day and night')) : '';
+      const parts = A ? [A.part] : Object.keys(R.parts || {});
+      return `<div class="sp-ichips">${elChip(C.el)}${A ? ch(`<canvas data-sp="egg:${A.area}"></canvas>${esc(areaName(A.area))}`) : ch('Rare', 'gold')}${time}${parts.filter(Boolean).map(p => ch('Grows ' + esc(partName(p)))).join('')}</div>`;
+    }
+    if (k === 'e') {
+      const E = D.EGGS[id] || {};
+      return `<div class="sp-ichips">${ch(`<canvas data-sp="icon:sprouts"></canvas>${E.taps || 5} taps to hatch`)}${E.skin && D.SKINS[E.skin] ? ch(`${esc(D.SKINS[E.skin].name)} skin`, 'gold') : ''}${E.hatchWith && creature(E.hatchWith) ? ch(`<canvas data-sp="critter:${E.hatchWith}"></canvas>Comes with a ${esc(creature(E.hatchWith).name)}`) : E.hatchWith === 'random' ? ch('Comes with a rare creature') : ''}</div>`;
+    }
+    const have = k === 'p' ? +((PS.S.items.paints || {})[id]) || 0 : k === 's' ? +((PS.S.items.patterns || {})[id]) || 0 : 0;
+    const what = k === 'p' ? 'Paint' : k === 's' ? 'Sticker' : (D.HATS[id] || {}).slot === 'extra' ? 'Charm' : 'Hat';
+    return `<div class="sp-ichips">${ch(what)}${have ? ch(`You have ${have}`, 'gold') : k === 'h' && ok ? ch('In your closet', 'gold') : ''}</div>`;
+  }
+  function givesHTML(k, id) {
+    const C = k === 'a' && creature(id); if (!C || !C.gives) return '';
+    const g = D.STATS.filter(st => C.gives[st]).sort((a, b) => C.gives[b] - C.gives[a]);
+    return `<div class="sp-gives">${g.map(st => { const v = C.gives[st], M = D.STAT_META[st]; return `<span class="sp-give${v < 0 ? ' neg' : ''}" style="background:${M.color}">${esc(M.label)} ${v > 0 ? '+' : ''}${v}</span>`; }).join('')}</div>`;
+  }
+  function pageBtnsHTML(k, id, ok) {
+    const b = [];
+    if (k === 'a') { const A = D.ANIMALS[id]; if (A) b.push(`<button class="btn go" data-areago="${A.area}"><canvas data-sp="egg:${A.area}"></canvas>Go to the ${esc(areaName(A.area))}</button>`); else b.push('<button class="btn primary" data-shopgo="rare"><canvas data-sp="icon:shop"></canvas>Creatures in the Shop</button>'); }
+    else if (k === 'e') { const E = D.EGGS[id] || {}; if (E.price) b.push('<button class="btn primary" data-shopgo="egg"><canvas data-sp="icon:shop"></canvas>Eggs in the Shop</button>'); else if (!ok) b.push('<button class="btn go" data-go-garden><canvas data-sp="icon:garden"></canvas>Go to the Garden</button>'); }
+    else if (k === 'h') b.push('<button class="btn primary" data-gumball-go><canvas data-sp="gumball:6"></canvas>Gumball machine</button>');
+    else b.push('<button class="btn primary" data-closet-go><canvas data-sp="icon:shop"></canvas>Buy paint &amp; stickers</button>');
+    return `<div class="sp-pbtns">${b.join('')}</div>`;
+  }
+  function entryHTML(k, id, ok, sn, no) {
+    const nm = sn ? entryName(k, id) : '???', A = D.ANIMALS[id];
+    const bg = k === 'a' ? (A ? A.area : 'rare') : k === 'e' ? (D.AREAS[id] ? id : 'rare') : 'look';
+    const showSprout = ok && k !== 'a';
+    const hero = `<div class="sp-stagebox ${bg}"><span class="sp-where">#${no}</span>${showSprout ? `<canvas class="sp-item" data-sp="${artKey(k, id)}" data-scale="${k === 'e' ? 3 : 4}"></canvas>` : ''}<canvas data-pghero class="${ok ? '' : sn ? ghost(k, sn) : 'sp-sil deep'}" title="${ok ? 'Tap me!' : ''}"></canvas></div>`;
+    const fact = (FACTS[k] || {})[id] || (k === 'a' ? (creature(id) || {}).blurb : k === 'e' ? (D.EGGS[id] || {}).desc : '') || `${entryName(k, id)} is part of your Sprout Book!`;
+    const mine = ok ? mineFor(k, id) : [];
+    const mineT = k === 'a' ? 'Bonded with' : k === 'e' ? 'Hatched from it' : k === 'h' ? 'Wearing it' : 'Your Sprouts with it';
+    return `<section class="panel sp-paper ${turn > 0 ? 'turn-n' : turn < 0 ? 'turn-p' : ''}">${hero}
+        <h2 class="sp-ptitle px-title">${esc(nm)}</h2>
+        ${sn ? chipsHTML(k, id, ok) : ''}
+        ${ok ? `<div class="sp-fact"><b>Fun fact</b><p>${esc(fact)}</p></div>${givesHTML(k, id)}`
+        : `<div class="sp-fact locked"><b>${sn ? 'Not found yet' : 'A mystery!'}</b><p>${sn ? esc(howTo(k, id)) : 'Visit more of the garden to find out what this is!'}</p></div>${sn ? givesHTML(k, id) : ''}`}
+        ${sn ? pageBtnsHTML(k, id, ok) : ''}
+      </section>
+      ${mine.length ? `<section class="panel sp-sec"><h2>${mineT} <span class="sp-aside">${mine.length}</span></h2><div class="sp-minelist">${mine.slice(0, 12).map(s => `<button class="sp-mine" data-open="${s.id}"><canvas data-mini="${s.id}"></canvas><b>${esc(s.name)}</b></button>`).join('')}</div></section>` : ''}
+      ${ok && k !== 'a' ? `<p class="sp-muted" style="text-align:center">${k === 'e' ? 'Tap the Sprout to say hi!' : `Tap ${state.active() ? esc(state.active().name) : 'the Sprout'} to see it wiggle!`}</p>` : ''}`;
+  }
+  function pageHTML() {
+    const list = ids()[tabOf(pg.kind)], key = pg.kind + ':' + pg.id, i = list.indexOf(key), sc = scan();
+    const ok = sc.f[pg.kind].has(pg.id), sn = ok || seenOf(pg.kind, pg.id, visitedAreas());
+    const back = { eggs: 'Eggs', animals: 'Animals', looks: 'Looks' }[tabOf(pg.kind)];
+    return `<div class="sp-page"><div class="sp-pin"><div class="sp-pnav">
+        <button class="btn sp-back" data-back>‹ ${back}</button><span class="sp-pno num">${i + 1} / ${list.length}</span>
+        <button class="btn sp-arrow" data-pg="-1" aria-label="Previous page">‹</button><button class="btn sp-arrow" data-pg="1" aria-label="Next page">›</button>
+      </div></div>
+      <div class="sp-box"><div class="sp-wrap">${entryHTML(pg.kind, pg.id, ok, sn, i + 1)}</div></div></div>`;
+  }
+  function openPage(k, id, dir) {
+    const sc = scrollBox();
+    if (view === 'list' && sc) listTop = sc.scrollTop;
+    pg = { kind: k, id }; turn = dir || 0; view = 'page'; render(false); turn = 0;
+  }
+  function flip(d) {
+    const list = ids()[tabOf(pg.kind)], i = list.indexOf(pg.kind + ':' + pg.id), next = list[(i + d + list.length) % list.length];
+    PX.Sound.play('tick');
+    openPage(next.charAt(0), next.slice(2), d);
+  }
+  function setupPage() {
+    const hero = root.querySelector('[data-pghero]'); if (!hero) return;
+    const k = pg.kind, id = pg.id, ok = scan().f[k].has(id);
+    try {
+      if (ok && k !== 'a') { pgHero = animSprite(hero, previewLook(k, id), 4, { phase: 0 }); return; }
+      if (k === 'a') {
+        const n = ok && PX.critterFrames ? PX.critterFrames(id) || 1 : 1, src = PX.critter(id, 0), sc = PX.artW(src) > 20 ? 4 : 5;
+        put(hero, src, sc); critHero = { cv: hero, id, n, f: 0, sc };
+        return;
+      }
+      put(hero, k === 'e' ? PX.item('egg', id) : styleArt(k === 'p' ? 'paint' : k === 's' ? 'pattern' : 'hat', id), k === 'e' ? 5 : 6);
+    } catch (e) { console.error('book page', e); }
+  }
+  function heroTap() {
+    const hero = root.querySelector('[data-pghero]'); if (!hero) return;
+    const ok = scan().f[pg.kind].has(pg.id);
+    if (!ok) { PX.Sound.play('tick'); return; }
+    PX.buzz(8);
+    if (pgHero) {
+      pgHero.happyUntil = clock + 1.1;
+      try { const act = state.active(); if (PX.Cry && PX.Cry.play && act && pg.kind !== 'e') { PX.Cry.play(act, { stage: act.stage || 0 }); return; } } catch (e) { /* fall back below */ }
+      PX.Sound.play('coo'); return;
+    }
+    hero.classList.remove('sp-hop'); void hero.offsetWidth; hero.classList.add('sp-hop');
+    PX.Sound.play(pg.kind === 'a' ? 'coo' : 'pop');
+  }
+  // the book's own little icon (a green book with a leaf and a sun), made once
+  let bookC = null;
+  function bookIcon() {
+    if (bookC) return bookC;
+    // (drawn like the Sprouts: smooth shapes, soft shading, 1-fine-px lines and one outer ink ring)
+    const g = new PX.Grid(16, 16), piece = draw => { const t = new PX.Grid(16, 16); draw(t); t.outline(); g.merge(t); };
+    const fill = t => { const f = (x, y) => t.filled(x, y); f.fine = true; return f; };
+    piece(t => { t.poly([[4.6, 1.2], [13.8, 1.2], [13.8, 14.8], [4.6, 14.8]], '#62a855'); t.sell(8.0, 6.0, 9.0, 11.0, ['#8fd46a', '#62a855', '#3f7a3a'], 0, fill(t)); });
+    piece(t => t.poly([[2.8, 1.2], [4.8, 1.2], [4.8, 14.8], [2.8, 14.8]], '#3f7a3a'));
+    g.dots([[13.25, 2.5], [13.25, 3.0], [13.25, 3.5], [13.25, 4.0], [13.25, 4.5], [13.25, 5.0], [13.25, 5.5], [13.25, 6.0], [13.25, 6.5], [13.25, 7.0], [13.25, 7.5], [13.25, 8.0], [13.25, 8.5], [13.25, 9.0], [13.25, 9.5], [13.25, 10.0], [13.25, 10.5], [13.25, 11.0], [13.25, 11.5], [13.25, 12.0], [13.25, 12.5], [13.25, 13.0], [13.25, 13.5]], '#fff8e6');
+    g.dots([[3.75, 2.5], [3.75, 5.0], [3.75, 7.5], [3.75, 10.0], [3.75, 12.5]], '#62a855');
+    piece(t => t.ell(9.4, 8.4, 2.6, 3.8, ['#d8f8b0', '#99e550', '#4f9e36'], 0.55));
+    for (let i = 0; i <= 10; i++) { const u = i / 10; g.dot(8.0 + u * 2.7, 11.6 - u * 6.2, '#3f7a3a'); }
+    piece(t => t.ell(11.6, 3.0, 1.15, 1.15, ['#fff27a', '#ffcc44', '#c7861c']));
+    g.dots([[11.25, 2.5]], '#ffffff'); g.dots([[6.0, 2.5], [6.5, 2.5], [6.0, 3.0]], '#a6ec70');
+    return (bookC = (PX.hd ? PX.hd(g) : g).canvas());
   }
 
   // ---------- detail ----------
@@ -603,7 +1070,7 @@
   function detailHTML(s) {
     const fi = state.formInfo(s), partner = s.id === PS.S.activeId, hb = happyX(s);
     return `<div class="sp-scroll"><div class="sp-wrap">
-      <div class="sp-top"><button class="btn sp-back" data-back>\u2039 All Sprouts</button></div>
+      <div class="sp-top"><button class="btn sp-back" data-back>${backTo === 'page' ? '\u2039 Back' : '\u2039 All Sprouts'}</button></div>
       <section class="panel sp-hero">
         <div class="sp-stagebox ${esc(s.area)}"><span class="sp-where">${esc(areaName(s.area))}${s.home ? ` \u00b7 resting in the ${esc(state.homeName(s.area))}` : ''}</span><canvas data-hero title="Pet"></canvas></div>
         <div class="sp-namebox"><input class="sp-name-in" maxlength="12" value="${esc(s.name)}" aria-label="Name" enterkeyhint="done" autocomplete="off" spellcheck="false"></div>
@@ -619,21 +1086,27 @@
         </div>
       </section>
       ${statsHTML(s)}${natureHTML(s)}${evoHTML(s)}${movesHTML(s)}${styleHTML(s)}${bondsHTML(s)}${partsHTML(s)}${battleHTML(s)}${recordsHTML(s)}
-      <button class="btn sp-back" data-back style="justify-self:start">\u2039 All Sprouts</button>
+      <button class="btn sp-back" data-back style="justify-self:start">${backTo === 'page' ? '\u2039 Back' : '\u2039 All Sprouts'}</button>
       ${sellHTML(s)}
     </div></div>`;
   }
 
   // ---------- render ----------
+  // keepScroll: true keeps the scroll where it is, a number scrolls there, false starts at the top
+  function scrollBox() { return root && (root.querySelector('.sp-box') || root.querySelector('.sp-scroll')); }
   function render(keepScroll) {
-    dirty = false; anims = [];
-    const sc = root.querySelector('.sp-scroll'), keep = keepScroll && sc ? sc.scrollTop : 0;
+    dirty = false; anims = []; pgHero = null; critHero = null;
+    const sc = scrollBox(), keep = typeof keepScroll === 'number' ? keepScroll : keepScroll && sc ? sc.scrollTop : 0;
     const s = view === 'detail' ? state.get(curId) : null;
     if (view === 'detail' && !s) view = 'list';
-    root.innerHTML = view === 'detail' ? detailHTML(s) : listHTML();
+    if (view === 'page' && !validEntry(pg.kind, pg.id)) view = 'list';
+    root.innerHTML = view === 'detail' ? detailHTML(s) : view === 'page' ? pageHTML() : listHTML();
     hydrate(root);
     if (view === 'list') {
       root.querySelectorAll('canvas[data-anim]').forEach(cv => { const sp = state.get(cv.dataset.anim); if (sp) animSprite(cv, state.lookOf(sp), 2, { flap: hasWings(sp) }); });
+    } else if (view === 'page') {
+      setupPage();
+      root.querySelectorAll('canvas[data-mini]').forEach(cv => { const sp = state.get(cv.dataset.mini); if (sp) try { put(cv, PX.sprig(state.lookOf(sp), {}), 2); } catch (e) { /* art optional */ } });
     } else {
       const hero = root.querySelector('[data-hero]');
       heroAnim = animSprite(hero, state.lookOf(s), 5, { phase: 0, flap: hasWings(s) });
@@ -648,18 +1121,32 @@
         else put(cv, PX.sprig(state.lookOf(fake), { eyes: i > s.stage ? 'closed' : undefined }), 2);
       });
     }
-    const sc2 = root.querySelector('.sp-scroll'); if (sc2) sc2.scrollTop = keep;
+    const sc2 = scrollBox(); if (sc2) sc2.scrollTop = keep;
   }
   let heroAnim = null, mirrorAnim = null;
-  function openDetail(id) { curId = id; view = 'detail'; render(false); }
+  function openDetail(id) { const sc = scrollBox(); if (view === 'list' && sc) listTop = sc.scrollTop; backTo = view === 'page' ? 'page' : 'list'; curId = id; view = 'detail'; render(false); }
 
   // ---------- events ----------
   function onClick(e) {
     const q = sel => e.target.closest(sel);
     let b;
     if ((b = q('[data-open]'))) { PX.Sound.play('pop'); openSecs.clear(); openDetail(b.dataset.open); return; }
+    if ((b = q('[data-ltab]'))) { if (b.dataset.ltab !== listTab) { listTab = b.dataset.ltab; listTop = 0; PX.Sound.play('tick'); render(false); } return; }
+    if ((b = q('[data-entry]'))) { PX.Sound.play('pop'); const key = b.dataset.entry; openPage(key.charAt(0), key.slice(2)); return; }
+    if ((b = q('[data-pg]'))) { flip(+b.dataset.pg); return; }
+    if (q('[data-pghero]')) { heroTap(); return; }
+    if ((b = q('[data-shopgo]'))) { PX.Sound.play('pop'); PS.ui.go('shop', { tab: b.dataset.shopgo }); return; }
+    if ((b = q('[data-areago]'))) {
+      const a = b.dataset.areago; PX.Sound.play('pop');
+      if (D.AREAS[a] && PS.S.area !== a) { PS.S.area = a; PS.emit('area', { area: a }); PS.save(); }
+      PS.ui.go('garden'); return;
+    }
     if ((b = q('[data-fold]'))) { const id = b.dataset.fold; if (openSecs.has(id)) openSecs.delete(id); else openSecs.add(id); PX.Sound.play('tick'); render(true); return; }
-    if (q('[data-back]')) { PX.Sound.play('tick'); view = 'list'; render(false); return; }
+    if (q('[data-back]')) {
+      PX.Sound.play('tick');
+      if (view === 'detail' && backTo === 'page') { backTo = 'list'; view = 'page'; render(false); return; }
+      backTo = 'list'; view = 'list'; render(listTop); setTimeout(checkPrize, 300); return;
+    }
     if ((b = q('[data-hatch]'))) {
       const egg = PS.S.eggs.find(x => x.id === b.dataset.hatch);
       PX.Sound.play('pop');
@@ -699,6 +1186,7 @@
     const a = document.activeElement;
     if (a && a.classList && a.classList.contains('sp-name-in')) { dirty = true; return; } // don't yank the field while typing
     render(true);
+    if (view === 'list') setTimeout(checkPrize, 300);
   };
 
   PS.scenes.sprouts = {
@@ -708,14 +1196,34 @@
       root.addEventListener('change', e => { if (e.target.classList.contains('sp-name-in')) commitName(e.target); });
       root.addEventListener('keydown', e => { if (e.target.classList.contains('sp-name-in') && e.key === 'Enter') e.target.blur(); });
       root.addEventListener('focusout', e => { if (e.target.classList && e.target.classList.contains('sp-name-in') && dirty) setTimeout(() => { if (visible && dirty) render(true); }, 0); });
-      ['sprout:update', 'sprout:evolve', 'sprout:sold', 'items', 'egg:new', 'egg:hatch', 'reset'].forEach(ev => PS.on(ev, markDirty));
+      ['sprout:update', 'sprout:evolve', 'sprout:sold', 'items', 'egg:new', 'egg:hatch', 'reset', 'pouch'].forEach(ev => PS.on(ev, markDirty));
+      ['sprout:update', 'items', 'egg:hatch', 'pouch'].forEach(ev => PS.on(ev, badgeSoon));
+      // a swipe across a book page turns it
+      let sx = 0, sy = 0, st = 0;
+      root.addEventListener('touchstart', e => { const t = e.touches[0]; if (!t || e.touches.length > 1) { st = 0; return; } sx = t.clientX; sy = t.clientY; st = Date.now(); }, { passive: true });
+      root.addEventListener('touchend', e => {
+        if (!st || view !== 'page' || Date.now() - st > 700) return; st = 0;
+        const t = e.changedTouches[0]; if (!t) return;
+        const dx = t.clientX - sx, dy = t.clientY - sy;
+        if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 2) flip(dx < 0 ? 1 : -1);
+      }, { passive: true });
+      badgeSoon();
     },
     show(params) {
       visible = true;
-      if (params && params.id && state.get(params.id)) { curId = params.id; view = 'detail'; render(false); if (params.section === 'style') scrollToStyle(false); return; }
+      if (params && params.id && state.get(params.id)) { curId = params.id; view = 'detail'; backTo = 'list'; listTop = 0; render(false); if (params.section === 'style') scrollToStyle(false); return; }
+      if (params && params.entry) { const key = String(params.entry), k = key.charAt(0), id = key.slice(2); if (validEntry(k, id)) { listTab = tabOf(k); view = 'list'; listTop = 0; openPage(k, id); return; } }
+      if (params && ['mine', 'eggs', 'animals', 'looks'].includes(params.tab)) listTab = params.tab;
       view = 'list'; render(false);
+      setTimeout(checkPrize, 500);
     },
     hide() { visible = false; },
-    frame(dt, t) { clock = t; for (const a of anims) drawAnim(a, t); },
+    frame(dt, t) {
+      clock = t; for (const a of anims) drawAnim(a, t);
+      const c = critHero;
+      if (c && c.n > 1) { const f = Math.floor(t * 3) % c.n; if (f !== c.f) { c.f = f; try { put(c.cv, PX.critter(c.id, f), c.sc); } catch (e) { c.n = 1; } } }
+    },
   };
+  // for the title screen's cards and anyone who wants to open a page: PS.book.open('a', 'hare')
+  PS.book = { counts: () => counts(), icon: bookIcon, sync, prizeDue: () => prizeDue(), open: (k, id) => PS.ui.go('sprouts', validEntry(k, id) ? { entry: k + ':' + id } : { tab: tabOf(k) }) };
 })();

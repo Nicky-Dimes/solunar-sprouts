@@ -588,6 +588,54 @@
   const towerUnlocked = () => ST.leagueProgress(TOWER.unlock).cleared;
   const today = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
 
+  // ---------------- trophies (art-trophies.js draws them: PX.trophy(id, scale, { dim })) ----------------
+  // One per league ('l-<id>'), Legend ('g-<id>') and Tower milestone floor ('t-<floor>'). Saved as battleExtra.trophies[id] = when
+  // it was won and battleExtra.trophyNew[id] = not looked at yet. Both are made only when the first trophy is won; leagues, Legends
+  // and floors beaten before trophies existed get theirs quietly (marked NEW, shown once in the trophy case).
+  const TOWER_TROPHIES = [5, 15, 30, 50];
+  function trophyDefs() {
+    const lg = D.LEAGUES.map(L => ({ id: 'l-' + L.id, name: L.name.replace(/ League$/, '') + ' Cup', by: L.name, kind: 'league', done: () => !!ST.leagueProgress(L.id).cleared }));
+    const bs = BOSSES.map(B => ({ id: 'g-' + B.id, name: B.name + ' Medal', by: 'the ' + B.name, kind: 'legend', done: () => bossRec(B.id).wins > 0 }));
+    const tw = TOWER_TROPHIES.map(f => ({ id: 't-' + f, name: `Tower Floor ${f}`, by: `Floor ${f} of the Battle Tower`, kind: 'tower', done: () => (extra().tower.best || 0) >= f }));
+    return lg.concat(bs, tw);
+  }
+  function trophyStore() {
+    const X = extra();
+    if (!X.trophies || typeof X.trophies !== 'object') X.trophies = {};
+    if (!X.trophyNew || typeof X.trophyNew !== 'object') X.trophyNew = {};
+    return X;
+  }
+  function syncTrophies() {
+    let ch = false;
+    for (const T of trophyDefs()) {
+      const got = extra().trophies; let done = false;
+      if (got && got[T.id]) continue;
+      try { done = T.done(); } catch (e) { done = false; }
+      if (!done) continue;
+      const X = trophyStore(); X.trophies[T.id] = Date.now(); X.trophyNew[T.id] = true; ch = true;
+    }
+    if (ch) PS.save();
+  }
+  // a league, Legend or Tower floor just won for the first time: its trophy id (for the results and the celebration), or null
+  function giveTrophy(id) {
+    try { const X = trophyStore(); if (X.trophies[id]) return null; X.trophies[id] = Date.now(); return id; } catch (e) { return null; }
+  }
+  function trophyList() {
+    syncTrophies();
+    const X = extra(), got = X.trophies || {}, nw = X.trophyNew || {};
+    return trophyDefs().map(T => ({ id: T.id, name: T.name, by: T.by, kind: T.kind, got: !!got[T.id], at: got[T.id] || null, isNew: !!(got[T.id] && nw[T.id]) }));
+  }
+  const trophyName = id => (trophyDefs().find(T => T.id === id) || { name: 'Trophy' }).name;
+  // the first unbeaten opponent of the first unfinished league that is open
+  function nextOf(list) {
+    for (let li = 0; li < list.length; li++) {
+      const L = list[li]; if (!ST.leagueUnlocked(L.id)) continue;
+      const p = ST.leagueProgress(L.id); if (p.cleared) continue;
+      const i = p.beaten.findIndex(x => !x); if (i >= 0) return { L, li, i };
+    }
+    return null;
+  }
+
   // ======================================================================
   // UI
   // ======================================================================
@@ -932,6 +980,117 @@
 .b-pass h1{font-size:30px;font-family:var(--f-ui);font-weight:700}
 .b-res h1.num{font-family:var(--f-ui);font-weight:700}
 @media (prefers-reduced-motion: reduce){.b-res .card,.b-pass .card{animation:none}.b-log i,.b-warn,.b-mv.brace,.b-snack.brace,.b-tag.charge{animation:none}}
+/* ---- hub: your fighter big on a grassy platform ---- */
+.b-hero{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;align-items:center}
+.b-stage{position:relative;width:112px;height:104px;display:flex;align-items:flex-end;justify-content:center}
+.b-stage::before{content:"";position:absolute;left:2px;right:2px;bottom:0;height:26px;border-radius:50%;background:radial-gradient(ellipse at 50% 38%,#d4f7a8 0 40%,#99e550 44% 100%);box-shadow:inset 0 -4px 0 #6abe30,0 2px 0 rgba(34,32,52,.18)}
+.b-hero .b-psprite{position:relative;width:96px;height:96px;background:none;border:0;border-radius:0;margin-bottom:8px}
+.b-hinfo{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+.b-hero .b-pname{font-size:24px;line-height:1.1}
+.b-hero .b-pform{margin:0}
+.b-hbtns{display:flex;gap:8px;margin-top:6px}
+.b-hbtns .btn{min-height:48px;padding:6px 16px;font-size:15px}
+.b-mchips{grid-column:1 / -1;display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+.b-mchip{display:flex;align-items:center;gap:6px;min-width:0;min-height:38px;padding:3px 8px;border-radius:12px;background:color-mix(in srgb,var(--c) 14%,#fffdf6);border:2px solid color-mix(in srgb,var(--c) 55%,#e3cf9d);font-family:var(--f-ui);font-weight:700;font-size:15px;color:var(--ink)}
+.b-mchip span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b-mchip canvas{width:14px;height:14px;flex:0 0 auto}
+@media (min-width:600px){.b-stage{width:148px;height:136px}.b-hero .b-psprite{width:128px;height:128px}.b-hero .b-pname{font-size:28px}.b-mchips{grid-template-columns:repeat(4,minmax(0,1fr))}.b-mchip{min-height:44px;font-size:16px}}
+/* ---- the trophy case: a cosy wooden shelf (one row; "See all" opens the whole case) ---- */
+.b-case{padding:10px 12px 12px}
+.b-case-h{display:flex;align-items:center;gap:8px;margin:0 0 8px}
+.b-case-h b{font-family:var(--f-px);font-weight:700;font-size:20px;color:var(--ink)}
+.b-case-n{font-family:var(--f-ui);font-weight:700;font-size:15px;color:#4a3210;background:var(--sun);border:2px solid var(--sun-edge);border-radius:10px;padding:0 10px;margin-right:auto}
+.b-caseall{min-height:48px;padding:4px 16px;font-size:15px}
+.b-shelf,.b-tgrid{display:grid;gap:4px;background:linear-gradient(180deg,#b47c4a,#8f563b);border:2px solid #5a3322;border-radius:14px;box-shadow:inset 0 3px 6px rgba(34,32,52,.35);padding:6px}
+.b-shelf{grid-template-columns:repeat(auto-fill,minmax(68px,1fr));grid-auto-rows:68px;row-gap:24px;height:84px;overflow:hidden}
+.b-tslot{position:relative;display:grid;place-items:center;padding:2px;border:0;border-radius:10px;background:rgba(34,32,52,.18);min-width:0;min-height:68px}
+.b-tslot canvas{display:block;width:64px;height:64px;image-rendering:pixelated}
+.b-tslot.got{background:radial-gradient(circle,rgba(255,242,160,.5),rgba(34,32,52,.1) 72%)}
+.b-tslot.on{box-shadow:0 0 0 3px #fbf236}
+.b-tslot i{position:absolute;top:2px;right:2px;font-style:normal;font-family:var(--f-ui);font-weight:700;font-size:11px;line-height:14px;padding:0 4px;border-radius:6px;background:var(--berry,#e5535f);color:#fff;border:1px solid #fff;z-index:1}
+.b-tslot.new canvas{animation:bShine 1.1s ease-in-out 4}
+@keyframes bShine{50%{transform:scale(1.1) rotate(-4deg)}}
+.b-tcap{min-height:46px;background:var(--slot);border-radius:12px;padding:6px 10px;font-size:15px;line-height:1.3;color:var(--ink);text-align:center;margin:0 0 8px}
+.b-tcap b{display:block;font-family:var(--f-ui);font-weight:700;font-size:16px}
+.b-tgrp{margin:0 0 10px}
+.b-tgh{display:flex;justify-content:space-between;font-family:var(--f-ui);font-weight:700;font-size:15px;color:var(--ink);margin:0 2px 4px}
+.b-tgrid{grid-template-columns:repeat(auto-fill,minmax(68px,1fr))}
+.b-tmod{display:flex;justify-content:center}.b-tmod canvas{width:128px;height:128px;image-rendering:pixelated}
+/* ---- next challenge ---- */
+.b-next{border-top:6px solid var(--mode,#6abe30)}
+.b-next-h{font-family:var(--f-px);font-weight:700;font-size:18px;color:var(--ink);margin:0 0 4px}
+.b-next-b{display:flex;align-items:center;gap:10px}
+.b-nfoe{width:64px;height:64px;flex:0 0 auto}
+.b-next-t{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+.b-next-t b{font-family:var(--f-ui);font-weight:700;font-size:19px;line-height:1.15;color:var(--ink)}
+.b-next-t small{font-family:var(--f-ui);font-weight:700;font-size:14px;color:var(--ink-soft)}
+.b-next-t .b-ow{font-size:14px;padding:1px 8px}
+.b-nextgo{flex:0 0 auto;min-height:56px;min-width:108px;font-size:19px}
+@media (min-width:600px){.b-nfoe{width:96px;height:96px}.b-next-t b{font-size:22px}.b-nextgo{min-height:60px;min-width:140px;font-size:20px}}
+/* ---- results window: fallbacks for the shared .sv-res kit (zero specificity: app.css wins when it has them) ---- */
+:where(.b-kit .sv-res-win){position:relative;width:min(100%,440px);margin:auto;background:var(--panel,#fff8e6);border:3px solid var(--edge,#8a5a3a);border-top:10px solid var(--mode,#6abe30);border-bottom-width:6px;border-radius:18px;padding:12px 16px 16px;text-align:center;animation:bPop .26s ease-out}
+:where(.b-kit .sv-res-title){font-family:var(--f-px);font-weight:700;font-size:38px;line-height:1.05;color:#fbf236;-webkit-text-stroke:2px #5a3322;paint-order:stroke fill;text-shadow:0 3px 0 #c8861c;margin:2px 0 4px}
+:where(.b-kit .sv-res-title.lose){color:#cbdbfc;-webkit-text-stroke:2px #3f3f74;text-shadow:0 3px 0 #5b6ee1}
+:where(.b-kit .sv-res-hero){position:relative;display:flex;align-items:flex-end;justify-content:center;gap:10px;height:112px;margin:2px auto 0}
+:where(.b-kit .sv-res-hero)::before{content:"";position:absolute;left:50%;bottom:2px;width:220px;height:26px;margin-left:-110px;border-radius:50%;background:#99e550;box-shadow:inset 0 -4px 0 #6abe30}
+:where(.b-kit .sv-res-tiles){display:flex;justify-content:center;gap:8px;margin:10px 0 4px}
+:where(.b-kit .sv-res-tile){position:relative;flex:1 1 0;min-width:0;max-width:150px;display:flex;flex-direction:column;align-items:center;gap:1px;background:var(--slot,#f6ead0);border:2px solid var(--line,#e3cf9d);border-radius:12px;padding:6px 6px 7px}
+:where(.b-kit .sv-res-tile) b{font-family:var(--f-ui);font-weight:700;font-size:22px;line-height:1.1;color:var(--ink)}
+:where(.b-kit .sv-res-tile) small{font-family:var(--f-ui);font-weight:700;font-size:13px;color:var(--ink-soft)}
+:where(.b-kit .sv-res-btns){display:grid;gap:8px;margin-top:12px}
+.b-res.b-kit{justify-content:flex-start}
+.b-kit .sv-res-hero canvas{position:relative}
+.b-kit .b-rhero,.b-kit .b-rfoe{width:96px;height:96px}
+.b-kit .b-rfoe{transform:scaleX(-1);opacity:.75}
+.b-kit .b-rfoe.crit{transform:none}
+.b-kit .b-rduo{transform:scaleX(-1)}
+.b-kit .b-rsub{font-family:var(--f-ui);font-weight:700;font-size:15px;line-height:1.3;color:var(--ink);margin:4px 0 0}
+.b-rline{display:flex;justify-content:center;margin:8px auto 2px;max-width:380px;opacity:0;transform:translateX(36px);transition:opacity .25s,transform .3s ease-out}
+.b-rline.in{opacity:1;transform:none}
+.b-rline p{margin:0;background:#fffdf6;border:2px solid var(--edge,#8a5a3a);border-radius:12px;padding:6px 12px;font-family:var(--f-ui);font-weight:700;font-size:15px;line-height:1.3;color:var(--ink)}
+.b-rline p b{color:var(--mode-dk,#37946e)}
+.b-kit .sv-res-tile .b-tbig{width:32px;height:32px}
+.b-kit .sv-res-tile .b-ttro{width:64px;height:64px;margin:-12px 0 -6px;image-rendering:pixelated}
+.b-xpb{display:block;width:100%;height:8px;margin-top:4px;background:#3a3350;border:1px solid #222034;border-radius:4px;overflow:hidden}
+.b-xpb i{display:block;height:100%;width:0;background:linear-gradient(180deg,#c8f59a,#6abe30);transition:width .7s ease-out}
+.b-rlv{font-family:var(--f-ui);font-weight:700;font-size:17px;color:#2b8243;margin:6px 0 0;animation:bPop .3s ease-out}
+.b-rlv[hidden]{display:none}
+.b-fcoin{position:absolute;left:0;top:0;width:18px;height:18px;z-index:5;pointer-events:none;image-rendering:pixelated}
+.b-tcoin.bump .b-tbig{animation:bBump .18s ease-out}
+@keyframes bBump{50%{transform:scale(1.25)}}
+.b-kit .b-rrows{margin:8px 0 0}
+.b-kit .b-why,.b-kit .b-alt{margin:8px 0 0}
+.b-kit .sv-res-btns{opacity:0;transform:translateY(16px);transition:opacity .2s,transform .28s cubic-bezier(.2,1.3,.5,1);pointer-events:none}
+.b-kit .sv-res-btns.in{opacity:1;transform:none;pointer-events:auto}
+.b-kit .sv-res-btns .btn{min-height:54px;font-size:17px}
+@media (min-width:600px) and (min-height:721px){.b-kit .b-rhero,.b-kit .b-rfoe{width:128px;height:128px}.b-kit .sv-res-hero{height:140px}:where(.b-kit .sv-res-win){width:min(100%,540px)}}
+@media (max-height:720px){.b-kit .sv-res-hero{height:72px}.b-kit .b-rhero,.b-kit .b-rfoe{width:64px;height:64px}}
+/* ---- low HP: the HP bar pulses ---- */
+.b-plate.lowhp .b-hpbar i{animation:bLow .55s steps(2) infinite}
+@keyframes bLow{50%{background:#ffb4aa}}
+/* ---- the battle scene on tablets: bigger HP boxes and text, the bottom panel capped and centred, big move buttons ---- */
+.b-panel{align-items:center}
+.b-panel>*{width:100%;max-width:860px}
+@media (min-width:600px){
+  .b-plate{width:clamp(220px,32%,300px);padding:6px 11px 7px}
+  .b-prow b{font-size:20px}
+  .b-prow .b-lv{font-size:16px}
+  .b-pels canvas{width:16px;height:16px}
+  .b-hpn{font-size:17px}
+  .b-hpbar{height:13px}
+  .b-tag{font-size:14px;line-height:18px}
+  .b-moves{grid-template-rows:68px 68px;gap:10px}
+  .b-mv{height:68px;grid-template-columns:24px 1fr}
+  .b-mv canvas{width:24px;height:24px}
+  .b-mv .n{font-size:19px}
+  .b-mv .n.sm{font-size:17px}
+  .b-mv .d{font-size:15px}
+  .b-log{height:72px;font-size:19px}
+  .b-info,.b-info.long{font-size:15px;height:40px}
+  .b-run{font-size:16px;padding:8px 12px}
+  .b-snack{font-size:18px}
+}
+@media (prefers-reduced-motion: reduce){.b-plate.lowhp .b-hpbar i,.b-tslot.new canvas,.b-tcoin.bump .b-tbig{animation:none}.b-kit .sv-res-btns,.b-rline,.b-xpb i{transition:none}}
 `;
 
   // ---------------- small pixel icons ----------------
@@ -939,74 +1098,81 @@
   function icons() {
     if (ICON.ok) return ICON; ICON.ok = true;
     const G = PX.Grid;
-    let g = new G(9, 9); g.px([[1, 4], [2, 5], [3, 6], [4, 5], [5, 4], [6, 3], [7, 2]], '#ffffff'); g.px([[1, 5], [2, 6], [3, 7], [4, 6], [5, 5], [6, 4], [7, 3]], '#ffffff');
-    const t = new G(11, 11); t.ell(5.5, 5.5, 5, 5, ['#99e550', '#6abe30', '#37946e']); t.outline(); for (let y = 0; y < 9; y++) for (let x = 0; x < 9; x++) if (g.get(x, y)) t.set(x + 1, y + 1, '#ffffff'); ICON.tick = t.canvas();
-    g = new G(9, 11); g.rect(2, 1, 5, 1, '#8c93a8'); g.rect(1, 2, 1, 3, '#8c93a8'); g.rect(7, 2, 1, 3, '#8c93a8'); g.rect(1, 5, 7, 5, '#f6c83a'); g.px([[4, 7], [4, 8]], '#8a6f30'); ICON.lock = g.canvas();
+    // every grid finishes through PX.hd: icons get the one outer ink ring, particles and sparkles none (they have no ink edge)
+    const done = g => PX.hd(g).canvas(), soft = g => PX.hd(g, { outer: false }).canvas();
+    let g = new G(11, 11); g.ell(5.5, 5.5, 5, 5, ['#99e550', '#6abe30', '#37946e']); g.outline(); PX.stroke(g, [[2.9, 5.9], [4.7, 7.7], [8.2, 3.7]], 0.72, 0.72, '#ffffff'); ICON.tick = done(g);
+    g = new G(9, 11); g.rect(2, 1, 5, 1, '#8c93a8'); g.rect(1, 2, 1, 3, '#8c93a8'); g.rect(7, 2, 1, 3, '#8c93a8'); g.rect(1, 5, 7, 5, '#f6c83a'); g.ell(4.5, 7.2, 0.8, 0.8, '#8a6f30'); g.dots([[4.25, 8], [4.25, 8.5]], '#8a6f30'); ICON.lock = done(g);
     ICON.coin = safe(() => PX.item('coin'), null) || safe(() => PS.ui.icon('coin'), null);
     ICON.bigcoin = safe(() => PX.item('bigcoin'), null) || ICON.coin;
     // tab icons (16x16)
     g = new G(16, 16); g.poly([[1.5, 4.5], [5, 9], [8, 2.5], [11, 9], [14.5, 4.5], [13.2, 13], [2.8, 13]], '#f6c83a'); g.rect(3, 11, 10, 2, '#c7861c'); g.outline();
-    g.px([[8, 7], [8, 8]], '#e5535f'); g.px([[5, 11], [11, 11]], '#639bff'); g.px([[4, 7], [7, 5]], '#fff27a'); g.px([[1, 3], [8, 1], [14, 3]], '#fff27a'); ICON.crown = g.canvas();
+    g.ell(8, 7.6, 0.9, 1.0, '#e5535f'); g.ell(5.5, 11.6, 0.7, 0.6, '#639bff'); g.ell(10.5, 11.6, 0.7, 0.6, '#639bff'); g.dots([[4.5, 7.5], [5, 7], [7, 5.5], [7.5, 5]], '#fff27a'); g.ell(1.5, 3.5, 0.8, 0.8, '#fff27a'); g.ell(8, 1.5, 0.8, 0.8, '#fff27a'); g.ell(14.5, 3.5, 0.8, 0.8, '#fff27a'); ICON.crown = done(g);
     g = new G(16, 16); g.rect(4, 6, 8, 9, '#b7c2cc'); g.rect(3, 4, 10, 2, '#8c93a8'); g.px([[3, 3], [5, 3], [7, 3], [9, 3], [11, 3], [12, 3]], '#8c93a8'); g.rect(7, 0, 1, 4, '#595a70'); g.rect(8, 0, 4, 2, '#e5535f'); g.outline();
-    g.px([[6, 8], [9, 8], [6, 9], [9, 9]], '#3f3f74'); g.rect(7, 12, 2, 3, '#8f563b'); g.px([[4, 11], [11, 7], [5, 13]], '#8c93a8'); ICON.tower = g.canvas();
-    g = new G(16, 16); g.ell(4.8, 10.5, 3.8, 3.8, ['#a6f2d3', '#52c7a8', '#2f8078']); g.ell(11.2, 10.5, 3.8, 3.8, ['#f7b6c8', '#e07ba0', '#a2477a']); g.px([[7, 3], [9, 3], [6, 4], [7, 4], [8, 4], [9, 4], [10, 4], [7, 5], [8, 5], [9, 5], [8, 6]], '#e5535f'); g.outline();
-    g.px([[3, 10], [6, 10], [10, 10], [13, 10]], INK); g.px([[4, 12], [5, 12], [11, 12], [12, 12]], INK); ICON.friends = g.canvas();
+    g.px([[6, 8], [9, 8], [6, 9], [9, 9]], '#3f3f74'); g.rect(7, 12, 2, 3, '#8f563b'); g.dots([[4.5, 11], [4.5, 11.5], [11, 7], [11, 7.5], [5.5, 13], [5.5, 13.5]], '#8c93a8'); ICON.tower = done(g);
+    g = new G(16, 16); g.ell(4.8, 10.5, 3.8, 3.8, ['#a6f2d3', '#52c7a8', '#2f8078']); g.ell(11.2, 10.5, 3.8, 3.8, ['#f7b6c8', '#e07ba0', '#a2477a']); g.ell(7.1, 4.3, 1.3, 1.2, '#e5535f'); g.ell(8.9, 4.3, 1.3, 1.2, '#e5535f'); g.poly([[5.9, 4.6], [10.1, 4.6], [8, 7]], '#e5535f'); g.outline();
+    g.ell(3.5, 10.4, 0.45, 0.65, INK); g.ell(6.3, 10.4, 0.45, 0.65, INK); g.ell(9.7, 10.4, 0.45, 0.65, INK); g.ell(12.5, 10.4, 0.45, 0.65, INK); PX.stroke(g, [[4.1, 12.3], [4.9, 12.7], [5.7, 12.3]], 0.25, 0.25, INK); PX.stroke(g, [[10.3, 12.3], [11.1, 12.7], [11.9, 12.3]], 0.25, 0.25, INK); g.dot(7.5, 3.5, '#ffffff'); ICON.friends = done(g);
     ICON.league = safe(() => PS.ui.icon('battle'), null);
-    g = new G(16, 16); g.ell(8, 11, 3.8, 3.2, ['#c48a5c', '#8f563b', '#5a3322']); for (const [x, y] of [[3, 6.5], [6, 3.6], [10, 3.6], [13, 6.5]]) g.ell(x, y, 1.7, 2, ['#c48a5c', '#8f563b', '#5a3322']); g.outline(); g.px([[7, 10], [5, 3], [9, 3]], '#f6d2ad'); ICON.paw = g.canvas();
-    ICON.staron = PX.fromStrings(['...k...', '..kyk..', 'kkkykkk', 'kyyWyyk', '.kyyyk.', '.kykyk.', 'kk...kk'], { k: INK, y: '#fbf236', W: '#ffffff' }).canvas();
-    ICON.staroff = PX.fromStrings(['...k...', '..kgk..', 'kkkgkkk', 'kgggggk', '.kgggk.', '.kgkgk.', 'kk...kk'], { k: '#8c93a8', g: '#e3dccb' }).canvas();
-    // particles
-    const dot = (c, s) => { const d = new G(s || 2, s || 2); d.rect(0, 0, s || 2, s || 2, c); return d.canvas(); };
-    ICON.bubble = PX.fromStrings(['.a.', 'a.a', '.a.'], { a: '#cbeeff' }).canvas();
-    ICON.pebble = PX.fromStrings(['gg', 'gG'], { g: '#b7c2cc', G: '#595a70' }).canvas();
-    ICON.rock = PX.fromStrings(['.gg.', 'gggG', 'gGGG', '.GG.'], { g: '#b7c2cc', G: '#8c7a5e' }).canvas();
-    ICON.up = PX.fromStrings(['..c..', '.ccc.', 'ccccc', '..c..', '..c..'], { c: '#99e550' }).canvas();
-    ICON.down = PX.fromStrings(['..c..', '..c..', 'ccccc', '.ccc.', '..c..'], { c: '#9fd8ff' }).canvas();
-    ICON.plus = PX.fromStrings(['.c.', 'ccc', '.c.'], { c: '#c3f08a' }).canvas();
-    ICON.sweat = PX.fromStrings(['.c', 'cc'], { c: '#9fd8ff' }).canvas();
-    ICON.fireball = PX.fromStrings(['.oyo.', 'oyWyo', 'yWWWy', 'oyWyo', '.oyo.'], { o: '#df5a26', y: '#fbf236', W: '#ffffff' }).canvas();
-    ICON.orb = PX.fromStrings(['.pp.', 'pPPp', 'pPPp', '.pp.'], { p: '#5e3a8e', P: '#c9a2f0' }).canvas();
-    ICON.wind = PX.fromStrings(['wwww..', '..wwww'], { w: '#ffffff' }).canvas();
-    ICON.drop = PX.fromStrings(['.b.', 'bwb', 'bbb'], { b: '#639bff', w: '#cbeeff' }).canvas();
-    ICON.star = PX.fromStrings(['..y..', '.yyy.', 'yyWyy', '.yyy.', '.y.y.'], { y: '#fbf236', W: '#ffffff' }).canvas();
-    ICON.sprinkle = [['#e5535f'], ['#639bff'], ['#99e550'], ['#fbf236'], ['#f7b6c8']].map(c => PX.fromStrings(['cc'], { c: c[0] }).canvas());
-    ICON.shield = PX.fromStrings(['.bbbbb.', 'bwwwwwb', 'bwWWWwb', 'bwWWWwb', '.bwWwb.', '..bwb..', '...b...'], { b: '#3f55b8', w: '#9fd8ff', W: '#ffffff' }).canvas();
+    g = new G(16, 16); g.ell(8, 11, 3.8, 3.2, ['#c48a5c', '#8f563b', '#5a3322']); for (const [x, y] of [[3, 6.5], [6, 3.6], [10, 3.6], [13, 6.5]]) g.ell(x, y, 1.7, 2, ['#c48a5c', '#8f563b', '#5a3322']); g.outline(); g.ell(7, 9.8, 0.9, 0.6, '#f6d2ad'); g.dots([[5, 2.5], [5.5, 2.5], [9, 2.5], [9.5, 2.5]], '#f6d2ad'); ICON.paw = done(g);
+    const star = on => { const s = new G(7, 7); s.poly(PX.starPts(3.5, 3.85, 3.3, 1.45, 5), on ? '#fbf236' : '#e3dccb'); if (on) { s.ell(3.5, 4.6, 1.3, 0.8, '#f6c83a', 0, (x, y) => s.filled(x, y)); s.dots([[3.0, 3.0], [3.5, 3.0], [3.0, 3.5]], '#ffffff'); } s.outline(on ? INK : '#8c93a8'); if (!on) { PX.hd(s, { outer: false }); s.outerLine('#8c93a8'); return s.canvas(); } return done(s); };
+    ICON.staron = star(true); ICON.staroff = star(false);
+    // particles: soft round shapes in fine pixels (1-2 px dots stay 1x, plan §3.7)
+    const dot = (c, s) => { const d = new G(s || 2, s || 2, 1); d.rect(0, 0, s || 2, s || 2, c); return d.canvas(); };
+    g = new G(3, 3); g.ell(1.5, 1.5, 1.45, 1.45, '#cbeeff').ell(1.5, 1.5, 0.9, 0.9, null); g.dot(0.75, 0.75, '#ffffff'); ICON.bubble = soft(g);
+    g = new G(2, 2); g.ell(1, 1, 1, 1, '#b7c2cc'); g.dots([[1.25, 1.25], [1.75, 1.25], [1.25, 1.75], [1.75, 1.75]], '#595a70'); ICON.pebble = soft(g);
+    g = new G(4, 4); g.ell(2, 2, 1.95, 1.95, ['#d8c8a8', '#b7c2cc', '#8c7a5e']); g.dot(1.25, 1.25, '#ffffff'); ICON.rock = soft(g);
+    g = new G(5, 5); g.poly([[2.5, 0.2], [4.8, 2.8], [3.4, 2.8], [3.4, 4.8], [1.6, 4.8], [1.6, 2.8], [0.2, 2.8]], '#99e550'); g.dots([[2.5, 1.0], [2.0, 1.5]], '#e2ff96'); ICON.up = soft(g);
+    g = new G(5, 5); g.poly([[2.5, 4.8], [4.8, 2.2], [3.4, 2.2], [3.4, 0.2], [1.6, 0.2], [1.6, 2.2], [0.2, 2.2]], '#9fd8ff'); g.dots([[2.0, 0.5], [2.0, 1.0]], '#e6f6ff'); ICON.down = soft(g);
+    g = new G(3, 3); PX.stroke(g, [[1.5, 0.45], [1.5, 2.55]], 0.5, 0.5, '#c3f08a'); PX.stroke(g, [[0.45, 1.5], [2.55, 1.5]], 0.5, 0.5, '#c3f08a'); g.dot(1.25, 1.25, '#ffffff'); ICON.plus = soft(g);
+    // the results XP tile's icon (shown at 32 px: a real 12 x 12 sprite, not the little particle blown up)
+    g = new G(12, 12); PX.stroke(g, [[6, 2.1], [6, 9.9]], 1.75, 1.75, '#99e550'); PX.stroke(g, [[2.1, 6], [9.9, 6]], 1.75, 1.75, '#99e550'); g.outline();
+    PX.hd(g, { shade: 0.2 }); g.ell(4.9, 3.6, 0.55, 1.05, '#e2ff96', 0, (x, y) => g.filled(x, y)); g.dots([[2.6, 5.3], [3.1, 5.3]], '#e2ff96'); ICON.xp = g.canvas();
+    g = new G(2, 2); g.ell(1, 1.25, 0.9, 0.75, '#9fd8ff'); g.poly([[1.4, 0], [1.9, 1], [0.6, 0.9]], '#9fd8ff'); g.dot(0.5, 1, '#ffffff'); ICON.sweat = soft(g);
+    g = new G(5, 5); g.ell(2.5, 2.5, 2.45, 2.45, ['#fbf236', '#ff9a3a', '#df5a26']); g.ell(2.1, 2.1, 0.9, 0.9, '#ffffff'); ICON.fireball = soft(g);
+    g = new G(4, 4); g.ell(2, 2, 1.95, 1.95, ['#c9a2f0', '#9a6ad0', '#5e3a8e']); g.dot(1.25, 1.25, '#e6ccff'); ICON.orb = soft(g);
+    g = new G(6, 2); PX.line(g, 0, 0, 3, 0, '#ffffff'); PX.line(g, 2, 1, 5, 1, '#ffffff'); ICON.wind = soft(g);
+    g = new G(3, 3); g.ell(1.5, 1.85, 1.25, 1.1, '#639bff'); g.poly([[1.5, 0], [2.6, 1.6], [0.4, 1.6]], '#639bff'); g.dots([[1.0, 1.5], [1.0, 2.0]], '#cbeeff'); ICON.drop = soft(g);
+    g = new G(5, 5); g.poly(PX.starPts(2.5, 2.7, 2.5, 1.1, 5), '#fbf236'); g.dots([[2.0, 2.0], [2.5, 2.5]], '#ffffff'); ICON.star = soft(g);
+    ICON.sprinkle = ['#e5535f', '#639bff', '#99e550', '#fbf236', '#f7b6c8'].map(c => { const s = new G(2, 1); s.ell(1, 0.5, 1.0, 0.5, c); return soft(s); });
+    g = new G(7, 7); g.poly([[0.6, 0.8], [3.5, 0.2], [6.4, 0.8], [6.4, 3.6], [3.5, 6.8], [0.6, 3.6]], '#9fd8ff'); g.poly([[1.8, 1.6], [3.5, 1.2], [5.2, 1.6], [5.2, 3.4], [3.5, 5.4], [1.8, 3.4]], '#ffffff'); g.outline('#3f55b8'); ICON.shield = soft(g);
     ICON.dot = dot;
     ICON.splash = dot('#cbdbfc', 1);
     // element hit effects (hitFx)
-    ICON.petals = [fxs('leaf'), PX.fromStrings(['.p', 'pP'], { p: '#f7b6c8', P: '#e07ba0' }).canvas(), PX.fromStrings(['gg', '.G'], { g: '#99e550', G: '#37946e' }).canvas()];
-    ICON.droplet = PX.fromStrings(['.a.', 'aba', '.a.'], { a: '#639bff', b: '#cbeeff' }).canvas();
-    ICON.embers = [dot('#ff9a3a', 1), dot('#fbf236', 1), dot('#df5a26', 2), PX.fromStrings(['y', 'o'], { y: '#fbf236', o: '#df5a26' }).canvas()];
-    ICON.chips = [PX.fromStrings(['gG', 'G.'], { g: '#d8c8a8', G: '#8c7a5e' }).canvas(), PX.fromStrings(['.g', 'gG'], { g: '#b7c2cc', G: '#595a70' }).canvas(), dot('#a8946e', 1), dot('#6a5a40', 2)];
-    ICON.streak = PX.fromStrings(['..wwWW', 'wwww..'], { w: '#ffffff', W: '#dcecfa' }).canvas();
-    ICON.wisps = [PX.fromStrings(['.p', 'pq', 'q.'], { p: '#c9a2f0', q: '#9a6ad0' }).canvas(), PX.fromStrings(['p.', 'qp', '.q'], { p: '#c9a2f0', q: '#5e3a8e' }).canvas()];
+    { const pet = new G(2, 2), lf = new G(2, 2); pet.ell(1, 1, 1, 0.75, '#f7b6c8', -0.7); pet.dot(1.5, 1.5, '#e07ba0'); pet.dot(0.5, 0.5, '#ffffff'); lf.ell(1, 1, 1, 0.6, '#99e550', -0.7); lf.dot(1.5, 1.0, '#37946e'); ICON.petals = [fxs('leaf'), soft(pet), soft(lf)]; }
+    g = new G(3, 3); g.ell(1.5, 1.5, 1.4, 1.4, '#639bff'); g.ell(1.25, 1.25, 0.6, 0.6, '#cbeeff'); ICON.droplet = soft(g);
+    { const e = new G(1, 2); e.ell(0.5, 1.1, 0.5, 0.9, '#df5a26'); e.dot(0.5, 0.5, '#fbf236'); ICON.embers = [dot('#ff9a3a', 1), dot('#fbf236', 1), dot('#df5a26', 2), soft(e)]; }
+    { const a = new G(2, 2), b = new G(2, 2); a.poly([[0, 0], [2, 0.3], [0.4, 2]], '#d8c8a8'); a.dots([[1.0, 0.5], [0.5, 1.0]], '#8c7a5e'); b.poly([[1.8, 0], [2, 2], [0, 1.6]], '#b7c2cc'); b.dot(1.5, 1.5, '#595a70');
+      ICON.chips = [soft(a), soft(b), dot('#a8946e', 1), dot('#6a5a40', 2)]; }
+    g = new G(6, 2); PX.line(g, 2, 0, 5, 0, '#dcecfa'); PX.line(g, 0, 1, 3, 1, '#ffffff'); ICON.streak = soft(g);
+    ICON.wisps = [0, 1].map(i => { const w = new G(2, 3); const pts = i ? [[0.2, 0.3], [1.1, 1.2], [0.9, 2.0], [1.7, 2.8]] : [[1.8, 0.3], [0.9, 1.2], [1.1, 2.0], [0.3, 2.8]]; for (let j = 1; j < pts.length; j++) { const [x0, y0] = pts[j - 1], [x1, y1] = pts[j]; for (let s = 0; s <= 6; s++) w.dot(x0 + (x1 - x0) * s / 6, y0 + (y1 - y0) * s / 6, j < 2 ? '#c9a2f0' : i ? '#5e3a8e' : '#9a6ad0'); } return soft(w); });
     ICON.twinkle = [fxs('spark', '#ffffff'), fxs('bigspark', '#fbf236'), fxs('spark', '#fff27a')];
+    const cloud = rows => soft(PX.fromStrings(rows, { w: '#ffffff', W: '#dcecfa' }));
     ICON.clouds = [
-      PX.fromStrings(['...wwww....', '.wwwwwwww..', 'wwwwwwwwwww', '.WWWWWWWWW.'], { w: '#ffffff', W: '#dcecfa' }).canvas(),
-      PX.fromStrings(['..www..', 'wwwwwww', '.WWWWW.'], { w: '#ffffff', W: '#dcecfa' }).canvas(),
-      PX.fromStrings(['.....www.......', '..wwwwwwwww....', '.wwwwwwwwwwwww.', 'wwwwwwwwwwwwwww', '.WWWWWWWWWWWWW.'], { w: '#ffffff', W: '#dcecfa' }).canvas(),
+      cloud(['...wwww....', '.wwwwwwww..', 'wwwwwwwwwww', '.WWWWWWWWW.']),
+      cloud(['..www..', 'wwwwwww', '.WWWWW.']),
+      cloud(['.....www.......', '..wwwwwwwww....', '.wwwwwwwwwwwww.', 'wwwwwwwwwwwwwww', '.WWWWWWWWWWWWW.']),
     ];
     ICON.darkclouds = ICON.clouds.map(c => tint(c, '#4a5478', 0.85));
     return ICON;
   }
   function tint(c, col, a) {
     const o = document.createElement('canvas'); o.width = c.width; o.height = c.height; const x = o.getContext('2d');
-    x.drawImage(c, 0, 0); x.globalCompositeOperation = 'source-atop'; x.globalAlpha = a; x.fillStyle = col; x.fillRect(0, 0, o.width, o.height); return o;
+    x.drawImage(c, 0, 0, c.width, c.height); x.globalCompositeOperation = 'source-atop'; x.globalAlpha = a; x.fillStyle = col; x.fillRect(0, 0, o.width, o.height); return PX.keepK(c, o);
   }
-  // pixel tower art for the hub (28x44)
+  // pixel tower art for the hub (28x44): stone tower, fine brick marks, lit windows (finished by PX.hd like every sprite)
   let towerArt = null;
   function towerPic() {
     if (towerArt) return towerArt;
     const G = PX.Grid, g = new G(28, 44), S = ['#dfe4ee', '#b7c2cc', '#8c93a8', '#595a70'];
     g.rect(6, 12, 16, 31, S[1]); g.rect(4, 8, 20, 5, S[2]);
     for (const x of [4, 9, 14, 19]) g.rect(x, 5, 3, 3, S[2]);
-    g.rect(13, 0, 1, 6, S[3]); g.rect(14, 0, 7, 3, '#e5535f'); g.rect(14, 3, 4, 1, '#e5535f');
+    g.rect(13, 0, 1, 6, S[3]); g.poly([[14, 0], [21, 0.6], [20, 2.2], [17.6, 3.0], [14, 3.6]], '#e5535f');
     g.outline();
-    for (let y = 14; y < 43; y += 3) for (let x = 7 + ((y / 3) % 2 ? 2 : 0); x < 21; x += 5) g.px([[x, y]], S[2]);
-    for (let y = 13; y < 43; y++) { g.set(7, y, S[0]); g.set(20, y, S[2]); }
-    const win = (x, y, lit) => { g.rect(x, y, 3, 4, lit ? '#fbf236' : '#3f3f74'); g.set(x + 1, y - 1, lit ? '#fbf236' : '#3f3f74'); if (lit) g.set(x, y + 3, '#f6c83a'); };
+    for (let y = 14; y < 43; y += 3) for (let x = 7 + ((y / 3) % 2 ? 2 : 0); x < 21; x += 5) g.dots([[x, y + 0.5], [x + 0.5, y + 0.5], [x + 1, y + 0.5]], S[2]); // brick seams: one fine pixel tall
+    for (let y = 13; y < 43; y += 0.5) { g.dot(7, y, S[0]); g.dot(20.5, y, S[2]); } // a fine lit edge (left) and a fine shaded edge (right)
+    const win = (x, y, lit) => { g.rect(x, y, 3, 4, lit ? '#fbf236' : '#3f3f74'); g.ell(x + 1.5, y, 1.5, 1.0, lit ? '#fbf236' : '#3f3f74', 0, (a, b) => b < y); if (lit) { g.dots([[x, y + 3.5], [x + 0.5, y + 3.5], [x + 1, y + 3.5]], '#f6c83a'); g.dot(x + 0.5, y + 0.5, '#ffffff'); } };
     win(9, 17, false); win(16, 17, true); win(12, 25, true); win(9, 32, true); win(16, 32, false);
-    g.rect(11, 38, 6, 5, '#8f563b'); g.rect(12, 37, 4, 1, '#8f563b'); g.set(15, 40, '#fbf236'); g.px([[16, 1], [15, 1]], '#f07a84');
+    g.rect(11, 38, 6, 5, '#8f563b'); g.ell(14, 38, 3, 1.4, '#8f563b', 0, (a, b) => b < 38); g.dots([[15.5, 40.5], [15.5, 41]], '#fbf236'); g.dots([[15, 1], [15.5, 1], [16, 1], [16.5, 1]], '#f07a84');
+    PX.hd(g);
     towerArt = g.canvas(); return towerArt;
   }
   const fxs = (k, c) => safe(() => PX.fx(k, c), null);
@@ -1093,11 +1259,12 @@
     if (!V) { fightEl.hidden = true; hubEl.hidden = false; renderHub(); }
     if (params.league != null && params.index != null) startBattle(params.league, params.index);
   }
-  function hide() { if (V) forfeit(true); } // leaving the screen some other way only pauses a Tower floor
+  function hide() { launchGen++; wipeBusy = false; if (V) forfeit(true); } // leaving the screen some other way only pauses a Tower floor
   function forfeit(pause) { // leave mid-battle: no reward, restore shell. Giving up on a Tower floor ends the run (half the bag).
     if (V && V.mode === 'tower' && !V.granted && !pause) towerEnd('lost'); // (a decided floor was already paid by grant())
-    V = null; resEl.hidden = true; passEl.hidden = true; fightEl.hidden = true; hubEl.hidden = false;
-    PS.ui.chrome(true); PS.ui.hold(false);
+    rsStop(); V = null; resEl.hidden = true; resEl.className = 'b-res'; resEl.onpointerdown = null; passEl.hidden = true; fightEl.hidden = true; hubEl.hidden = false;
+    PS.ui.chrome(true); PS.ui.hold(false); music(M => M.tempo && M.tempo(1));
+    if (!pause) hubMusic();
   }
 
   // ---------------- hub ----------------
@@ -1105,22 +1272,25 @@
   function chip(el) {
     return `<span class="b-chip" style="--c:${elColor(el)}"><canvas class="px" data-el="${el}" width="7" height="7"></canvas>${elLabel(el)}</span>`;
   }
+  // (fit: the bitmap becomes the sprite's fine size; the CSS size stays in art px — PS.ui.fitCanvas, plan §3.6)
+  const fitPaint = (c, s) => { if (PS.ui.fitCanvas) PS.ui.fitCanvas(c, s); else { c.width = s.width; c.height = s.height; } PS.ui.paint(c, s); };
   function paintIcons(scope) {
-    scope.querySelectorAll('canvas[data-el]').forEach(c => { const s = safe(() => PX.item('element', c.dataset.el), null); if (s) { c.width = s.width; c.height = s.height; PS.ui.paint(c, s); } });
-    scope.querySelectorAll('canvas[data-coin]').forEach(c => { const s = c.dataset.coin === 'big' ? icons().bigcoin : icons().coin; if (s) { c.width = s.width; c.height = s.height; PS.ui.paint(c, s); } });
-    scope.querySelectorAll('canvas[data-egg]').forEach(c => { const s = safe(() => PX.item('egg', c.dataset.egg), null); if (s) { c.width = s.width; c.height = s.height; PS.ui.paint(c, s); } });
-    scope.querySelectorAll('canvas[data-icon]').forEach(c => { const s = icons()[c.dataset.icon]; if (s) { c.width = s.width; c.height = s.height; PS.ui.paint(c, s); } });
-    scope.querySelectorAll('canvas[data-fruit]').forEach(c => { const s = safe(() => PX.item('fruit', c.dataset.fruit), null); if (s) { c.width = s.width; c.height = s.height; PS.ui.paint(c, s); } });
-    scope.querySelectorAll('canvas[data-critter]').forEach(c => { const s = critterBox(c.dataset.critter, +(c.dataset.box || 32)); if (s) { c.width = s.width; c.height = s.height; PS.ui.paint(c, s); } });
+    scope.querySelectorAll('canvas[data-trophy]').forEach(c => { const s = safe(() => PX.trophy && PX.trophy(c.dataset.trophy, 1, { dim: 'dim' in c.dataset }), null); if (s) fitPaint(c, s); });
+    scope.querySelectorAll('canvas[data-el]').forEach(c => { const s = safe(() => PX.item('element', c.dataset.el), null); if (s) fitPaint(c, s); });
+    scope.querySelectorAll('canvas[data-coin]').forEach(c => { const s = c.dataset.coin === 'big' ? icons().bigcoin : icons().coin; if (s) fitPaint(c, s); });
+    scope.querySelectorAll('canvas[data-egg]').forEach(c => { const s = safe(() => PX.item('egg', c.dataset.egg), null); if (s) fitPaint(c, s); });
+    scope.querySelectorAll('canvas[data-icon]').forEach(c => { const s = icons()[c.dataset.icon]; if (s) fitPaint(c, s); });
+    scope.querySelectorAll('canvas[data-fruit]').forEach(c => { const s = safe(() => PX.item('fruit', c.dataset.fruit), null); if (s) fitPaint(c, s); });
+    scope.querySelectorAll('canvas[data-critter]').forEach(c => { const s = critterBox(c.dataset.critter, +(c.dataset.box || 32)); if (s) fitPaint(c, s); });
   }
   // a rare critter centred on its feet in a square canvas (so it scales by whole pixels)
   const boxCache = {};
   function critterBox(id, box) {
     const key = id + box; if (boxCache[key]) return boxCache[key];
     const c = safe(() => PX.critter(id), null); if (!c) return null;
-    const o = document.createElement('canvas'); o.width = box; o.height = box;
-    o.getContext('2d').drawImage(c, Math.floor((box - c.width) / 2), box - c.height - Math.floor((box - c.height) / 4));
-    return (boxCache[key] = o);
+    const k = c.k || 1, w = PX.artW(c), h = PX.artH(c), o = document.createElement('canvas'); o.width = box * k; o.height = box * k; // (box in art pixels)
+    o.getContext('2d').drawImage(c, Math.floor((box - w) / 2) * k, (box - h - Math.floor((box - h) / 4)) * k, c.width, c.height);
+    return (boxCache[key] = PX.keepK(c, o));
   }
   function moveKind(mv) {
     const fx = mv.fx;
@@ -1172,22 +1342,63 @@
       hubEl.querySelector('.b-change').onclick = () => { sfx('pop'); PS.ui.pickSprout({ title: 'Choose a fighter', eyebrow: 'Battle', extra: x => ST.movesOf(x).map(id => D.MOVES[id].name).join(', '), onPick: x => { ST.setActive(x.id); renderHub(); } }); };
     }
     if (hubTab === 'wild') bindWild(); else if (hubTab === 'legends') bindLegends(); else if (hubTab === 'tower') bindTower(); else if (hubTab === 'friends') bindFriends(); else bindLeagues();
+    hubEl.querySelectorAll('.b-tslot,.b-caseall').forEach(b => b.onclick = () => { sfx('pop'); trophyCase(b.dataset.tid); });
+    const nx = hubEl.querySelector('.b-next');
+    if (nx) {
+      const L = D.LEAGUES[+nx.dataset.li], i = +nx.dataset.i;
+      safe(() => PS.ui.drawSproutTo(nx.querySelector('.b-nfoe'), ST.lookOf(leagueNPC(L.id, i)), { eyes: 'brave', mouth: 'grin' }));
+      nx.querySelector('.b-nextgo').onclick = () => { sfx('pop'); preview(L, i); };
+    }
+    // (trophies given quietly for leagues won before trophies existed: their NEW tag shows this once)
+    if (hubTab === 'leagues') { const X = extra(); if (X.trophyNew && Object.keys(X.trophyNew).length) { X.trophyNew = {}; PS.save(); } }
   }
+  // your fighter: big on a grassy platform, its elements and its four moves as chips
   function partnerHtml(s) {
     const fi = ST.formInfo(s), bs = ST.battleStats(s), mv = ST.movesOf(s), rec = s.record || {};
-    return `<section class="panel b-partner"><div class="b-ph"><canvas class="px b-psprite" width="32" height="32"></canvas>
-        <div><div class="label">Your fighter</div><div class="px-title b-pname">${esc(s.name)}</div><div class="b-pform">${esc(fi.name)} · Lv ${bs.level} · ${rec.battleWins || 0}–${(rec.battles || 0) - (rec.battleWins || 0)}</div>
-        <div class="b-chips">${bs.els.map(chip).join('')}</div></div>
-        <button class="btn b-change" type="button">Change</button></div>
-        <div class="b-mlist">${mv.map(id => { const m = D.MOVES[id]; return `<div class="b-mrow" style="--c:${elColor(m.el)}"><canvas class="px" data-el="${m.el}"></canvas><b>${m.name}</b><small>${moveKind(m)} · ${esc(moveSource(s, id))}</small></div>`; }).join('')}</div>
-        <div class="b-howrow"><p class="b-how">${s.moveset ? 'You picked these moves.' : 'The game picks these moves.'} ${esc(s.name)} knows ${ST.learnedMoves ? ST.learnedMoves(s).length : mv.length}. Bond with more animals to learn more.</p><button class="btn b-pickmoves" type="button">Choose moves</button></div>
+    return `<section class="panel b-partner b-hero"><div class="b-stage"><canvas class="px b-psprite" width="32" height="32"></canvas></div>
+        <div class="b-hinfo"><div class="px-title b-pname">${esc(s.name)}</div>
+          <div class="b-pform">${esc(fi.name)} · <span>Lv ${bs.level}</span> · <span>${rec.battleWins || 0}–${(rec.battles || 0) - (rec.battleWins || 0)}</span></div>
+          <div class="b-chips">${bs.els.map(chip).join('')}</div>
+          <div class="b-hbtns"><button class="btn b-change" type="button">Change</button><button class="btn b-pickmoves" type="button">Moves</button></div></div>
+        <div class="b-mchips">${mv.map(id => { const m = D.MOVES[id]; return `<span class="b-mchip" style="--c:${elColor(m.el)}"><canvas class="px" data-el="${m.el}"></canvas><span>${m.name}</span></span>`; }).join('')}</div>
       </section>`;
+  }
+  // the trophy case: a wooden shelf of the newest trophies (and the next ones to win, dim); "See all" opens the whole case
+  const tslot = t => `<button class="b-tslot${t.got ? ' got' : ''}${t.isNew ? ' new' : ''}" type="button" data-tid="${t.id}" aria-label="${esc(t.name)}"><canvas class="px" data-trophy="${t.id}"${t.got ? '' : ' data-dim'} width="32" height="32"></canvas>${t.isNew ? '<i>NEW</i>' : ''}</button>`;
+  function trophyCaseHtml() {
+    const T = trophyList(), got = T.filter(t => t.got);
+    const shelf = got.slice().sort((a, b) => (b.isNew - a.isNew) || (b.at - a.at)).concat(T.filter(t => !t.got)).slice(0, 12);
+    return `<section class="panel b-case"><div class="b-case-h"><b>Trophies</b><span class="b-case-n">${got.length}/${T.length}</span><button class="btn b-caseall" type="button">See all</button></div>
+      <div class="b-shelf">${shelf.map(tslot).join('')}</div></section>`;
+  }
+  function trophyCase(focus) {
+    const T = trophyList(), groups = [['league', 'Leagues'], ['legend', 'Legends'], ['tower', 'Battle Tower']];
+    const cap = t => !t ? 'Tap a trophy to see it.' : `<b>${esc(t.name)}</b>${t.got ? (t.kind === 'legend' ? `You beat ${esc(t.by)}!` : t.kind === 'tower' ? `You reached ${esc(t.by)}!` : `You won the ${esc(t.by)}!`) : (t.kind === 'legend' ? `Beat ${esc(t.by)} to win it.` : t.kind === 'tower' ? `Reach ${esc(t.by)} to win it.` : `Win the ${esc(t.by)} to get it.`)}`;
+    const html = `<div class="b-tcap">${cap(T.find(t => t.id === focus))}</div>` + groups.map(([k, label]) => {
+      const list = T.filter(t => t.kind === k);
+      return `<div class="b-tgrp"><div class="b-tgh">${label}<span>${list.filter(t => t.got).length}/${list.length}</span></div><div class="b-tgrid">${list.map(tslot).join('')}</div></div>`;
+    }).join('');
+    PS.ui.modal({ eyebrow: 'Battle', title: 'Trophy case', html, buttons: [{ label: 'Close', kind: 'go' }],
+      mount(card) {
+        paintIcons(card);
+        const box = card.querySelector('.b-tcap');
+        card.querySelectorAll('.b-tslot').forEach(b => { if (b.dataset.tid === focus) b.classList.add('on'); b.onclick = () => { sfx('tick'); card.querySelectorAll('.b-tslot.on').forEach(x => x.classList.remove('on')); b.classList.add('on'); if (box) box.innerHTML = cap(T.find(t => t.id === b.dataset.tid)); }; });
+      } });
+  }
+  function nextCardHtml(nx) {
+    const s = partner(), npc = leagueNPC(nx.L.id, nx.i);
+    const o = s ? safe(() => oddsOf(matchup(s, { kind: 'league', id: nx.L.id, i: nx.i }).win), null) : null;
+    return `<section class="panel b-next" data-li="${nx.li}" data-i="${nx.i}"><div class="b-next-h">Next challenge</div>
+      <div class="b-next-b"><canvas class="px b-nfoe" width="32" height="32"></canvas>
+        <div class="b-next-t"><b>${esc(npc.name)}</b><small>${esc(nx.L.name)} · ${nx.i + 1} of 3</small>${o ? `<span class="b-ow ${o.c}">${o.word}</span>` : ''}</div>
+        <button class="btn go b-nextgo" type="button">Battle!</button></div></section>`;
   }
   function leaguesHtml() {
     const done = D.LEAGUES.filter(L => ST.leagueProgress(L.id).cleared).length, last = D.LEAGUES[D.LEAGUES.length - 1];
-    let h = ST.leagueProgress(last.id).cleared
-      ? `<div class="b-champ"><canvas class="px" data-icon="crown"></canvas><div><b>Grand Champion!</b><small>You cleared all ${D.LEAGUES.length} leagues. Rematch anyone to keep training!</small></div></div>`
-      : `<p class="b-intro"><b>${done} of ${D.LEAGUES.length} leagues cleared.</b> Beat the ${esc(last.name)} to become the Grand Champion!</p>`;
+    let h = trophyCaseHtml();
+    if (ST.leagueProgress(last.id).cleared) h += `<div class="b-champ"><canvas class="px" data-icon="crown"></canvas><div><b>Grand Champion!</b><small>You cleared all ${D.LEAGUES.length} leagues. Rematch anyone to keep training!</small></div></div>`;
+    else { const nx = nextOf(D.LEAGUES); if (nx) h += nextCardHtml(nx); }
+
     D.LEAGUES.forEach((L, li) => {
       const open = ST.leagueUnlocked(L.id), p = ST.leagueProgress(L.id), n = p.beaten.filter(Boolean).length;
       const nextI = p.beaten.findIndex(x => !x);
@@ -1430,7 +1641,7 @@
     return h;
   }
   function bindTower() {
-    const art = hubEl.querySelector('canvas[data-icon="towerart"]'); if (art) { const c = towerPic(); art.width = c.width; art.height = c.height; PS.ui.paint(art, c); }
+    const art = hubEl.querySelector('canvas[data-icon="towerart"]'); if (art) fitPaint(art, towerPic());
     const run = towerRun(), rs = run ? ST.get(run.sid) : null;
     if (run && !rs) { const pay = towerEnd(towerPaused(run) ? 'lost' : 'stop'); PS.ui.toast(`Your tower climber left, so the climb ended.${pay ? ` You got ${pay} coins.` : ''}`); renderHub(); return; }
     const sp = hubEl.querySelector('.b-runsp'); if (sp && rs) PS.ui.drawSproutTo(sp, rs, { eyes: 'brave' });
@@ -1487,7 +1698,7 @@
   function bindFriends() {
     const s = partner(), a = hubEl.querySelector('.b-fa'), b = hubEl.querySelector('.b-fb');
     if (a && s) PS.ui.drawSproutTo(a, s, { eyes: 'brave', arms: 'up', mouth: 'grin' });
-    if (b) { const L = PX.cloneLook(PX.DEFAULT_LOOK); L.body = 'rose'; b.width = 32; b.height = 32; const c = PX.sprig(L, { eyes: 'brave', arms: 'up', mouth: 'grin' }); const x = b.getContext('2d'); x.save(); x.translate(32, 0); x.scale(-1, 1); x.drawImage(c, 0, 0); x.restore(); }
+    if (b) { const L = PX.cloneLook(PX.DEFAULT_LOOK); L.body = 'rose'; const c = PX.sprig(L, { eyes: 'brave', arms: 'up', mouth: 'grin' }), k = c.k || 1; b.width = 32 * k; b.height = 32 * k; const x = b.getContext('2d'); x.imageSmoothingEnabled = false; x.setTransform(k, 0, 0, k, 0, 0); x.translate(32, 0); x.scale(-1, 1); x.drawImage(c, 0, 0, PX.artW(c), PX.artH(c)); x.setTransform(1, 0, 0, 1, 0, 0); } // (flipped, at the sprite's fine size)
     const st = hubEl.querySelector('.b-fstart'); if (st) st.onclick = () => { sfx('pop'); friendSetup(); };
   }
   // a list modal like PS.ui.pickSprout but for any items. items: [{name, sub, draw(canvas), onPick, disabled}]
@@ -1539,9 +1750,59 @@
   }
 
   // ---------------- battle start ----------------
+  // Every battle opens with a screen wipe (app.js PS.ui.wipe; the battle starts at once if there isn't one).
+  let wipeBusy = false, launchGen = 0;
   function launch(cfg) {
     PS.ui.closeModal && PS.ui.closeModal();
-    PS.ui.hold(true); PS.ui.chrome(false);
+    if (!root) return; // (the Battle screen was never opened)
+    if (!PS.ui.wipe) { launchNow(cfg); return; }
+    if (wipeBusy) return; // (a double tap)
+    wipeBusy = true; PS.ui.hold(true);
+    const gen = ++launchGen; let done = false;
+    const mid = () => {
+      if (done) return; done = true; wipeBusy = false;
+      if (gen !== launchGen) { PS.ui.hold(false); return; } // (left the Battle screen during the wipe)
+      try { launchNow(cfg); } catch (e) { console.error(e); forfeit(); renderHub(); }
+    };
+    const kind = cfg.mode === 'boss' ? 'boss' : cfg.mode === 'friend' ? 'plain' : 'battle';
+    setTimeout(mid, 1600); // (if the wipe never calls back, start anyway)
+    try { const p = PS.ui.wipe(kind, mid); if (p && p.catch) p.catch(e => { console.error(e); mid(); }); } catch (e) { console.error(e); mid(); }
+  }
+  // the music for a battle (audio.js; unknown ids are ignored): Legends, the Tower, everything else
+  const battleTrack = v => (v.mode === 'boss' ? 'battle-boss' : v.mode === 'tower' ? 'tower' : 'battle');
+  const music = fn => safe(() => { if (PX.Music) fn(PX.Music); });
+  const hubMusic = () => safe(() => { if (PS.ui.music) PS.ui.music(); });
+  // a Sprout's voice (audio.js PX.Cry); Legends and wild animals stay quiet
+  function cry(side, o) {
+    const f = V && V.b && V.b[side]; if (!f || f.critter || !PX.Cry || !PX.Cry.play) return;
+    const who = f.s || f.look; if (!who) return;
+    safe(() => PX.Cry.play(who, Object.assign({ stage: (f.look && f.look.stage) | 0 }, o || {})));
+  }
+  // your Sprout pops out on the "Go!" step (or the first step after the intro, if a battle has no "Go!")
+  function sendOut() {
+    const A = V.a.p; if (!A.hide) return;
+    A.hide = false; A.enter = 1; A.hop = 1; A.pose = { arms: 'up', mouth: 'open', eyes: 'happy' }; A.poseT = 0.8;
+    const p = topOf('p'); burst(p, V.b.p.els[0] || 'normal', 14, 40); ring(p.x, p.y, '#ffffff', 14); ring(p.x, p.y, '#c8f59a', 20, 0.08);
+    sfx('pop'); setTimeout(() => { if (V) cry('p'); }, 120);
+  }
+  // Hi-res Sprouts cost ~1 ms to build (3-4 ms on an old iPad): build both fighters' usual poses and the crowd now, while the
+  // wipe covers the screen, instead of one by one during the intro. The pose objects match poseFor() / A.pose exactly (the
+  // sprite cache key is the pose as JSON, so key order matters).
+  const POSES = [{}, { eyes: 'blink' }, { eyes: 'closed', mouth: 'flat' }, { eyes: 'sad', mouth: 'o' }, { eyes: 'closed', mouth: 'o' }, { eyes: 'sad', mouth: 'flat' }, { eyes: 'brave', mouth: 'o' },
+    { arms: 'up', eyes: 'happy', mouth: 'open', frame: 0 }, { arms: 'up', eyes: 'happy', mouth: 'open', frame: 1 }, { arms: 'out', mouth: 'open', eyes: 'brave' }, { arms: 'up', mouth: 'grin' },
+    { arms: 'up', mouth: 'open', eyes: 'brave' }, { arms: 'up', mouth: 'open', eyes: 'happy' }, { eyes: 'brave', mouth: 'grin', arms: 'up' }, { eyes: 'happy', mouth: 'open', arms: 'up' }, { eyes: 'happy', mouth: 'smile', arms: 'up' }];
+  function prewarm(cfg) {
+    safe(() => {
+      icons();
+      for (const side of ['p', 'o']) { const f = cfg.b && cfg.b[side]; if (f && f.look) for (const P of POSES) PX.sprig(f.look, P); }
+      const T = THEMES[cfg.area] || THEMES.meadow;
+      if (T.crowd) for (const k of (T.crowd === 'mix' ? [].concat(...Object.values(CROWD)) : CROWD[cfg.area] || CROWD.meadow)) if (D.ANIMALS[k]) PX.critter(k);
+    });
+  }
+  function launchNow(cfg) {
+    PS.ui.closeModal && PS.ui.closeModal();
+    prewarm(cfg);
+    PS.ui.hold(true); PS.ui.chrome(false); rsStop(); resEl.className = 'b-res'; resEl.onpointerdown = null;
     hubEl.hidden = true; fightEl.hidden = false; resEl.hidden = true; passEl.hidden = true;
     const b = cfg.b;
     V = Object.assign({
@@ -1550,6 +1811,7 @@
       a: { p: fresh(), o: fresh() }, log: { full: '', shown: 0, drawn: -1, drawnFull: null }, lastMove: null, quake: 0, quakeA: 0, flashT: 0, flashA: 0.7, flashC: '#ffffff', banner: null, bolt: null, boltT: 3 + Math.random() * 4,
     }, cfg);
     V.a.p.enter = 1; V.a.o.enter = 1; V.seed = Math.floor(Math.random() * 1e9);
+    V.a.p.hide = true; // (pops out on "Go!")
     for (let i = 0; i < 4; i++) V.clouds.push({ x: Math.random() * 140 - 20, y: 2 + Math.random() * 16, k: i % 3, v: 1.5 + Math.random() * 2 });
     fightEl.classList.toggle('boss', !!V.boss);
     resize(); bgKey = -1;
@@ -1558,6 +1820,7 @@
     runBtn.textContent = V.mode === 'friend' ? 'End battle' : 'Give up'; runBtn.classList.remove('armed'); runBtn.hidden = false;
     queue(cfg.intro);
     sfx('go');
+    music(M => { if (M.tempo) M.tempo(1); M.play(battleTrack(V)); });
     resize(true); render(); // draw the new scene now, so the previous battle's last frame never flashes up
   }
   // Every battle is built by foeBattle() from a spec, the same way the pre-battle estimates build theirs.
@@ -1618,11 +1881,11 @@
     cssW = r.width; cssH = r.height; dpr = d;
     PXS = clamp(Math.round(cssW / 125), 3, 5); // smaller pixels = more detail
     while (PXS > 3 && cssH / PXS < 96) PXS--;
-    SC = Math.max(1, Math.round(PXS * dpr)); WPX = SC / dpr;
+    const K = PX.SCENE_K || 1; SC = Math.max(K, Math.round(PXS * dpr / K) * K); WPX = SC / dpr; // (SC / K device px per fine px: whole)
     cv.width = Math.ceil(cssW * dpr); cv.height = Math.ceil(cssH * dpr);
     cv.style.width = cv.width / dpr + 'px'; cv.style.height = cv.height / dpr + 'px'; // 1 canvas pixel = 1 device pixel (no resampling)
     WW = Math.ceil(cv.width / SC); WH = Math.ceil(cv.height / SC);
-    lo.width = WW; lo.height = WH; bgC.width = WW; bgC.height = WH; bgKey = -1;
+    lo.width = WW * K; lo.height = WH * K; bgC.width = WW * K; bgC.height = WH * K; bgKey = -1; // (K buffer px per world px: fine outlines survive)
     if (V) makeCrowd();
   }
   // fighter feet positions (world px)
@@ -1679,6 +1942,11 @@
       const hs = Math.round(V.hpShown[side] * 4); if (el._hs === hs) continue; el._hs = hs;
       const k = clamp(V.hpShown[side] / f.max, 0, 1);
       el._bar.style.width = (k * 100).toFixed(1) + '%'; el._bar.className = k > 0.5 ? '' : k > 0.2 ? 'mid' : 'low';
+      if (side === chooser()) {
+        const low = k > 0 && k < 0.25 && !V.b.over; el.classList.toggle('lowhp', low);
+        if (low && !V.lowBeep) { V.lowBeep = true; sfx('bump'); music(M => M.tempo && M.tempo(1.08)); }
+        else if (!low && V.lowBeep && k > 0.4) { V.lowBeep = false; music(M => M.tempo && M.tempo(1)); }
+      }
       const t = `${Math.max(0, Math.round(V.hpShown[side]))} / ${f.max}`; if (el._n.textContent !== t) el._n.textContent = t;
     }
   }
@@ -1712,7 +1980,7 @@
     snackBtn.hidden = !sn || sn.used;
     if (snackBtn.hidden) return;
     const c = snackBtn.querySelector('canvas'), s = safe(() => PX.item('fruit', sn.fruit), null);
-    if (s && c.dataset.f !== sn.fruit) { c.width = s.width; c.height = s.height; PS.ui.paint(c, s); c.dataset.f = sn.fruit; }
+    if (s && c.dataset.f !== sn.fruit) { fitPaint(c, s); c.dataset.f = sn.fruit; }
     snackBtn.disabled = V.phase !== 'choose';
     snackBtn.classList.toggle('brace', !!(f.foe.boss && f.foe.charging && V.phase === 'choose'));
     snackBtn.setAttribute('aria-label', `Eat snack: ${sn.name}`);
@@ -1787,7 +2055,7 @@
     begin(st);
   }
   function toChoose() {
-    V.phase = 'choose';
+    V.phase = 'choose'; sendOut();
     if (V.mode === 'friend') { showPass(V.fr.turn); return; }
     renderMoves(); renderPlates(false); setLog(`What will ${V.b.p.name} do?`); setInfo(null);
   }
@@ -1820,10 +2088,11 @@
 
   // start the visuals for one step
   function begin(st) {
-    if (st.kind === 'intro') { sfx('whoosh'); if (V.mode === 'friend') banner('FIGHT!', `${V.fr.names.p} vs ${V.fr.names.o}`, '#fbf236'); return; }
+    if (st.kind === 'intro') { sfx('whoosh'); if (V.mode !== 'friend') setTimeout(() => { if (V) cry('o'); }, 250); if (V.mode === 'friend') banner('FIGHT!', `${V.fr.names.p} vs ${V.fr.names.o}`, '#fbf236'); return; }
     if (st.kind === 'bossin') { sfx('thud'); V.a.o.enter = 1; V.a.o.drop = 1; banner(V.boss.name.toUpperCase(), V.boss.title, '#fbf236', 2.2); return; }
     if (st.kind === 'wildin') { sfx('whoosh'); banner(V.b.o.name.toUpperCase(), 'Wild ' + D.AREAS[D.ANIMALS[V.wild.id].area].name, V.wild.step === 2 ? '#ff9a3a' : '#fff27a'); V.a.o.hop = 1; return; }
     if (st.kind === 'floor') { sfx('whoosh'); banner(`FLOOR ${V.floor}`, V.floor % 5 === 0 ? 'Star challenger!' : '', '#fff27a'); return; }
+    if (st.kind !== 'intro' && st.kind !== 'bossin' && st.kind !== 'wildin' && st.kind !== 'floor') sendOut();
     if (st.kind === 'go') { V.a.p.pose = { arms: 'up', mouth: 'open', eyes: 'happy' }; V.a.p.poseT = 0.8; V.a.p.hop = 1; if (V.mode === 'friend') { V.a.o.pose = { arms: 'up', mouth: 'open', eyes: 'brave' }; V.a.o.poseT = 0.8; V.a.o.hop = 1; } return; }
     if (st.kind === 'victory' || st.kind === 'defeat') return;
     const e = st.ev, who = e.who, A = who ? V.a[who] : null;
@@ -1851,7 +2120,7 @@
           ring(p.x, p.y, e.crit ? '#fbf236' : '#ffffff', e.crit ? 16 : 11);
           if (e.crit) { quake(0.25, 2); flash('#ffffff', 0.12); } else if (e.tm > 1) quake(0.15, 1);
           pop(p.x, p.y - 12, `-${e.n}`, e.crit ? '#fbf236' : e.tm > 1 ? '#ffb347' : '#ffffff', e.crit ? 34 : e.tm > 1 ? 30 : 26, e.crit ? 'CRIT' : e.tm > 1 ? 'SUPER' : '');
-          sfx(e.crit ? 'snap' : 'thud'); if (who === 'p' || V.mode === 'friend') safe(() => PX.buzz(e.crit ? 25 : 12));
+          sfx(e.crit ? 'snap' : 'thud'); if (e.crit || e.tm > 1) sfx('bump'); if (who === 'p' || V.mode === 'friend') safe(() => PX.buzz(e.crit ? 25 : 12));
         }
         cheer(0.5);
         break;
@@ -1898,7 +2167,7 @@
         break;
       }
       case 'cure': case 'cleanse': { rise(top(who), fxs('spark', '#ffffff'), 8); sfx('chime'); break; }
-      case 'faint': { A.fainting = 0.001; A.charge = 0; A.pose = { eyes: 'closed', mouth: 'o' }; A.poseT = 99; sfx('thud'); if (who === 'o' && V.boss) { quake(0.9, 3); burst(top('o'), V.boss.els[0], 26, 60); } break; }
+      case 'faint': { A.fainting = 0.001; A.charge = 0; A.pose = { eyes: 'closed', mouth: 'o' }; A.poseT = 99; sfx('thud'); cry(who, { pitch: 0.8 }); setTimeout(() => sfx('bloop'), 260); if (who === 'o' && V.boss) { quake(0.9, 3); burst(top('o'), V.boss.els[0], 26, 60); } break; }
       case 'hang': { // a tie against the computer: the player's Sprout wobbles back up with 1 HP
         A.fainting = 0; A.hop = 1; A.shake = 0.3; A.emote = '!'; A.emoteT = 1.2; A.pose = { eyes: 'brave', mouth: 'grin', arms: 'up' }; A.poseT = 1.3;
         rise(top(who), fxs('heart'), 5); pop(top(who).x, top(who).y - 12, '1 HP', '#fbf236', 28, 'HANG ON!'); sfx('chime');
@@ -1922,47 +2191,58 @@
     else if (V.mode === 'wild' && won) text = `${V.b.p.name} beat the ${V.b.o.name}!`;
     if (!draw && (won || V.mode === 'friend')) banner(V.mode === 'friend' ? 'WINNER!' : 'VICTORY!', '', '#fbf236', 1.8);
     queue([{ kind: won || V.mode === 'friend' ? 'victory' : 'defeat', text, dur: 1.8 }]);
-    sfx(won || V.mode === 'friend' ? 'level' : 'miss');
+    for (const sd of SIDES) plateEls[sd].classList.remove('lowhp');
+    if (!PX.Music) sfx(won || V.mode === 'friend' ? 'level' : 'miss');
+    else if (won || (V.mode === 'friend' && !draw)) music(M => { if (M.tempo) M.tempo(1); M.play('victory'); M.jingle('victory'); });
+    else music(M => { if (M.tempo) M.tempo(1); M.stop(600); M.jingle('lose'); });
   }
 
   function showResults() {
     if (V.done) return; V.done = true; V.phase = 'results';
     if (!V.granted) grant(); // (normally already paid, the moment the battle was decided)
     const res = V.res || { rows: '', pay: null };
-    if (V.mode === 'wild') resultsWild(res); else if (V.mode === 'boss') resultsBoss(res); else if (V.mode === 'tower') resultsTower(res); else if (V.mode === 'friend') resultsFriend(res); else resultsLeague(res);
-    paintIcons(resEl);
-    resEl.hidden = false;
-    PS.ui.chrome(true); PS.ui.hold(false);
-    if (!V.won && V.mode !== 'friend' && V.mode !== 'tower') suggestSprout();
+    try { if (V.mode === 'wild') resultsWild(res); else if (V.mode === 'boss') resultsBoss(res); else if (V.mode === 'tower') resultsTower(res); else if (V.mode === 'friend') resultsFriend(res); else resultsLeague(res); }
+    catch (e) { console.error(e); backToHub(); return; } // (safety: the prize is already paid, so never get stuck on a broken card)
+    if (V && !V.won && V.mode !== 'friend' && V.mode !== 'tower') suggestSprout();
   }
   // Pays the battle's prize exactly once (V.granted), the moment the outcome is known. The rows it builds are shown later
   // by the results card, so the card always shows what was really paid.
   function grant() {
     if (!V || V.granted || !V.b.over) return;
     V.granted = true;
+    const who = V.s; V.lv0 = safe(() => lvInfo(who), null); V.lvS = who; // (the XP bar in the results fills from here)
     try { V.res = GRANT[V.mode](V.b.winner === 'p'); } catch (e) { console.error(e); V.res = null; }
+    V.lv1 = safe(() => lvInfo(who), null);
     PS.save();
   }
+  // a Sprout's total level and how far it is to the next one (the mean of its stats' XP bars), for the results XP bar
+  function lvInfo(s) {
+    if (!s || !s.stats) return null;
+    let f = 0, n = 0;
+    for (const k of D.STATS) { const st = s.stats[k]; if (!st) continue; n++; f += st.lv >= D.GROWTH.maxLevel ? 1 : clamp((st.xp || 0) / D.GROWTH.xpForLevel(st.lv), 0, 1); }
+    return { lv: ST.totalLevels(s), f: n ? f / n : 0 };
+  }
   const rowHtml = (icon, label, val, cls) => `<div class="b-rrow${cls ? ' ' + cls : ''}">${icon}${label}${val == null ? '' : `<b>${val}</b>`}</div>`;
-  const COIN = '<canvas class="px" data-coin="1"></canvas>', BIGCOIN = '<canvas class="px" data-coin="big"></canvas>', PLUS = '<canvas class="px" data-icon="plus"></canvas>';
+  const COIN = '<canvas class="px" data-coin="1"></canvas>', BIGCOIN = '<canvas class="px" data-coin="big"></canvas>', PLUS = '<canvas class="px" data-icon="xp"></canvas>';
   const xpText = pay => (pay.xp || !pay.maxed ? `+${pay.xp}` : 'Max level!');
   const xpRow = pay => rowHtml(PLUS, `Training XP${pay.happy ? ' <span class="b-happy">Happy bonus!</span>' : ''}`, xpText(pay));
   const eggRow = (kind, egg, lead) => `<div class="b-rrow gold"><canvas class="px egg" data-egg="${kind}"></canvas><span>${lead} It's waiting in the ${areaName(egg.area)}.</span></div>`;
   const GRANT = {
     league(won) {
       const { L, index, s } = V, pz = prize('league', V, won), pay = payout(s, pz.coins, pz.xp, 'battle', won), p = ST.leagueProgress(L.id);
-      let rows = rowHtml(COIN, 'Coins', `+${pay.coins}`) + xpRow(pay);
+      let rows = rowHtml(COIN, 'Coins', `+${pay.coins}`) + xpRow(pay), extraR = '', trophy = null;
       if (won) {
         p.beaten[index] = true;
         if (!p.cleared && p.beaten.every(Boolean)) {
           p.cleared = true;
           const bonus = ST.addCoins(leagueClearCoins(L), 'league'), kind = eggKind(L.egg), egg = ST.addEgg(kind, L.name);
           PS.S.bestTier = Math.max(PS.S.bestTier || 0, Math.min(3, Math.ceil((D.LEAGUES.indexOf(L) + 1) / 2)));
-          rows += rowHtml(COIN, `${L.name} cleared!`, `+${bonus}`, 'gold') + eggRow(kind, egg, `New ${eggName(kind)}!`);
+          extraR = rowHtml(COIN, `${L.name} cleared!`, `+${bonus}`, 'gold') + eggRow(kind, egg, `New ${eggName(kind)}!`);
+          trophy = giveTrophy('l-' + L.id);
         }
       }
       PS.S.progress.leagues[L.id] = p;
-      return { pay, rows };
+      return { pay, rows: rows + extraR, extra: extraR, trophy };
     },
     boss(won) {
       const { boss: B, s } = V, X = extra(), r = bossRec(B.id), first = won && !r.wins;
@@ -1974,8 +2254,9 @@
         if (B.egg) { const kind = eggKind(B.egg), egg = ST.addEgg(kind, `${B.name} Legend`); rows += eggRow(kind, egg, `${aOrAn(eggName(kind)) === 'an' ? 'An' : 'A'} ${eggName(kind)}!`); }
         else { PS.S.pouch.push(B.id); PS.S.seen['rare:' + B.id] = true; PS.emit('pouch'); rows += `<div class="b-rrow gold"><canvas class="px crit" data-critter="${B.id}"></canvas><span>The ${B.name} joined you! It's in your pouch. Give it to a Sprout in the Garden.</span></div>`; }
       }
+      const extraR = rows, trophy = first ? giveTrophy('g-' + B.id) : null;
       rows += rowHtml(COIN, 'Coins', `+${pay.coins}`) + xpRow(pay);
-      return { pay, rows, first };
+      return { pay, rows, first, extra: extraR, trophy };
     },
     wild(won) {
       const { s } = V, { id, step } = V.wild, A = D.ANIMALS[id], L = wildLv(id, step), X = extra();
@@ -1995,24 +2276,25 @@
         const egg = ST.addEgg(area, `Wild ${areaName(area)}`);
         rows += `<div class="b-rrow gold"><canvas class="px egg" data-egg="${area}"></canvas><span>You beat every Alpha in the ${areaName(area)}! ${aOrAn(eggName(area)) === 'an' ? 'An' : 'A'} ${eggName(area)} is waiting in the ${areaName(egg.area)}.</span></div>`;
       }
+      const extraR = rows;
       rows += rowHtml(COIN, 'Coins', `+${pay.coins}`) + xpRow(pay);
-      return { pay, rows, firstStep };
+      return { pay, rows, firstStep, extra: extraR };
     },
     tower(won) {
       const { s, floor: f } = V, T = extra().tower, run = towerRun(), pz = prize('tower', V, won), pay = payout(s, 0, pz.xp, 'tower', won);
       if (won && run) {
         delete run.fighting;
-        run.pot += pz.coins;
+        const pot0 = run.pot; run.pot += pz.coins;
         const record = f > (T.best || 0); if (record) T.best = f;
         const hpNext = Math.min(1, V.b.p.hp / V.b.p.max + TOWER.heal);
         run.hp = hpNext; run.floor = f + 1;
         let rows = rowHtml(COIN, 'Into the prize bag', `+${pz.coins}`);
-        const t = treatFor(f); if (t) rows += giveTreat(t, f, run);
-        rows += rowHtml(BIGCOIN, 'Prize bag', run.pot, 'blue') + xpRow(pay);
-        return { pay, rows, record, hpNext, pot: run.pot };
+        const t = treatFor(f), treat = t ? giveTreat(t, f, run) : '', trophy = TOWER_TROPHIES.includes(f) ? giveTrophy('t-' + f) : null;
+        rows += treat + rowHtml(BIGCOIN, 'Prize bag', run.pot, 'blue') + xpRow(pay);
+        return { pay, rows, record, hpNext, pot: run.pot, bagAdd: run.pot - pot0, extra: treat, trophy };
       }
       const pot = run ? run.pot : 0, paid = towerEnd('lost');
-      return { pay, rows: rowHtml(BIGCOIN, 'You keep half the bag', `+${paid}`, 'gold') + xpRow(pay), pot };
+      return { pay, rows: rowHtml(BIGCOIN, 'You keep half the bag', `+${paid}`, 'gold') + xpRow(pay), pot, paid };
     },
     friend() {
       const { b, fr, s } = V, win = b.winner, F = extra().friend;
@@ -2072,100 +2354,206 @@
   }
   // start the same fight again (with whoever is the partner now)
   function rematch(v) {
-    V = null; resEl.hidden = true;
+    V = null; rsStop(); resEl.hidden = true;
     if (v.mode === 'league') startBattle(v.L.id, v.index); else if (v.mode === 'wild') startWild(v.wild.id, v.wild.step); else if (v.mode === 'boss') startBoss(v.boss.id);
   }
   const turnsText = n => `${n} turn${n > 1 ? 's' : ''}`;
   const upsBlock = res => { const u = Object.entries((res.pay && res.pay.ups) || {}).map(([k, n]) => `<span style="background:${D.STAT_META[k].color}">${D.STAT_META[k].label} +${n} Lv</span>`).join(''); return u ? `<div class="b-ups">${u}</div>` : ''; };
   const winSub = (s, foe) => (V.b.tie ? `${esc(s.name)} hung on with 1 HP and won the tie!` : `${esc(s.name)} beat ${foe} in ${turnsText(V.b.turn)}.`);
-  function backToHub(then) { V = null; resEl.hidden = true; passEl.hidden = true; fightEl.hidden = true; hubEl.hidden = false; renderHub(); if (then) then(); }
-  function bindRes(map) {
-    resEl.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { sfx('pop'); const fn = map[b.dataset.a]; if (fn) fn(); else backToHub(); });
+  function backToHub(then) {
+    rsStop();
+    const flyN = lastCoins; lastCoins = 0;
+    V = null; resEl.hidden = true; resEl.className = 'b-res'; resEl.onpointerdown = null; passEl.hidden = true; fightEl.hidden = true; hubEl.hidden = false;
+    PS.ui.chrome(true); PS.ui.hold(false); music(M => M.tempo && M.tempo(1)); hubMusic();
+    renderHub();
+    if (flyN > 0 && PS.ui.fx && PS.ui.fx.coinsFly) safe(() => PS.ui.fx.coinsFly(hubEl.querySelector('.b-top') || hubEl, clamp(Math.round(flyN / 40), 3, 8))); // (the winnings go into the coin counter)
+    if (then) then();
   }
-  function resultsLeague(res) {
-    const { L, index, s, won } = V;
-    const nextOk = won && index < 2;
-    const nextL = won && index === 2 ? D.LEAGUES[V.li + 1] : null;
-    resEl.innerHTML = `<div class="card">
-      <div class="eyebrow">${L.name} · ${esc(V.npc.name)}</div>
-      <canvas class="px hero" width="32" height="32"></canvas>
-      <h1>${won ? 'Victory!' : 'So close!'}</h1>
-      <p class="sub">${won ? winSub(s, esc(V.npc.name)) : `${esc(V.npc.name)} won this time.`}</p>
-      ${won ? '' : lossHtml()}
-      <div class="b-rrows">${res.rows}</div>${upsBlock(res)}
-      <div class="modal-btns">
-        ${nextOk ? `<button class="btn wide go" data-a="next">Next: ${esc(L.opponents[index + 1].name)}</button>` : ''}
-        ${nextL && ST.leagueUnlocked(nextL.id) ? `<button class="btn wide go" data-a="league">Next: ${nextL.name}</button>` : ''}
-        ${!won ? '<button class="btn wide primary" data-a="retry">Try again</button>' : ''}
-        <button class="btn wide" data-a="hub">Back to leagues</button>
-      </div></div>`;
-    PS.ui.drawSproutTo(resEl.querySelector('canvas.hero'), s, won ? { arms: 'up', eyes: 'happy', mouth: 'open' } : { eyes: 'sad', mouth: 'flat' });
-    const lid = L.id;
-    bindRes({
-      next: () => { V = null; resEl.hidden = true; startBattle(lid, index + 1); },
-      retry: () => { V = null; resEl.hidden = true; startBattle(lid, index); },
-      league: () => backToHub(() => preview(nextL, 0)),
+  // ---------------- the results window (the shared .sv-res kit), played as a short show; a tap skips to the end ----------------
+  // 0 ms the window drops in · 300 ms the opponent's line · 900 ms coins count up (a few fly into the tile) · 1.5 s the XP bar fills
+  // (and "grew to Lv 31!") · 2.4 s the buttons slide up (they ignore taps for 400 ms) · then the trophy moment, if one was won.
+  // The top bar and nav stay hidden until the player leaves the battle.
+  const LINE_WIN = ['What a great battle!', 'Wow, your Sprout is strong!', 'Good game! You earned it.', 'I need more training!'];
+  const LINE_LOSE = ['Good try! Train up and come back!', 'Nice try! Come back stronger!', "Keep growing. You'll get it!"];
+  let RS = null, lastCoins = 0;
+  function rsStop() { if (RS) { RS.dead = true; RS.timers.forEach(clearTimeout); RS.timers.length = 0; } RS = null; }
+  function countUp(el, to, ms) {
+    if (!el) return;
+    const t0 = performance.now(); let tick = 0;
+    const step = now => { if (!el.isConnected || !RS || RS.done) return; const k = clamp((now - t0) / ms, 0, 1); el.textContent = String(Math.round(to * ease(k))); if (k < 1) { if (now - tick > 70) { tick = now; sfx('coin'); } requestAnimationFrame(step); } };
+    requestAnimationFrame(step);
+  }
+  // a few coins fly from the beaten foe into the coins tile
+  function flyCoins(fromEl, toEl, n) {
+    const src = icons().coin; if (calm() || !fromEl || !toEl || !src) return;
+    const box = resEl.getBoundingClientRect(), a = fromEl.getBoundingClientRect(), b = toEl.getBoundingClientRect();
+    const ox = resEl.scrollLeft - box.left, oy = resEl.scrollTop - box.top;
+    const x0 = a.left + a.width / 2 + ox - 9, y0 = a.top + a.height * 0.4 + oy - 9, x1 = b.left + b.width / 2 + ox - 9, y1 = b.top + 12 + oy - 9;
+    for (let i = 0; i < n; i++) {
+      const c = document.createElement('canvas'); if (!c.animate) return;
+      c.className = 'px b-fcoin'; c.width = src.width; c.height = src.height; PS.ui.paint(c, src); // (.b-fcoin sets its CSS size)
+      const dx = (Math.random() - 0.5) * 50, my = Math.min(y0, y1) - 30 - Math.random() * 20;
+      resEl.appendChild(c);
+      const an = c.animate([{ transform: `translate(${x0}px,${y0}px) scale(.6)`, opacity: 0 }, { transform: `translate(${(x0 + x1) / 2 + dx}px,${my}px) scale(1.15)`, opacity: 1, offset: 0.45 }, { transform: `translate(${x1}px,${y1}px) scale(.8)`, opacity: 1 }],
+        { duration: 520, delay: i * 45, easing: 'ease-in', fill: 'both' });
+      an.onfinish = () => { c.remove(); toEl.classList.remove('bump'); void toEl.offsetWidth; toEl.classList.add('bump'); };
+    }
+  }
+  function xpKit(res) {
+    const pay = res && res.pay; if (!pay) return null;
+    const a = V.lv0, b = V.lv1;
+    return { text: xpText(pay), f0: a ? a.f : 1, f1: b ? b.f : 1, lv0: a ? a.lv : 0, lv1: b ? b.lv : 0, name: V.lvS ? V.lvS.name : '' };
+  }
+  // K: { title, lose, eyebrow, sub, line:{who,text}, hero, heroPose, duo:[look, look], foeLook | foeCrit, foePose, coins:{n,label}, coins2, xp,
+  //      trophy, tip (false = no loss tip), body, btns:[{a,label,go}], map:{a: fn}, after }  (eyebrow / sub / body are HTML, already escaped)
+  function kitShow(K) {
+    rsStop();
+    const R = RS = { timers: [], dead: false, done: false, readyAt: Infinity };
+    const pct = f => Math.round(clamp(f, 0, 1) * 100), X = K.xp, lvUp = !!(X && X.lv1 > X.lv0);
+    const tiles = [];
+    if (K.coins) tiles.push(`<div class="sv-res-tile b-tcoin"><canvas class="px b-tbig" data-coin="big"></canvas><b class="num">+<span class="b-cn">${K.coins.n > 0 ? 0 : K.coins.n}</span></b><small>${esc(K.coins.label)}</small></div>`);
+    if (K.coins2) tiles.push(`<div class="sv-res-tile"><canvas class="px b-tbig" data-coin="big"></canvas><b class="num">${K.coins2.n}</b><small>${esc(K.coins2.label)}</small></div>`);
+    if (X) tiles.push(`<div class="sv-res-tile b-txp"><canvas class="px b-tbig" data-icon="xp"></canvas><b class="num">${esc(X.text)}</b><small>XP${X.lv0 ? ` · Lv <span class="b-lvn">${X.lv0}</span>` : ''}</small><span class="b-xpb"><i style="width:${pct(X.f0)}%"></i></span></div>`);
+    if (K.trophy) tiles.push(`<div class="sv-res-tile b-tprize"><canvas class="px b-ttro" data-trophy="${K.trophy}" width="32" height="32"></canvas><b>New!</b><small>${esc(trophyName(K.trophy))}</small></div>`);
+    const foe = K.foeLook || K.foeCrit;
+    resEl.className = 'b-res sv-res b-kit';
+    resEl.innerHTML = `<div class="sv-res-win${K.lose ? ' lose' : ''}">${K.eyebrow ? `<div class="eyebrow">${K.eyebrow}</div>` : ''}
+      <div class="sv-res-title${K.lose ? ' lose' : ''}">${esc(K.title)}</div>
+      <div class="sv-res-hero">${K.duo ? '<canvas class="px b-rhero" width="32" height="32"></canvas><canvas class="px b-rhero b-rduo" width="32" height="32"></canvas>'
+        : `<canvas class="px b-rhero" width="32" height="32"></canvas>${foe ? `<canvas class="px b-rfoe${K.foeCrit ? ' crit' : ''}" width="32" height="32"></canvas>` : ''}`}</div>
+      ${K.sub ? `<p class="b-rsub">${K.sub}</p>` : ''}
+      ${K.line ? `<div class="b-rline"><p>${K.line.who ? `<b>${esc(K.line.who)}:</b> ` : ''}${esc(K.line.text)}</p></div>` : ''}
+      ${tiles.length ? `<div class="sv-res-tiles">${tiles.join('')}</div>` : ''}
+      ${lvUp ? `<div class="b-rlv" hidden>${esc(X.name)} grew to Lv ${X.lv1}!</div>` : ''}
+      ${K.lose && K.tip !== false ? lossHtml() : ''}
+      ${K.body ? `<div class="b-rrows">${K.body}</div>` : ''}
+      <div class="sv-res-btns">${K.btns.map(b => `<button class="btn wide${b.go ? ' go' : ''}" type="button" data-a="${b.a}">${esc(b.label)}</button>`).join('')}</div></div>`;
+    paintIcons(resEl);
+    resEl.hidden = false;
+    const q = sel => resEl.querySelector(sel);
+    if (K.duo) resEl.querySelectorAll('.b-rhero').forEach((c, i) => safe(() => PS.ui.drawSproutTo(c, K.duo[i][0], K.duo[i][1])));
+    else safe(() => PS.ui.drawSproutTo(q('.b-rhero'), K.hero, K.heroPose || (K.lose ? { eyes: 'sad', mouth: 'flat' } : { arms: 'up', eyes: 'happy', mouth: 'open' })));
+    const fc = q('.b-rfoe');
+    if (fc) safe(() => {
+      if (K.foeCrit) { const c = critterBox(K.foeCrit, 32); if (c) fitPaint(fc, c); }
+      else PS.ui.drawSproutTo(fc, K.foeLook, K.foePose || (K.lose ? { mouth: 'open', arms: 'up', eyes: 'happy' } : { eyes: 'closed', mouth: 'o' }));
+    });
+    lastCoins = K.coins ? K.coins.n || 0 : 0;
+    const line = q('.b-rline'), cn = q('.b-cn'), tc = q('.b-tcoin'), bar = q('.b-xpb i'), lvl = q('.b-rlv'), lvn = q('.b-lvn'), bt = q('.sv-res-btns');
+    const at = (ms, fn) => R.timers.push(setTimeout(() => { if (!R.dead && !R.done) safe(fn); }, ms));
+    const finish = () => {
+      if (R.dead || R.done) return; R.done = true;
+      R.timers.forEach(clearTimeout); R.timers.length = 0;
+      if (line) line.classList.add('in');
+      if (cn && K.coins) cn.textContent = Number(K.coins.n || 0).toLocaleString();
+      if (bar && X) { bar.style.transition = 'none'; bar.style.width = pct(X.f1) + '%'; }
+      if (lvn && X) lvn.textContent = String(X.lv1 || X.lv0);
+      if (lvl) lvl.hidden = false;
+      bt.classList.add('in'); R.readyAt = performance.now() + 400;
+      PS.ui.hold(false); // (pop-ups that waited for the battle to end can show now)
+      if (K.after) { const f = K.after; K.after = null; setTimeout(() => { if (RS === R) safe(f); }, 350); }
+    };
+    at(300, () => { if (line) line.classList.add('in'); });
+    if (K.coins && K.coins.n > 0) at(900, () => { countUp(cn, K.coins.n, 600); flyCoins(fc || q('.b-rhero'), tc, clamp(Math.round(K.coins.n / 40), 3, 8)); });
+    if (bar && X) at(1500, () => {
+      if (!lvUp) { bar.style.width = pct(X.f1) + '%'; return; }
+      bar.style.transition = 'width .45s ease-in'; bar.style.width = '100%';
+      at(480, () => {
+        if (lvl) lvl.hidden = false; if (lvn) lvn.textContent = String(X.lv1);
+        music(M => M.jingle('levelup'));
+        bar.style.transition = 'none'; bar.style.width = '0%'; void bar.offsetWidth; bar.style.transition = 'width .3s ease-out'; bar.style.width = pct(X.f1) + '%';
+      });
+    });
+    at(2400, finish);
+    resEl.onpointerdown = e => { if (!R.done && !(e.target.closest && e.target.closest('.sv-res-btns.in'))) finish(); };
+    resEl.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
+      if (!R.done || performance.now() < R.readyAt) return; // (no starting the next battle by mashing)
+      sfx('pop'); const fn = K.map && K.map[b.dataset.a]; if (fn) fn(); else backToHub();
     });
   }
+  // the big reward moment (app.js PS.ui.celebrate; a plain pop-up if it isn't there)
+  function celebrate(o, fb) {
+    try { if (PS.ui.celebrate) { const p = PS.ui.celebrate(o); return p && p.then ? p.then(() => {}, () => {}) : Promise.resolve(); } } catch (e) { console.error(e); }
+    if (o.jingle) music(M => M.jingle(o.jingle));
+    return new Promise(res => { PS.ui.hold(false); PS.ui.modal(Object.assign({}, fb, { onClose: res })); });
+  }
+  function trophyMoment(id) {
+    const T = trophyDefs().find(x => x.id === id); if (!T) return;
+    const tower = T.kind === 'tower', title = tower ? `You reached ${T.name.replace('Tower ', '')}!` : `You won the ${T.name}!`;
+    const sub = T.kind === 'legend' ? `You beat ${T.by}!` : tower ? 'A new Tower trophy for your shelf!' : `You cleared the ${T.by}!`;
+    const icon = () => safe(() => PX.trophy(id, 4), null);
+    return celebrate({ kind: 'trophy', title, sub, icon: icon(), jingle: 'trophy', button: 'Great!', hold: 900 },
+      { eyebrow: 'New trophy!', title: esc(title), html: `<div class="b-tmod"></div><p style="text-align:center">${esc(sub)}</p>`, buttons: [{ label: 'Great!', kind: 'go' }],
+        mount(card) { const c = icon(), box = card.querySelector('.b-tmod'); if (c && box) box.appendChild(c); } });
+  }
+  const pickLine = (list, n) => list[Math.abs(n | 0) % list.length];
+  const go = fn => () => { V = null; rsStop(); resEl.hidden = true; fn(); };
+  const winTitle = () => 'VICTORY!';
+  function resultsLeague(res) {
+    const { L, index, s, won } = V, lid = L.id;
+    const nextOk = won && index < 2, nextL = won && index === 2 ? D.LEAGUES[V.li + 1] : null, nextLOk = !!(nextL && ST.leagueUnlocked(nextL.id)), btns = [];
+    let nc = null;
+    if (nextOk) btns.push({ a: 'next', label: `Next: ${L.opponents[index + 1].name}`, go: true });
+    else if (nextLOk) btns.push({ a: 'league', label: `Next: ${nextL.name.replace(/ League$/, '')}`, go: true });
+    else if (won && (nc = safe(nextChallenge, null))) btns.push({ a: 'nc', label: `Next: ${nc.label}`, go: true });
+    if (!won) btns.push({ a: 'retry', label: 'Try again', go: true });
+    btns.push({ a: 'hub', label: 'Back' });
+    const n = index + (V.b.turn || 0);
+    kitShow({ title: won ? winTitle() : 'So close!', lose: !won, eyebrow: esc(L.name),
+      sub: won ? winSub(s, esc(V.npc.name)) : '',
+      line: { who: V.npc.name, text: won ? pickLine(LINE_WIN, n) : pickLine(LINE_LOSE, n) },
+      hero: s, foeLook: V.b.o.look,
+      coins: { n: res.pay ? res.pay.coins : 0, label: 'Coins' }, xp: xpKit(res), trophy: res.trophy || null,
+      body: (res.extra || '') + upsBlock(res), btns,
+      map: { next: go(() => startBattle(lid, index + 1)), retry: go(() => startBattle(lid, index)),
+        league: () => backToHub(() => preview(nextL, 0)), nc: () => backToHub(() => nc.go()) },
+      after: res.trophy ? () => trophyMoment(res.trophy) : null });
+  }
   function resultsBoss(res) {
-    const { boss: B, s, won } = V;
-    resEl.innerHTML = `<div class="card">
-      <div class="eyebrow">Legend Challenge · ${B.name}</div>
-      <canvas class="px hero" width="32" height="32"></canvas>
-      <h1>${won ? (res.first ? 'Legendary!' : 'Victory!') : 'So close!'}</h1>
-      <p class="sub">${won ? winSub(s, `the ${B.name}`) : `The ${B.name} won this time.`}</p>
-      ${won ? '' : lossHtml()}
-      <div class="b-rrows">${res.rows}</div>${upsBlock(res)}
-      <div class="modal-btns">${!won ? '<button class="btn wide primary" data-a="retry">Try again</button>' : ''}<button class="btn wide" data-a="hub">Back to Legends</button></div></div>`;
-    const hero = resEl.querySelector('canvas.hero');
-    if (won) PS.ui.drawSproutTo(hero, s, { arms: 'up', eyes: 'happy', mouth: 'open' }); else { const c = critterBox(B.id, 32); hero.width = 32; hero.height = 32; PS.ui.paint(hero, c); }
-    const id = B.id;
-    bindRes({ retry: () => { V = null; resEl.hidden = true; previewBossAgain(id); } });
+    const { boss: B, s, won } = V, id = B.id; let nc = null;
+    const btns = !won ? [{ a: 'retry', label: 'Try again', go: true }, { a: 'hub', label: 'Back' }]
+      : (nc = safe(nextChallenge, null)) ? [{ a: 'nc', label: `Next: ${nc.label}`, go: true }, { a: 'hub', label: 'Back' }] : [{ a: 'hub', label: 'Back', go: true }];
+    kitShow({ title: won ? (res.first ? 'LEGENDARY!' : winTitle()) : 'So close!', lose: !won, eyebrow: `Legend · ${esc(B.name)}`,
+      sub: won ? winSub(s, `the ${B.name}`) : `The ${B.name} won this time.`,
+      hero: s, foeCrit: id,
+      coins: { n: res.pay ? res.pay.coins : 0, label: 'Coins' }, xp: xpKit(res), trophy: res.trophy || null, body: (res.extra || '') + upsBlock(res), btns,
+      map: { retry: () => previewBossAgain(id), nc: () => backToHub(() => nc.go()) },
+      after: res.trophy ? () => trophyMoment(res.trophy) : null });
   }
   function resultsWild(res) {
     const { s, won } = V, { id, step } = V.wild, A = D.ANIMALS[id], area = A.area;
-    const list = wildRank(area), nextId = list[(list.indexOf(id) + 1) % list.length];
-    resEl.innerHTML = `<div class="card"><div class="eyebrow">Wild ${areaName(area)} · ${esc(V.b.o.name)}</div><canvas class="px hero" width="32" height="32"></canvas>
-      <h1>${won ? (step === 2 && res.firstStep ? 'Alpha beaten!' : 'Victory!') : 'So close!'}</h1>
-      <p class="sub">${won ? winSub(s, `the ${esc(V.b.o.name)}`) : `The ${esc(V.b.o.name)} won this time.`}</p>
-      ${won ? starsHtml(id).replace('b-stars', 'b-stars" style="justify-content:center') : lossHtml()}
-      <div class="b-rrows">${res.rows}</div>${upsBlock(res)}
-      <div class="modal-btns">
-        ${won && step < 2 ? `<button class="btn wide go" data-a="up">Next: ${WILD.steps[step + 1].name} ${esc(A.name)} (Lv ${wildLv(id, step + 1)})</button>` : ''}
-        ${!won ? '<button class="btn wide primary" data-a="retry">Try again</button>' : ''}
-        ${won && nextId !== id ? `<button class="btn wide" data-a="nextA">Next animal: ${esc(D.ANIMALS[nextId].name)}</button>` : ''}
-        <button class="btn wide" data-a="hub">Back to Wild</button></div></div>`;
-    const hero = resEl.querySelector('canvas.hero');
-    if (won) PS.ui.drawSproutTo(hero, s, { arms: 'up', eyes: 'happy', mouth: 'open' }); else { const c = critterBox(id, 32); hero.width = 32; hero.height = 32; PS.ui.paint(hero, c); }
-    bindRes({
-      up: () => { V = null; resEl.hidden = true; startWild(id, step + 1); },
-      retry: () => { V = null; resEl.hidden = true; startWild(id, step); },
-      nextA: () => { hubTab = 'wild'; backToHub(() => previewWild(nextId)); },
-    });
+    const list = wildRank(area), nextId = list[(list.indexOf(id) + 1) % list.length], btns = [];
+    if (won && step < 2) btns.push({ a: 'up', label: `Next: ${WILD.steps[step + 1].name} ${A.name}`, go: true });
+    if (!won) btns.push({ a: 'retry', label: 'Try again', go: true });
+    if (won && nextId !== id) btns.push({ a: 'nextA', label: `Next: ${D.ANIMALS[nextId].name}`, go: !btns.length });
+    btns.push({ a: 'hub', label: 'Back' });
+    kitShow({ title: won ? (step === 2 && res.firstStep ? 'Alpha beaten!' : winTitle()) : 'So close!', lose: !won, eyebrow: `Wild ${areaName(area)} · ${esc(V.b.o.name)}`,
+      sub: won ? winSub(s, `the ${esc(V.b.o.name)}`) : `The ${esc(V.b.o.name)} won this time.`,
+      hero: s, foeCrit: id,
+      coins: { n: res.pay ? res.pay.coins : 0, label: 'Coins' }, xp: xpKit(res),
+      body: (won ? starsHtml(id).replace('b-stars', 'b-stars" style="justify-content:center') : '') + (res.extra || '') + upsBlock(res), btns,
+      map: { up: go(() => startWild(id, step + 1)), retry: go(() => startWild(id, step)), nextA: () => { hubTab = 'wild'; backToHub(() => previewWild(nextId)); } } });
   }
-  function previewBossAgain(id) { fightEl.hidden = true; hubEl.hidden = false; hubTab = 'legends'; renderHub(); previewBoss(BOSS[id]); }
+  function previewBossAgain(id) { hubTab = 'legends'; backToHub(() => previewBoss(BOSS[id])); }
   function resultsTower(res) {
     const { s, won, floor: f } = V, T = extra().tower;
-    let title, sub, btns;
     if (won && res.hpNext != null) {
       const hp = Math.round(res.hpNext * 100);
-      title = res.record && f > 1 ? 'New record!' : `Floor ${f} cleared!`;
-      sub = `${esc(s.name)} heals ${Math.round(TOWER.heal * 100)}% for the next floor.`;
-      btns = `<div class="b-hpline">HP<div class="b-hpbar"><i style="width:${hp}%" class="${res.hpNext > 0.5 ? '' : res.hpNext > 0.2 ? 'mid' : 'low'}"></i></div>${hp}%</div>
-        <div class="modal-btns"><button class="btn wide go" data-a="next">Climb to Floor ${f + 1}!</button><button class="btn wide" data-a="stop">Stop and take ${res.pot} coins</button></div>`;
-    } else {
-      title = 'Great climb!';
-      sub = `${esc(s.name)} reached Floor ${f}${res.pot ? ` (the bag had ${res.pot} coins)` : ''}. Best ever: Floor ${T.best || 0}.`;
-      btns = `<div class="modal-btns"><button class="btn wide primary" data-a="again">Climb again</button><button class="btn wide" data-a="hub">Back to the Tower</button></div>`;
+      kitShow({ title: res.record && f > 1 ? 'New record!' : `Floor ${f}!`, eyebrow: `Battle Tower · Floor ${f}`,
+        sub: `${esc(s.name)} heals ${Math.round(TOWER.heal * 100)}% for the next floor.`, hero: s, foeLook: V.b.o.look,
+        coins: { n: res.bagAdd || 0, label: 'Into the bag' }, coins2: { n: res.pot, label: 'Prize bag' }, xp: xpKit(res), trophy: res.trophy || null,
+        body: (res.extra || '') + `<div class="b-hpline">HP<div class="b-hpbar"><i style="width:${hp}%" class="${res.hpNext > 0.5 ? '' : res.hpNext > 0.2 ? 'mid' : 'low'}"></i></div>${hp}%</div>` + upsBlock(res),
+        btns: [{ a: 'next', label: `Climb to Floor ${f + 1}!`, go: true }, { a: 'stop', label: `Take ${res.pot} coins` }],
+        map: { next: go(() => startTowerFloor()),
+          stop: () => { const pot = towerEnd('stop'); lastCoins = pot; sfx('level'); backToHub(() => PS.ui.toast(`You took ${pot} coins home!`)); } },
+        after: res.trophy ? () => trophyMoment(res.trophy) : null });
+      return;
     }
-    resEl.innerHTML = `<div class="card"><div class="eyebrow">Battle Tower · Floor ${f}</div><canvas class="px hero" width="32" height="32"></canvas>
-      <h1 class="${/\d/.test(title) ? 'num' : ''}">${title}</h1><p class="sub">${sub}</p>${won ? '' : lossHtml()}<div class="b-rrows">${res.rows}</div>${upsBlock(res)}${btns}</div>`;
-    PS.ui.drawSproutTo(resEl.querySelector('canvas.hero'), s, won ? { arms: 'up', eyes: 'happy', mouth: 'open' } : { eyes: 'happy', mouth: 'smile' });
-    bindRes({
-      next: () => { V = null; resEl.hidden = true; startTowerFloor(); },
-      stop: () => { const pot = towerEnd('stop'); sfx('level'); backToHub(() => PS.ui.toast(`You took ${pot} coins home!`)); },
-      again: () => { hubTab = 'tower'; backToHub(() => previewTower()); },
-    });
+    kitShow({ title: 'Great climb!', eyebrow: `Battle Tower · Floor ${f}`, tip: false,
+      sub: `${esc(s.name)} reached Floor ${f}. Best ever: Floor ${T.best || 0}.`, hero: s, heroPose: { eyes: 'happy', mouth: 'smile' }, foeLook: V.b.o.look,
+      coins: { n: res.paid || 0, label: 'Half the bag' }, xp: xpKit(res), body: upsBlock(res),
+      btns: [{ a: 'again', label: 'Climb again', go: true }, { a: 'hub', label: 'Back' }],
+      map: { again: () => { hubTab = 'tower'; backToHub(() => previewTower()); } } });
   }
   function giveTreat(t, f, run) {
     if (t.kind === 'fruit') { const a = STAT_FRUITS[Math.floor(Math.random() * STAT_FRUITS.length)], b = STAT_FRUITS[Math.floor(Math.random() * STAT_FRUITS.length)]; ST.addFruit(a, 1); ST.addFruit(b, 1); return `<div class="b-rrow gold"><canvas class="px" data-fruit="${a}"></canvas><span>Treat: ${a === b ? `2 ${D.FRUITS[a].name}s` : `${D.FRUITS[a].name} and ${D.FRUITS[b].name}`}!</span></div>`; }
@@ -2181,14 +2569,15 @@
   }
   function resultsFriend(res) {
     const { b, fr } = V, win = b.winner, draw = !win;
-    resEl.innerHTML = `<div class="card"><div class="eyebrow">Friend Battle</div>
-      <div style="display:flex;justify-content:center;gap:6px"><canvas class="px duo" data-side="p" width="32" height="32"></canvas><canvas class="px duo" data-side="o" width="32" height="32"></canvas></div>
-      <h1>${draw ? "It's a draw!" : `${esc(fr.names[win])} wins!`}</h1><p class="sub">${draw ? `Both were knocked out at the same time after ${turnsText(b.turn)}.` : `${esc(b[win].name)} won in ${turnsText(b.turn)}.`} Good game, ${esc(fr.names.p)} and ${esc(fr.names.o)}!</p>
-      <div class="b-rrows">${res.rows}</div>${upsBlock(res)}
-      <div class="modal-btns"><button class="btn wide go" data-a="rematch">Rematch!</button><button class="btn wide" data-a="hub">Done</button></div></div>`;
-    resEl.querySelectorAll('canvas.duo').forEach(c => { const side = c.dataset.side, f = b[side]; PS.ui.drawSproutTo(c, f.s || f.look, draw || side === win ? { arms: 'up', eyes: 'happy', mouth: 'open' } : { eyes: 'sad', mouth: 'flat' }); if (side === 'o') c.style.transform = 'scaleX(-1)'; });
+    const pose = side => (draw || side === win ? { arms: 'up', eyes: 'happy', mouth: 'open' } : { eyes: 'sad', mouth: 'flat' });
     const sA = V.s, sB = V.sB, nA = fr.names.p, nB = fr.names.o, own = V.own;
-    bindRes({ rematch: () => { V = null; resEl.hidden = true; startFriend(sA, sB, nA, nB, own); } });
+    kitShow({ title: draw ? "It's a draw!" : `${fr.names[win]} wins!`, eyebrow: 'Friend Battle',
+      sub: `${draw ? `Both fainted at the same time after ${turnsText(b.turn)}.` : `${esc(b[win].name)} won in ${turnsText(b.turn)}.`} Good game!`,
+      duo: [[b.p.s || b.p.look, pose('p')], [b.o.s || b.o.look, pose('o')]],
+      coins: res.pay ? { n: res.pay.coins, label: `Coins for ${fr.names.p}` } : null, xp: xpKit(res),
+      body: res.pay ? upsBlock(res) : (res.rows || ''),
+      btns: [{ a: 'rematch', label: 'Rematch!', go: true }, { a: 'hub', label: 'Done' }],
+      map: { rematch: go(() => startFriend(sA, sB, nA, nB, own)) } });
   }
 
   // ---------------- particles & pops ----------------
@@ -2248,8 +2637,8 @@
     const r = srng(V.seed || 1), hy = HY(), wall = T.far === 'walls', busy = [];
     for (const [kind, fx0] of wall ? [] : T.props || []) {
       const c = safe(() => PX.prop(kind, T.theme || 'day'), null); if (!c) continue;
-      const x = fx0 < 0 ? fx0 + c.width / 2 : fx0 > 1 ? WW - c.width / 2 + 4 : Math.round(WW * fx0 - (kind === 'rock' ? 0 : 10));
-      if (c.height >= 24) busy.push([x - c.width * 0.35 - 4, x + c.width * 0.35 + 4]); // tall props (trees): keep their trunks clear
+      const cw = PX.artW(c), x = fx0 < 0 ? fx0 + cw / 2 : fx0 > 1 ? WW - cw / 2 + 4 : Math.round(WW * fx0 - (kind === 'rock' ? 0 : 10));
+      if (PX.artH(c) >= 24) busy.push([x - cw * 0.35 - 4, x + cw * 0.35 + 4]); // tall props (trees): keep their trunks clear
     }
     const ox = spot('o').x; if (!wall) busy.push([ox - 12, ox + 12]);
     const want = wall ? (WW >= 150 ? 6 : 5) : (WW >= 150 ? 4 : 3), picks = [];
@@ -2334,8 +2723,8 @@
     if (k === 'sprinkles' && r() < dt * 3) add({ x: r() * WW, y: -2, vx: (r() - 0.5) * 4, vy: 16 + r() * 8, life: 14, c: ['#e5535f', '#639bff', '#99e550', '#fbf236', '#ffffff'][Math.floor(r() * 5)], w: r() < 0.5 ? 2 : 1, h: r() < 0.5 ? 1 : 2 });
     if (k === 'snow' && r() < dt * 14) add({ x: r() * (WW + 20) - 10, y: -2, vx: -3 + r() * 2, vy: 10 + r() * 10, sway: r() * 6, life: 20, c: r() < 0.7 ? '#ffffff' : '#dfe8fb', w: r() < 0.3 ? 2 : 1, h: r() < 0.3 ? 2 : 1 });
     if (k === 'embers' && r() < dt * 9) add({ x: r() * WW, y: WH + 2, vx: (r() - 0.5) * 6, vy: -(14 + r() * 18), sway: r() * 6, life: 12, c: r() < 0.5 ? '#ff9a3a' : r() < 0.5 ? '#fbf236' : '#df5a26', w: 1, h: 1, fade: true });
-    if (k === 'rain' && r() < dt * 40) add({ x: r() * (WW + 30), y: -4, vx: -22, vy: 110 + r() * 30, life: 3, c: '#9fb8e8', w: 1, h: 3, rain: true });
-    if (k === 'wind' && r() < dt * 2.5) add({ x: -12, y: r() * WH * 0.8, vx: 60 + r() * 30, vy: 0, life: 4, c: '#ffffff', w: 6 + Math.floor(r() * 6), h: 1, alpha: 0.6 });
+    if (k === 'rain' && r() < dt * 40) add({ x: r() * (WW + 30), y: -4, vx: -22, vy: 110 + r() * 30, life: 3, c: '#9fb8e8', w: 1 / (PX.SCENE_K || 1), h: 3, rain: true });
+    if (k === 'wind' && r() < dt * 2.5) add({ x: -12, y: r() * WH * 0.8, vx: 60 + r() * 30, vy: 0, life: 4, c: '#ffffff', w: 6 + Math.floor(r() * 6), h: 1 / (PX.SCENE_K || 1), alpha: 0.6 });
     if (k === 'leaves' && r() < dt * 1.2) add({ x: WW + 4, y: r() * WH * 0.6, vx: -(10 + r() * 8), vy: 6 + r() * 5, sway: r() * 6, life: 14, c: r() < 0.5 ? '#6abe30' : '#99e550', w: 2, h: 1 });
     if (k === 'dust' && r() < dt * 1) add({ x: r() * WW, y: HY() + r() * 20, vx: 3, vy: -2, life: 5, c: '#fff6c8', w: 1, h: 1, blink: true });
     for (const p of V.amb) {
@@ -2395,124 +2784,136 @@
     return '#' + ((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1);
   }
   function px(g, x, y, w, h, c) { g.fillStyle = c; g.fillRect(x, y, w, h); }
+  // The arena is painted at SCENE_K buffer px per world px (world coordinates unchanged): FP = one fine pixel. The background is
+  // drawn once per size / time of day, so it can afford fine columns and fine rows everywhere (plan §8: no art-pixel dither,
+  // fine edges, the 1-art-pixel ink ring only round objects that have one).
+  const KS = PX.SCENE_K || 1, FP = 1 / KS, fround = v => Math.round(v * KS) / KS;
+  // a fine-pixel disc (rows one fine pixel tall) centred on the middle of art pixel (cx, cy)
+  function discF(g, cx, cy, r, c) { g.fillStyle = c; const ox = cx + 0.5, oy = cy + 0.5, R = r + 0.5; for (let y = -R + FP / 2; y < R; y += FP) { const w = fround(Math.sqrt(Math.max(0, R * R - y * y))); if (w > 0) g.fillRect(ox - w, oy + y - FP / 2, w * 2, FP); } }
+  // an arena pad: a soft-shaded ellipse (5 tones top to bottom, no steps of whole art pixels) in a 1-art-pixel ink ring
   function ellipse(g, cx, cy, rx, ry, fill, rim, shade) {
-    for (let y = -ry; y <= ry; y++) {
-      const w = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry + 0.5))));
-      px(g, cx - w, cy + y, w * 2 + 1, 1, y > ry * 0.35 ? shade : y < -ry * 0.4 ? rim : fill);
-      px(g, cx - w - 1, cy + y, 1, 1, INK); px(g, cx + w + 1, cy + y, 1, 1, INK);
+    const R5 = [rim, mix(rim, fill, 0.5), fill, mix(fill, shade, 0.5), shade], ox = cx + 0.5, oy = cy + 0.5, RX = rx + 0.5, RY = ry + 0.5;
+    for (let y = -RY - 1 + FP / 2; y < RY + 1; y += FP) {
+      const wo = fround((RX + 1) * Math.sqrt(Math.max(0, 1 - (y * y) / ((RY + 1) * (RY + 1))))); if (wo <= 0) continue;
+      px(g, ox - wo, oy + y - FP / 2, wo * 2, FP, INK);
+      const wi = Math.abs(y) < RY ? fround(RX * Math.sqrt(Math.max(0, 1 - (y * y) / (RY * RY)))) : 0; if (wi <= 0) continue;
+      const t = y / RY;
+      px(g, ox - wi, oy + y - FP / 2, wi * 2, FP, R5[t < -0.55 ? 0 : t < -0.25 ? 1 : t > 0.6 ? 4 : t > 0.3 ? 3 : 2]);
     }
-    const w0 = Math.round(rx * 0.15); px(g, cx - w0, cy - ry - 1, w0 * 2 + 1, 1, INK); px(g, cx - w0, cy + ry + 1, w0 * 2 + 1, 1, INK);
-    for (let x = -rx; x <= rx; x++) { const yy = Math.round(ry * Math.sqrt(Math.max(0, 1 - (x * x) / (rx * rx)))); px(g, cx + x, cy - yy - 1, 1, 1, INK); px(g, cx + x, cy + yy + 1, 1, 1, INK); }
   }
-  function disc(g, cx, cy, r, c) { for (let y = -r; y <= r; y++) { const w = Math.round(Math.sqrt(Math.max(0, r * r - y * y))); px(g, cx - w, cy + y, w * 2 + 1, 1, c); } }
-  // faceted mountain range: lit left faces, shaded right faces, snow caps on the tall peaks
+  function disc(g, cx, cy, r, c) { discF(g, cx, cy, r - 0.5, c); }
+  // faceted mountain range in fine columns: lit left faces, shaded right faces, snow caps; a 1-fine-pixel ink ridge line
   function range(g, hy, base, amp, per, ph, cols, cap) {
     const hAt = x => { const t = (((x + ph) / per) % 1 + 1) % 1, tri = 1 - Math.abs(t * 2 - 1); return base + amp * tri * (0.75 + 0.25 * Math.sin((x + ph) * 0.9 / per * 6.28)) + Math.sin(x * 0.37 + ph) * 1.2; };
-    for (let x = 0; x < WW; x++) {
-      const h = Math.round(hAt(x)), up = hAt(x + 1) >= hAt(x), top = hy - h;
-      px(g, x, top, 1, h, up ? cols[0] : cols[1]);
-      px(g, x, top, 1, 1, INK);
-      if (cap) { const d = h - (base + amp * 0.62); if (d > 0) px(g, x, top + 1, 1, Math.round(d * 0.8) + 1, up ? cap[0] : cap[1]); }
+    for (let x = 0; x < WW; x += FP) {
+      const h = hAt(x), up = hAt(x + FP) >= h, top = fround(hy - h);
+      px(g, x, top, FP, hy - top, up ? cols[0] : cols[1]);
+      if (cap) { const d = h - (base + amp * 0.62); if (d > 0) px(g, x, top, FP, fround(d * 0.8) + 1, up ? cap[0] : cap[1]); }
+      const low = Math.min(hy, Math.max(fround(hy - hAt(x - FP)), fround(hy - hAt(x + FP)))); // ridge line: down to the lower neighbour, so steep sides stay lined
+      px(g, x, top, FP, Math.max(FP, low - top), INK);
     }
   }
+  // a little pine: rows one fine pixel tall, a fine ink edge each side
   function pine(g, x, y, h, cols, snowy) {
-    px(g, x, y - 3, 1, 3, '#5a3322');
-    for (let i = 0; i < h; i++) { const w = Math.round((i % 5) * 0.9 + i * 0.28) + 1, yy = y - 3 - h + i; px(g, x - w, yy, w * 2 + 1, 1, i % 5 === 0 && snowy ? '#ffffff' : (i % 5 < 2 ? cols[0] : cols[1])); px(g, x - w - 1, yy, 1, 1, INK); px(g, x + w + 1, yy, 1, 1, INK); }
-    px(g, x, y - 4 - h, 1, 1, INK);
+    px(g, x, y - 3, 1, 3, '#5a3322'); px(g, x, y - 3, FP, 3, '#8f563b');
+    const cx = x + 0.5;
+    for (let i = 0; i < h; i += FP) { const w = (i % 5) * 0.9 + i * 0.28 + 0.75, yy = y - 3 - h + i, wf = fround(w), band = Math.floor(i) % 5; px(g, cx - wf, yy, wf * 2, FP, band === 0 && snowy ? '#ffffff' : (band < 2 ? cols[0] : cols[1])); px(g, cx - wf - FP, yy, FP, FP, INK); px(g, cx + wf, yy, FP, FP, INK); }
+    px(g, cx - FP, y - 3 - h - FP, FP * 2, FP, INK);
   }
   function volcanoCone(g, hy, T, cx, H, small) {
-    const [c0, c1, c2] = T.cone, lava = T.lava;
-    for (let x = Math.floor(cx - H * 1.1); x <= cx + H * 1.1; x++) {
-      const d = Math.abs(x - cx), h = Math.round(H - Math.max(0, d - (small ? 2 : 5)) * 0.95);
-      if (h <= 0) continue;
-      px(g, x, hy - h, 1, h, x < cx - 2 ? c0 : x > cx + 3 ? c2 : c1); px(g, x, hy - h, 1, 1, INK);
+    const [c0, c1, c2] = T.cone, lava = T.lava, hAt = x => H - Math.max(0, Math.abs(x - cx - 0.5) - (small ? 2 : 5)) * 0.95;
+    for (let x = Math.floor(cx - H * 1.1); x <= cx + H * 1.1; x += FP) {
+      const h = hAt(x); if (h <= 0) continue;
+      const top = fround(hy - h); px(g, x, top, FP, hy - top, x < cx - 2 ? c0 : x > cx + 3 ? c2 : c1); px(g, x, top, FP, FP, INK);
     }
     const cw = small ? 2 : 5;
-    px(g, cx - cw, hy - H, cw * 2 + 1, 1, lava[1]); px(g, cx - 1, hy - H, 3, 1, lava[0]);
-    if (!small) for (const [sx, dir] of [[cx - 3, -1], [cx + 2, 1]]) { let x = sx; for (let i = 1; i < H * 0.7; i++) { if (i % 3 === 0) x += dir; px(g, x, hy - H + i, 1, 1, i % 4 ? lava[2] : lava[1]); } }
+    px(g, cx - cw, hy - H, cw * 2 + 1, 1, lava[1]); px(g, cx - 1, hy - H, 3, FP, lava[0]);
+    if (!small) for (const [sx, dir] of [[cx - 3, -1], [cx + 2, 1]]) { let x = sx; for (let i = 1; i < H * 0.7; i += FP) { x = sx + dir * Math.floor(i / 3); px(g, x + (dir > 0 ? 0 : FP), hy - H + i, FP, FP, Math.floor(i) % 4 ? lava[2] : lava[1]); } } // fine lava streaks
     const smoke = small ? ['#8a7a8a', '#6a5a6a'] : ['#5a4a5a', '#3e3040'];
-    for (const [dx, dy, r] of small ? [[1, -4, 2], [3, -8, 3]] : [[1, -5, 3], [5, -11, 4], [2, -19, 5]]) { disc(g, cx + dx, hy - H + dy, r, smoke[1]); disc(g, cx + dx - 1, hy - H + dy - 1, r - 1, smoke[0]); }
+    for (const [dx, dy, r] of small ? [[1, -4, 2], [3, -8, 3]] : [[1, -5, 3], [5, -11, 4], [2, -19, 5]]) { discF(g, cx + dx, hy - H + dy, r, smoke[1]); discF(g, cx + dx - 1, hy - H + dy - 1, r - 1, smoke[0]); }
   }
   function drawBg(night) {
     const T = THEMES[V.area] || THEMES.meadow, g = bgx, hy = HY();
     if (T.fixed) night = 0;
     const k = T.theme === 'night' ? night * 0.4 : night * 0.85;
+    g.setTransform(KS, 0, 0, KS, 0, 0); g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, WW, WH);
-    // stepped sky with dithered band edges
-    const bandH = Math.ceil(hy / 4);
-    for (let i = 0; i < 4; i++) px(g, 0, i * bandH, WW, bandH + 1, mix(T.sky[i], NIGHT_SKY[i], k));
-    for (let i = 1; i < 4; i++) { const c = mix(T.sky[i], NIGHT_SKY[i], k), y = i * bandH; for (let x = (i % 2); x < WW; x += 2) { px(g, x, y - 1, 1, 1, c); px(g, x + 1, y - 2, 1, 1, c); } }
-    // stars & moon / sun
+    // stepped sky with soft seams (6 fine rows of in-between tones; no checker dither)
+    const bandH = Math.ceil(hy / 4), sky = i => mix(T.sky[i], NIGHT_SKY[i], k);
+    for (let i = 0; i < 4; i++) px(g, 0, i * bandH, WW, bandH + 1, sky(i));
+    for (let i = 1; i < 4; i++) { const y = i * bandH - 3 * FP; for (let j = 0; j < 6; j++) px(g, 0, y + j * FP, WW, FP, mix(sky(i - 1), sky(i), (j + 1) / 7)); }
+    // stars & moon / sun (fine-pixel discs)
     if (T.stars || night > 0.35) {
       const sa = T.stars ? 1 : clamp((night - 0.35) / 0.4, 0, 1);
-      for (let i = 0; i < 40; i++) { const h = hash(i * 7 + 3); if (h % 3 && sa < 0.7) continue; px(g, h % WW, (h >>> 8) % Math.max(1, hy - 6), 1, 1, (h >>> 3) % 4 ? '#cbdbfc' : '#ffffff'); }
+      for (let i = 0; i < 40; i++) { const h = hash(i * 7 + 3); if (h % 3 && sa < 0.7) continue; const s = (h >>> 11) % 3 ? FP : 1; px(g, h % WW, (h >>> 8) % Math.max(1, hy - 6), s, s, (h >>> 3) % 4 ? '#cbdbfc' : '#ffffff'); }
     }
-    if (T.moon || (night > 0.5 && !T.fixed)) { const mx = Math.round(WW * 0.5), my = Math.round(hy * 0.32); for (let y = -4; y <= 4; y++) for (let x = -4; x <= 4; x++) if (x * x + y * y <= 17) px(g, mx + x, my + y, 1, 1, (x - 2) * (x - 2) + (y + 1) * (y + 1) <= 9 ? mix(T.sky[0], NIGHT_SKY[0], k) : '#fff6c8'); }
-    else if (T.sun === 'big') { const sx = Math.round(WW * 0.3), sy = Math.round(hy * 0.55); disc(g, sx, sy, 11, mix(T.sky[3], '#ffffff', 0.25)); disc(g, sx, sy, 8, '#fff27a'); disc(g, sx - 2, sy - 2, 4, '#fffcd0'); }
-    else if (T.sun === 'pale') { const sx = Math.round(WW * 0.16), sy = Math.round(hy * 0.28); disc(g, sx, sy, 4, '#fffcd0'); disc(g, sx, sy, 2, '#ffffff'); }
-    else if ((T.sun || !T.fixed) && !T.moon && night < 0.5 && V.area !== 'candy' && T.far !== 'walls') { const sx = Math.round(WW * 0.14), sy = Math.round(hy * 0.3); for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) if (x * x + y * y <= 10) px(g, sx + x, sy + y, 1, 1, x * x + y * y <= 4 ? '#fff27a' : '#fbe36a'); }
+    if (T.moon || (night > 0.5 && !T.fixed)) { const mx = Math.round(WW * 0.5), my = Math.round(hy * 0.32); discF(g, mx, my, 4.1, '#fff6c8'); discF(g, mx + 2, my - 1, 3.0, sky(0)); px(g, mx - 3, my, FP, FP * 2, '#ffffff'); }
+    else if (T.sun === 'big') { const sx = Math.round(WW * 0.3), sy = Math.round(hy * 0.55); discF(g, sx, sy, 11, mix(T.sky[3], '#ffffff', 0.25)); discF(g, sx, sy, 8, '#fff27a'); discF(g, sx, sy, 7, mix('#fff27a', '#fffcd0', 0.5)); discF(g, sx - 2, sy - 2, 4, '#fffcd0'); }
+    else if (T.sun === 'pale') { const sx = Math.round(WW * 0.16), sy = Math.round(hy * 0.28); discF(g, sx, sy, 4, '#fffcd0'); discF(g, sx, sy, 2, '#ffffff'); }
+    else if ((T.sun || !T.fixed) && !T.moon && night < 0.5 && V.area !== 'candy' && T.far !== 'walls') { const sx = Math.round(WW * 0.14), sy = Math.round(hy * 0.3); discF(g, sx, sy, 3.2, '#fbe36a'); discF(g, sx, sy, 2.2, '#fff27a'); px(g, sx - 1, sy - 1, FP, FP, '#ffffff'); }
     // far band
     switch (T.far) {
       case 'sea': case 'stormsea': {
         const storm = T.far === 'stormsea', top = storm ? 12 : 7;
-        if (storm) for (const [x0, w, h] of [[0.12, 5, 16], [0.2, 3, 10], [0.83, 6, 20], [0.9, 3, 9]]) { const x = Math.round(WW * x0); for (let i = 0; i < h; i++) { const ww = Math.max(1, Math.round(w * (i / h))); px(g, x - ww, hy - top - h + i, ww * 2 + 1, 1, i < 2 ? '#3a4668' : '#2a3450'); } }
+        if (storm) for (const [x0, w, h] of [[0.12, 5, 16], [0.2, 3, 10], [0.83, 6, 20], [0.9, 3, 9]]) { const x = Math.round(WW * x0) + 0.5; for (let i = 0; i < h; i += FP) { const ww = Math.max(FP, fround(w * (i / h) + 0.5)); px(g, x - ww, hy - top - h + i, ww * 2, FP, i < 2 ? '#3a4668' : '#2a3450'); } }
         for (let y = hy - top; y < hy; y++) px(g, 0, y, WW, 1, mix(y < hy - top + 2 ? T.sea[1] : T.sea[0], '#1a2a5a', k * 0.6));
-        for (let x = 0; x < WW; x++) { const h = hash(x * 13); if (h % (storm ? 4 : 7) === 0) px(g, x, hy - top + 1 + (h >>> 4) % (top - 1), storm ? 3 : 2, 1, mix(T.sea[2], '#6070a0', k * 0.6)); }
-        px(g, 0, hy - top, WW, 1, mix(storm ? '#8ab0e8' : '#e8f4ff', '#40507a', k * 0.6));
+        for (let x = 0; x < WW; x++) { const h = hash(x * 13); if (h % (storm ? 4 : 7) === 0) px(g, x, hy - top + 1 + (h >>> 4) % (top - 1), storm ? 3 : 2, FP, mix(T.sea[2], '#6070a0', k * 0.6)); } // fine glints
+        px(g, 0, hy - top, WW, FP, mix(storm ? '#8ab0e8' : '#e8f4ff', '#40507a', k * 0.6));
         break;
       }
       case 'mountains': case 'peaks': {
         range(g, hy, T.far === 'peaks' ? 20 : 12, T.far === 'peaks' ? 34 : 30, 62, 17, T.mtnB, T.cap);
         range(g, hy, T.far === 'peaks' ? 10 : 4, T.far === 'peaks' ? 24 : 22, 44, 41, T.mtnF, T.cap);
-        if (T.far === 'peaks') for (let x = -6; x < WW + 6; x += 7) { const h = hash(x + 99); disc(g, x, hy - 3 - (h % 3), 5 + (h >>> 5) % 3, '#ffffff'); disc(g, x + 1, hy + 1, 5, '#e2ecfb'); }
+        if (T.far === 'peaks') for (let x = -6; x < WW + 6; x += 7) { const h = hash(x + 99); discF(g, x, hy - 3 - (h % 3), 5 + (h >>> 5) % 3, '#ffffff'); discF(g, x + 1, hy + 1, 5, '#e2ecfb'); }
         break;
       }
       case 'volcano': {
         range(g, hy, 3, 10, 38, 5, [mix(T.cone[0], T.sky[3], 0.4), mix(T.cone[1], T.sky[3], 0.4)]);
         volcanoCone(g, hy, T, Math.round(WW * 0.58), Math.min(Math.round(hy * 0.72), 52));
-        for (let x = 0; x < WW; x++) if (hash(x * 5) % 3 === 0) px(g, x, hy - 1, 1, 1, T.lava[2]);
+        for (let x = 0; x < WW; x++) if (hash(x * 5) % 3 === 0) px(g, x, hy - FP, 1, FP, T.lava[2]);
         break;
       }
       case 'jungle': {
         volcanoCone(g, hy, { cone: ['#b07a70', '#96645c', '#7a5048'], lava: ['#fbf236', '#ff9a3a', '#df5a26'] }, Math.round(WW * 0.72), Math.min(Math.round(hy * 0.5), 30), true);
-        for (let x = 0; x < WW; x++) { const h = 7 + Math.round(3 * Math.abs(Math.sin(x * 0.19)) + 2 * Math.sin(x * 0.05 + 1)); px(g, x, hy - h, 1, 1, INK); px(g, x, hy - h + 1, 1, h, x % 9 < 4 ? '#3f8a4a' : '#2f6a3a'); if (hash(x * 3) % 5 === 0) px(g, x, hy - h + 1, 1, 1, '#6abe30'); }
+        const jh = x => 7 + 3 * Math.abs(Math.sin(x * 0.19)) + 2 * Math.sin(x * 0.05 + 1);
+        for (let x = 0; x < WW; x += FP) { const top = fround(hy - jh(x)); px(g, x, top, FP, hy - top, x % 9 < 4 ? '#3f8a4a' : '#2f6a3a'); px(g, x, top, FP, FP, INK); if (hash(Math.floor(x * KS) * 3) % 9 === 0) px(g, x, top + FP, FP, FP, '#6abe30'); }
         break;
       }
       case 'walls': {
         const W = T.wall, top = hy - 16;
         for (let x = 0; x < WW; x += 6) px(g, x, top - 3, 4, 3, W[1]);
         px(g, 0, top, WW, 16, W[1]);
-        for (let y = top; y < hy; y += 3) { px(g, 0, y, WW, 1, W[2]); for (let x = ((y - top) / 3) % 2 ? 0 : 4; x < WW; x += 8) px(g, x, y, 1, 3, W[2]); }
-        px(g, 0, top, WW, 1, W[0]);
-        for (let x = 0; x < WW; x += 6) { px(g, x, top - 3, 4, 1, W[0]); px(g, x - 1, top - 3, 1, 3, INK); px(g, x + 4, top - 3, 1, 3, INK); px(g, x - 1, top - 4, 6, 1, INK); }
+        for (let y = top; y < hy; y += 3) { px(g, 0, y + 1 - FP, WW, FP, W[2]); for (let x = ((y - top) / 3) % 2 ? 0 : 4; x < WW; x += 8) px(g, x, y, FP, 3, W[2]); } // fine mortar
+        px(g, 0, top, WW, FP, W[0]);
+        for (let x = 0; x < WW; x += 6) { px(g, x, top - 3, 4, FP, W[0]); px(g, x - FP, top - 3, FP, 3, INK); px(g, x + 4, top - 3, FP, 3, INK); px(g, x - FP, top - 3 - FP, 4 + 2 * FP, FP, INK); }
         V.torches = [];
         const cols = ['#e5535f', '#f6c83a', '#639bff', '#6abe30'];
         for (let i = 0, x = 10; x < WW - 6; x += 24, i++) {
-          px(g, x - 3, top + 5, 7, 11, W[3]); px(g, x - 2, top + 4, 5, 1, W[3]); px(g, x - 1, top + 3, 3, 1, W[3]);
-          const bx = x + 12; if (bx < WW - 4) { px(g, bx - 2, top + 1, 5, 9, cols[i % 4]); px(g, bx - 2, top + 10, 2, 1, cols[i % 4]); px(g, bx + 1, top + 10, 2, 1, cols[i % 4]); px(g, bx, top + 3, 1, 3, '#ffffff'); px(g, bx - 3, top + 1, 1, 10, INK); px(g, bx + 3, top + 1, 1, 10, INK); }
+          px(g, x - 3, top + 5, 7, 11, W[3]); discF(g, x, top + 5, 3, W[3]); // an arched doorway
+          const bx = x + 12; if (bx < WW - 4) { px(g, bx - 2, top + 1, 5, 9, cols[i % 4]); px(g, bx - 2, top + 10, 2, 1, cols[i % 4]); px(g, bx + 1, top + 10, 2, 1, cols[i % 4]); px(g, bx, top + 3, 1, 3, '#ffffff'); px(g, bx - 2, top + 1, FP, 9, mix(cols[i % 4], '#ffffff', 0.5)); px(g, bx - 2 - FP, top + 1, FP, 10, INK); px(g, bx + 3, top + 1, FP, 10, INK); } // banners with fine ink edges
           V.torches.push({ x: x + 6, y: top + 6 });
         }
         break;
       }
       default: {
-        for (let x = 0; x < WW; x++) {
-          const h1 = 7 + Math.round(3 * Math.sin(x * 0.07) + 2 * Math.sin(x * 0.19 + 1.3)), h2 = 3 + Math.round(2 * Math.sin(x * 0.11 + 0.5) + 1.5 * Math.sin(x * 0.27));
-          px(g, x, hy - h1, 1, 1, mix(T.hillF[0], NIGHT_SKY[3], k * 0.7)); px(g, x, hy - h1 + 1, 1, h1, mix(T.hillF[1], NIGHT_SKY[3], k * 0.7));
-          px(g, x, hy - h2, 1, 1, mix(T.hillN[0], '#1a1d40', k * 0.6)); px(g, x, hy - h2 + 1, 1, h2, mix(T.hillN[1], '#1a1d40', k * 0.6));
+        const h1 = x => 7 + 3 * Math.sin(x * 0.07) + 2 * Math.sin(x * 0.19 + 1.3), h2 = x => 3 + 2 * Math.sin(x * 0.11 + 0.5) + 1.5 * Math.sin(x * 0.27);
+        for (let x = 0; x < WW; x += FP) { // two hill bands in fine columns, each with a 1-fine-pixel lit edge
+          const t1 = fround(hy - h1(x)), t2 = fround(hy - h2(x));
+          px(g, x, t1, FP, hy - t1, mix(T.hillF[1], NIGHT_SKY[3], k * 0.7)); px(g, x, t1, FP, FP, mix(T.hillF[0], NIGHT_SKY[3], k * 0.7));
+          if (t2 < hy) { px(g, x, t2, FP, hy - t2, mix(T.hillN[1], '#1a1d40', k * 0.6)); px(g, x, t2, FP, FP, mix(T.hillN[0], '#1a1d40', k * 0.6)); }
         }
       }
     }
-    // ground with soft perspective bands
+    // ground with soft perspective bands (fine rows) and a fine horizon line
     const gk = k * 0.55, G = c => mix(c, '#10102a', gk);
-    px(g, 0, hy, WW, 1, G(T.gr[3]));
-    for (let y = hy + 1; y < WH; y++) {
-      const d = (y - hy) / (WH - hy), band = Math.floor(Math.sqrt(y - hy) * 2.2) % 2;
-      px(g, 0, y, WW, 1, G(d < 0.12 ? T.gr[2] : band ? T.gr[1] : T.gr[0]));
+    for (let y = hy; y < WH; y += FP) {
+      const d = (y - hy) / (WH - hy), band = Math.floor(Math.sqrt(Math.max(0, y - hy - FP)) * 2.2) % 2;
+      px(g, 0, y, WW, FP, G(y < hy + FP ? T.gr[3] : d < 0.12 ? T.gr[2] : band ? T.gr[1] : T.gr[0]));
     }
-    for (let i = 0; i < WW * WH / 45; i++) {
+    for (let i = 0; i < WW * WH / 45; i++) { // sparse fine flecks (no per-pixel noise)
       const h = hash(i * 31 + 7), x = h % WW, y = hy + 2 + (h >>> 8) % Math.max(1, WH - hy - 2), c = (h >>> 5) % 11;
-      if (c < 6) px(g, x, y, 1, 1, G(T.gr[3]));
-      else if (c < 8) { px(g, x, y, 1, 1, G(T.gr[2])); px(g, x + 1, y - 1, 1, 1, G(T.gr[2])); }
+      if (c < 6) px(g, x, y, FP, FP, G(T.gr[3]));
+      else if (c < 8) { px(g, x, y, FP, FP, G(T.gr[2])); px(g, x + FP, y - FP, FP, FP, G(T.gr[2])); }
       else if (c === 9) px(g, x, y, 1, 1, mix(T.dots[(h >>> 12) % T.dots.length], '#10102a', gk * 0.6));
     }
     groundDetail(g, T, hy, G);
@@ -2520,7 +2921,7 @@
     if (T.pines) { pine(g, 6, hy + 4, 18, ['#3f8a6a', '#2a6a52'], true); pine(g, 15, hy + 2, 12, ['#3f8a6a', '#2a6a52'], true); pine(g, WW - 7, hy + 5, 20, ['#3f8a6a', '#2a6a52'], true); pine(g, Math.round(WW * 0.46), hy + 1, 9, ['#4a9a78', '#2f7a5e'], true); }
     for (const [kind, fx0, flip] of T.props || []) {
       const c = safe(() => PX.prop(kind, T.theme || (night > 0.5 ? 'night' : 'day')), null); if (!c) continue;
-      const x = fx0 < 0 ? fx0 + c.width / 2 : fx0 > 1 ? WW - c.width / 2 + 4 : Math.round(WW * fx0 - (kind === 'rock' ? 0 : 10));
+      const cw = PX.artW(c), x = fx0 < 0 ? fx0 + cw / 2 : fx0 > 1 ? WW - cw / 2 + 4 : Math.round(WW * fx0 - (kind === 'rock' ? 0 : 10));
       const y = kind === 'shells' || kind === 'gumdrops' ? hy + 8 : kind === 'rock' ? hy + 10 : hy + 3;
       g.save(); if (night > 0.3 && T.theme !== 'night') g.filter = `brightness(${1 - night * 0.35})`; else if (V.area === 'volcano' || V.area === 'abyss') g.filter = 'brightness(0.6)';
       PX.blit(g, c, x, y, flip === 1); g.restore();
@@ -2529,37 +2930,38 @@
     for (const side of ['o', 'p']) {
       const s = spot(side), big = side === 'o' && V.boss, wild = side === 'o' && V.wild, rx = big ? 32 : wild ? 12 : side === 'o' ? 18 : 22, ry = big ? 6 : wild ? 3 : side === 'o' ? 4 : 5;
       ellipse(g, s.x, s.y - 1, rx, ry, G(T.pad[1]), G(T.pad[0]), G(T.pad[2]));
-      if (T.ground === 'tiles') { for (let a = 0; a < 6.28; a += 0.8) px(g, Math.round(s.x + Math.cos(a) * rx * 0.6), Math.round(s.y - 1 + Math.sin(a) * ry * 0.5), 1, 1, T.pad[2]); }
+      if (T.ground === 'tiles') { for (let a = 0; a < 6.28; a += 0.8) px(g, fround(s.x + 0.5 + Math.cos(a) * rx * 0.6), fround(s.y - 0.5 + Math.sin(a) * ry * 0.5), FP * 2, FP, T.pad[2]); }
     }
     if (night > 0.02 && T.theme !== 'night' && !T.fixed) { g.fillStyle = `rgba(20,18,64,${0.18 * night})`; g.fillRect(0, hy, WW, WH - hy); }
   }
+  // ground texture: grass blades, ferns, sand ripples... as 1-fine-pixel strokes
   function groundDetail(g, T, hy, G) {
     const n = Math.round(WW * (WH - hy) / 60);
     for (let i = 0; i < n; i++) {
       const h = hash(i * 131 + 17), x = h % WW, y = hy + 3 + (h >>> 9) % Math.max(1, WH - hy - 4), d = (y - hy) / (WH - hy), v = (h >>> 3) % 7;
       switch (T.ground) {
-        case 'grass': if (v < 3) { const c = G(T.gr[3]); px(g, x, y, 1, 1, c); px(g, x - 1, y - 1, 1, 1, c); px(g, x + 1, y - 1, 1, 1, c); if (d > 0.4) px(g, x, y - 2, 1, 1, c); } else if (v === 3) { px(g, x, y, 1, 1, G('#ffffff')); px(g, x, y - 1, 1, 1, G(T.dots[(h >>> 11) % 2])); } break;
-        case 'fern': if (v < 3) { const c = G(T.gr[3]); for (let j = 0; j < 3; j++) { px(g, x - j, y - j, 1, 1, c); px(g, x + j, y - j, 1, 1, c); } px(g, x, y - 3, 1, 1, c); } else if (v === 3) px(g, x, y, 3, 2, G('#8a6a40')); break;
-        case 'sand': if (v < 3) px(g, x, y, 3 + (h >>> 13) % 4, 1, G('#fff8e6')); else if (v === 3) { px(g, x, y, 2, 1, '#f7b6c8'); px(g, x, y + 1, 2, 1, '#e07ba0'); } break;
+        case 'grass': if (v < 3) { const c = G(T.gr[3]); px(g, x + FP, y - 1, FP, 1 + FP, c); px(g, x - FP, y - 1 + FP, FP, 1, c); px(g, x + 3 * FP, y - 1 + FP, FP, 1, c); if (d > 0.4) px(g, x + FP, y - 2, FP, 1, c); } else if (v === 3) { px(g, x + FP, y - 1 + FP, FP, 1, G(T.gr[3])); px(g, x, y - 1, 1, 1, G(T.dots[(h >>> 11) % 2])); px(g, x, y - 1, FP, FP, G('#ffffff')); } break;
+        case 'fern': if (v < 3) { const c = G(T.gr[3]); for (let j = 0; j < 3; j += FP) { px(g, x - j, y - j, FP, FP, c); px(g, x + FP + j, y - j, FP, FP, c); } px(g, x, y - 3, FP * 2, 3 + FP, c); } else if (v === 3) { px(g, x, y, 3, 2, G('#8a6a40')); px(g, x, y, 3, FP, G(mix('#8a6a40', '#ffffff', 0.25))); } break;
+        case 'sand': if (v < 3) px(g, x, y, 3 + (h >>> 13) % 4, FP, G('#fff8e6')); else if (v === 3) { discF(g, x, y, 0.6, '#f7b6c8'); px(g, x, y + 1 - FP, 2, FP, '#e07ba0'); } break;
         case 'glow': if (v === 0) { px(g, x, y, 1, 1, '#a6f2d3'); } break;
-        case 'candy': if (v < 2) px(g, x, y, 2, 1, ['#e5535f', '#639bff', '#99e550', '#fbf236'][(h >>> 12) % 4]); break;
-        case 'snow': if (v < 2) px(g, x, y, 3 + (h >>> 13) % 5, 1, '#dfe8fb'); else if (v === 2) { px(g, x, y, 1, 1, '#ffffff'); px(g, x - 1, y, 1, 1, '#cbdbfc'); px(g, x + 1, y, 1, 1, '#cbdbfc'); } break;
-        case 'cloud': if (v === 2) px(g, x, y, 4, 1, '#c8d8f4'); break;
-        case 'rock': if (v === 0) { const w = 3 + (h >>> 12) % 4; px(g, x - w, y, w * 2, 2, '#6e8ac8'); px(g, x - w + 1, y, 2, 1, '#9fb8e8'); } else if (v < 3) px(g, x, y, 2, 1, '#2a3044'); break;
-        case 'basalt': if (v < 2) { let cx = x, cy = y; for (let j = 0; j < 7; j++) { px(g, cx, cy, 1, 1, j % 3 ? T.lava[2] : T.lava[1]); cx += (hash(h + j) % 3) - 1; cy += (j % 2); } } else if (v === 2) px(g, x, y, 2, 1, '#221828'); break;
-        case 'redrock': if (v < 2) { let cx = x; for (let j = 0; j < 5; j++) { px(g, cx, y + (j % 2), 1, 1, '#8a4a2a'); cx++; } } else if (v === 2) px(g, x, y, 2, 2, '#f6d2ad'); break;
+        case 'candy': if (v < 2) { const c = ['#e5535f', '#639bff', '#99e550', '#fbf236'][(h >>> 12) % 4]; px(g, x, y, 2, 1, c); px(g, x, y, 2, FP, mix(c, '#ffffff', 0.5)); } break;
+        case 'snow': if (v < 2) px(g, x, y, 3 + (h >>> 13) % 5, FP, '#dfe8fb'); else if (v === 2) { px(g, x, y, 1, 1, '#ffffff'); px(g, x - FP, y, FP, FP, '#cbdbfc'); px(g, x + 1, y, FP, FP, '#cbdbfc'); } break;
+        case 'cloud': if (v === 2) px(g, x, y, 4, FP, '#c8d8f4'); break;
+        case 'rock': if (v === 0) { const w = 3 + (h >>> 12) % 4; px(g, x - w, y, w * 2, 2, '#6e8ac8'); px(g, x - w + FP, y, 2, FP, '#9fb8e8'); px(g, x - w, y + 2 - FP, w * 2, FP, '#2a3044'); } else if (v < 3) px(g, x, y, 2, FP, '#2a3044'); break;
+        case 'basalt': if (v < 2) { let cx = x, cy = y; for (let j = 0; j < 7; j++) { px(g, cx, cy, FP * 2, FP, j % 3 ? T.lava[2] : T.lava[1]); px(g, cx, cy + FP, FP * 2, FP, j % 3 ? T.lava[2] : T.lava[1]); cx += ((hash(h + j) % 3) - 1) * FP * 2; cy += (j % 2); } } else if (v === 2) px(g, x, y, 2, FP, '#221828'); break;
+        case 'redrock': if (v < 2) { for (let j = 0; j < 5; j += FP) px(g, x + j, y + fround(Math.sin(j * 1.6) * 0.5) + FP, FP, FP, '#8a4a2a'); } else if (v === 2) { px(g, x, y, 2, 2, '#f6d2ad'); px(g, x, y + 2 - FP, 2, FP, '#e0a672'); } break;
       }
     }
     if (T.ground === 'cloud') { // rows of puffy cloud tops, bigger nearer the front
       for (let row = 0, y = hy + 5; y < WH + 6; row++, y += 7 + row * 3) {
         const r = 3 + row, step = r * 2 + 3;
-        for (let x = (row % 2) * Math.round(step / 2) - r; x < WW + r; x += step) { disc(g, x + 1, y + 1, r, '#c8d8f4'); disc(g, x, y, r, '#ffffff'); disc(g, x - 1, y - Math.ceil(r / 2), Math.max(1, r - 2), '#ffffff'); }
+        for (let x = (row % 2) * Math.round(step / 2) - r; x < WW + r; x += step) { discF(g, x + 1, y + 1, r, '#c8d8f4'); discF(g, x, y, r, '#ffffff'); discF(g, x - 1, y - Math.ceil(r / 2), Math.max(1, r - 2), '#ffffff'); }
       }
     }
-    if (T.ground === 'tiles') {
+    if (T.ground === 'tiles') { // perspective tile lines, one fine pixel wide
       const vx = WW / 2, vy = hy - 60, c = T.gr[3];
-      for (let i = 1; i < 9; i++) { const y = Math.round(hy + (WH - hy) * Math.pow(i / 9, 1.5)); px(g, 0, y, WW, 1, c); }
-      for (let i = -8; i <= 8; i++) { const bx = vx + i * 22; for (let y = hy + 1; y < WH; y++) { const t = (y - vy) / (WH - vy); px(g, Math.round(vx + (bx - vx) * t), y, 1, 1, c); } }
+      for (let i = 1; i < 9; i++) { const y = fround(hy + (WH - hy) * Math.pow(i / 9, 1.5)); px(g, 0, y, WW, FP, c); }
+      for (let i = -8; i <= 8; i++) { const bx = vx + i * 22; for (let y = hy + FP; y < WH; y += FP) { const t = (y - vy) / (WH - vy); px(g, fround(vx + (bx - vx) * t), y, FP, FP, c); } }
     }
   }
 
@@ -2567,25 +2969,74 @@
   function whiteOf(c) {
     let w = tintCache.get(c); if (w) return w;
     w = document.createElement('canvas'); w.width = c.width; w.height = c.height; const x = w.getContext('2d');
-    x.drawImage(c, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#ffffff'; x.fillRect(0, 0, w.width, w.height);
-    tintCache.set(c, w); return w;
+    x.drawImage(c, 0, 0, c.width, c.height); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#ffffff'; x.fillRect(0, 0, w.width, w.height);
+    PX.keepK(c, w); tintCache.set(c, w); return w;
   }
   // big boss sprite (whole-pixel scaled) and its glowing charge aura
+  // A boss is a critter shown S times bigger. Plain nearest-neighbour scaling would make its pixels and its outline S times
+  // chunkier than the Sprout beside it (plan §0, rule #1). So the fine bitmap is enlarged with Scale2x / Scale3x (smooth
+  // diagonals, no new colours), then every ink line is thinned back: the outer ring to 2 fine pixels (1 art pixel, like a
+  // Sprout's), inner lines to 1 fine pixel. Small ink blobs (eyes, mouths) keep their size: only long lines are thinned.
+  function scaleNx(src, w, h, S) {
+    const W = w * S, out = new Uint32Array(W * h * S), at = (x, y) => src[(y < 0 ? 0 : y >= h ? h - 1 : y) * w + (x < 0 ? 0 : x >= w ? w - 1 : x)];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const E = at(x, y), B = at(x, y - 1), D = at(x - 1, y), F = at(x + 1, y), H = at(x, y + 1), o = y * S * W + x * S;
+      if (S === 2) {
+        const sw = B !== H && D !== F;
+        out[o] = sw && D === B ? D : E; out[o + 1] = sw && B === F ? F : E; out[o + W] = sw && D === H ? D : E; out[o + W + 1] = sw && H === F ? F : E;
+      } else { // Scale3x
+        const A = at(x - 1, y - 1), C = at(x + 1, y - 1), G = at(x - 1, y + 1), I = at(x + 1, y + 1), sw = B !== H && D !== F;
+        const e = sw ? [D === B ? D : E, (D === B && E !== C) || (B === F && E !== A) ? B : E, B === F ? F : E,
+          (D === B && E !== G) || (D === H && E !== A) ? D : E, E, (B === F && E !== I) || (H === F && E !== C) ? F : E,
+          D === H ? D : E, (D === H && E !== I) || (H === F && E !== G) ? H : E, H === F ? F : E] : [E, E, E, E, E, E, E, E, E];
+        for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) out[o + j * W + i] = e[j * 3 + i];
+      }
+    }
+    return out;
+  }
+  function thinInk(px, W, H, ink, S) {
+    const isInk = v => v === ink, solid = v => (v >>> 24) > 200 && v !== ink, minLen = 4 * S; // (only lines at least 2 art px long)
+    const run = (x, y, dx, dy, max) => { let n = 0; while (n < max && x >= 0 && y >= 0 && x < W && y < H && isInk(px[y * W + x])) { n++; x += dx; y += dy; } return n; };
+    for (let pass = 0; pass < 2 * S; pass++) {
+      const todo = [];
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        if (!isInk(px[y * W + x])) continue;
+        for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+          const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const c = px[ny * W + nx]; if (!solid(c)) continue;
+          const L = run(x, y, -dx, -dy, 2 * S + 2), ex = x - dx * L, ey = y - dy * L, end = ex < 0 || ey < 0 || ex >= W || ey >= H ? 0 : px[ey * W + ex], outer = (end >>> 24) < 40;
+          const along = run(x, y, dy, dx, minLen) + run(x, y, -dy, -dx, minLen) - 1; if (along < minLen) continue; // a blob, not a line
+          if (outer ? L > 2 : L > 2 || (L === 2 && (dx < 0 || dy < 0))) { todo.push(y * W + x, c); break; }
+        }
+      }
+      if (!todo.length) break;
+      for (let i = 0; i < todo.length; i += 2) px[todo[i]] = todo[i + 1];
+    }
+  }
+  function upscaleArt(c, S) {
+    const w = c.width, h = c.height, x0 = c.getContext('2d'), src = new Uint32Array(x0.getImageData(0, 0, w, h).data.buffer.slice(0));
+    const o = document.createElement('canvas'); o.width = w * S; o.height = h * S; const x = o.getContext('2d');
+    const out = scaleNx(src, w, h, S), probe = new Uint32Array(new Uint8ClampedArray([0x22, 0x20, 0x34, 255]).buffer)[0]; // INK as a pixel word
+    thinInk(out, w * S, h * S, probe, S);
+    const img = x.createImageData(w * S, h * S); img.data.set(new Uint8ClampedArray(out.buffer)); x.putImageData(img, 0, 0);
+    return o;
+  }
   const bigCache = {};
   function bigCritter(id, S, f) {
     const key = id + S + ':' + (f || 0); if (bigCache[key]) return bigCache[key];
-    const c = PX.critter(id, f || 0), o = document.createElement('canvas'); o.width = c.width * S; o.height = c.height * S;
-    const x = o.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(c, 0, 0, o.width, o.height);
-    return (bigCache[key] = o);
+    const c = PX.critter(id, f || 0); let o = null;
+    if ((S === 2 || S === 3) && c.k) o = safe(() => upscaleArt(c, S), null); // fine lines at boss size
+    if (!o) { o = document.createElement('canvas'); o.width = c.width * S; o.height = c.height * S; const x = o.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(c, 0, 0, o.width, o.height); }
+    return (bigCache[key] = PX.keepK(c, o)); // (S x the art size: PX.artW = artW(critter) * S)
   }
   const auraCache = {};
   function auraOf(c, col, key) {
     if (auraCache[key]) return auraCache[key];
-    const o = document.createElement('canvas'); o.width = c.width + 6; o.height = c.height + 6; const x = o.getContext('2d');
-    const w = whiteOf(c); for (const [dx, dy] of [[0, 3], [6, 3], [3, 0], [3, 6], [1, 1], [5, 1], [1, 5], [5, 5]]) x.drawImage(w, dx, dy);
+    const k = c.k || 1, o = document.createElement('canvas'); o.width = c.width + 6 * k; o.height = c.height + 6 * k; const x = o.getContext('2d'); // (3 art px all round)
+    const w = whiteOf(c); for (const [dx, dy] of [[0, 3], [6, 3], [3, 0], [3, 6], [1, 1], [5, 1], [1, 5], [5, 5]]) x.drawImage(w, dx * k, dy * k, w.width, w.height);
     x.globalCompositeOperation = 'source-in'; x.fillStyle = col; x.fillRect(0, 0, o.width, o.height);
-    x.globalCompositeOperation = 'destination-out'; x.drawImage(c, 3, 3);
-    return (auraCache[key] = o);
+    x.globalCompositeOperation = 'destination-out'; x.drawImage(c, 3 * k, 3 * k, c.width, c.height);
+    return (auraCache[key] = PX.keepK(c, o));
   }
   function poseFor(side) {
     const A = V.a[side], f = V.b[side], d = V.disp[side];
@@ -2607,10 +3058,11 @@
   const live = () => V && (V.phase === 'choose' || V.phase === 'play' || V.phase === 'intro' || V.phase === 'pass');
   function drawFighter(side) {
     const f = V.b[side], A = V.a[side], sp = spot(side), dir = side === 'p' ? 1 : -1, boss = side === 'o' && V.boss, crit = side === 'o' && !!f.critter;
+    if (A.hide) return; // (not sent out yet)
     let spr, ax, ay, flip;
     const pf = crit && !boss && D.ANIMALS[f.critter] && D.ANIMALS[f.critter].kind === 'plant' && !A.fainting ? [0, 1, 0, 1, 0, 2][Math.floor(V.t * 3) % 6] : 0; // living plants sway and blink
-    if (crit) { spr = safe(() => bigCritter(f.critter, critScale(), pf), null); if (!spr) return; ax = Math.floor(spr.width / 2); ay = spr.height; flip = true; }
-    else { if (!f.look) return; spr = sprigFor(side); if (!spr) return; ax = PX.SPRIG_AX || 16; ay = spr.height - 1; flip = side === 'p'; }
+    if (crit) { spr = safe(() => bigCritter(f.critter, critScale(), pf), null); if (!spr) return; ax = Math.floor(PX.artW(spr) / 2); ay = PX.artH(spr); flip = true; }
+    else { if (!f.look) return; spr = sprigFor(side); if (!spr) return; ax = PX.SPRIG_AX || 16; ay = PX.artH(spr) - 1; flip = side === 'p'; }
     let x = sp.x, y = sp.y;
     const bob = V.phase !== 'end' && !A.fainting && Math.floor(V.t * (boss ? 1.3 : 2) + (side === 'o' ? 1 : 0)) % 2 ? -1 : 0;
     y += bob;
@@ -2627,9 +3079,9 @@
     if (A.fainting) { alpha = 1 - ease(A.fainting); y += Math.round(ease(A.fainting) * (boss ? 14 : 7)); }
     if (alpha <= 0.02) return;
     // shadow
-    const sw = crit ? spr.width * 0.36 : 9;
+    const sw = crit ? PX.artW(spr) * 0.36 : 9;
     const sh = A.fainting ? 0 : clamp(Math.round((sp.y - y) / (boss ? 6 : 1)), 0, 8);
-    lx.fillStyle = 'rgba(34,32,52,.25)'; lx.fillRect(Math.round(x - sw + sh), sp.y - 1, Math.round(sw * 2 + 1 - sh * 2), 2);
+    { const x0 = Math.round(x - sw + sh), w0 = Math.round(sw * 2 + 1 - sh * 2); lx.fillStyle = 'rgba(34,32,52,.25)'; lx.fillRect(x0, sp.y - 1 + FP, w0, 2 - 2 * FP); if (w0 > 2) { lx.fillRect(x0 + FP, sp.y - 1, w0 - 2 * FP, FP); lx.fillRect(x0 + FP, sp.y + 1 - FP, w0 - 2 * FP, FP); } } // (fine rounded ends)
     lx.globalAlpha = alpha;
     // glowing aura while a boss charges its giant attack
     if (boss && V.disp.o.charging && !A.fainting && live()) {
@@ -2640,7 +3092,7 @@
     if (A.flash > 0 && Math.floor(A.flash * 30) % 2 === 0) PX.blit(lx, whiteOf(spr), x, y, flip, ax, ay);
     lx.globalAlpha = 1;
     const em = A.emote || (V.disp[side].status === 'sleep' ? 'zz' : V.disp[side].stun ? 'swirl' : null);
-    if (em && !A.fainting) { const e = safe(() => PX.emote(em), null); if (e) PX.blit(lx, e, x + (crit ? -Math.round(spr.width * 0.3) : 7), y - (crit ? spr.height - 4 : 26) - (Math.floor(V.t * 3) % 2), false, 0, e.height); }
+    if (em && !A.fainting) { const e = safe(() => PX.emote(em), null); if (e) PX.blit(lx, e, x + (crit ? -Math.round(PX.artW(spr) * 0.3) : 7), y - (crit ? PX.artH(spr) - 4 : 26) - (Math.floor(V.t * 3) % 2), false, 0, PX.artH(e)); }
   }
   function drawCrowd() {
     for (const c of V.crowd) {
@@ -2653,42 +3105,44 @@
     if (r.t < 0) return;
     const k = r.t / r.life, rad = 2 + ease(k) * r.r;
     lx.globalAlpha = 1 - k; lx.fillStyle = r.color;
-    const n = Math.max(12, Math.round(rad * 3));
-    for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; lx.fillRect(Math.round(r.x + Math.cos(a) * rad), Math.round(r.y + Math.sin(a) * rad * 0.7), 1, 1); }
+    const n = Math.max(24, Math.round(rad * 6 * KS / 2)); // a ring of fine dots
+    for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; lx.fillRect(fround(r.x + 0.5 + Math.cos(a) * rad), fround(r.y + 0.5 + Math.sin(a) * rad * 0.7), FP, FP); }
     lx.globalAlpha = 1;
   }
   function drawBeam(bm) {
     const k = bm.t / bm.life, grow = clamp(k * 4, 0, 1), fade = k > 0.6 ? 1 - (k - 0.6) / 0.4 : 1;
-    const ex = lerp(bm.ax, bm.bx, grow), ey = lerp(bm.ay, bm.by, grow), len = Math.hypot(ex - bm.ax, ey - bm.ay), n = Math.ceil(len);
+    const ex = lerp(bm.ax, bm.bx, grow), ey = lerp(bm.ay, bm.by, grow), len = Math.hypot(ex - bm.ax, ey - bm.ay), n = Math.ceil(len * KS);
     lx.globalAlpha = fade;
-    for (let i = 0; i <= n; i++) {
-      const t = i / Math.max(1, n), x = Math.round(lerp(bm.ax, ex, t)), y = Math.round(lerp(bm.ay, ey, t)), w = bm.w + (Math.floor(V.t * 30 + i) % 3 === 0 ? 1 : 0);
-      lx.fillStyle = bm.c[2]; lx.fillRect(x, y - w, 1, w * 2 + 1);
-      lx.fillStyle = bm.c[1]; lx.fillRect(x, y - w + 1, 1, Math.max(1, w * 2 - 1));
-      lx.fillStyle = bm.c[0]; lx.fillRect(x, y - Math.floor(w / 2), 1, Math.max(1, w));
+    for (let i = 0; i <= n; i++) { // fine columns: the beam's edges step one fine pixel at a time
+      const t = i / Math.max(1, n), x = fround(lerp(bm.ax, ex, t)), y = fround(lerp(bm.ay, ey, t)), w = bm.w + (Math.floor(V.t * 30 + i / KS) % 3 === 0 ? 1 : 0);
+      lx.fillStyle = bm.c[2]; lx.fillRect(x, y - w, FP, w * 2 + 1);
+      lx.fillStyle = bm.c[1]; lx.fillRect(x, y - w + FP * 2, FP, Math.max(1, w * 2 + 1 - FP * 4));
+      lx.fillStyle = bm.c[0]; lx.fillRect(x, y - Math.floor(w / 2), FP, Math.max(1, w));
     }
     lx.globalAlpha = 1;
   }
   function drawBolt(b) {
     let x = b.x, y = 0; const r = srng(b.seed), hy = HY();
     lx.globalAlpha = 1 - b.t / 0.35; lx.fillStyle = '#ffffff';
-    while (y < hy - 6) { const nx = x + Math.round((r() - 0.5) * 6), ny = y + 3 + Math.round(r() * 3); for (let i = 0; i <= ny - y; i++) lx.fillRect(Math.round(lerp(x, nx, i / (ny - y))), y + i, 1, 1); x = nx; y = ny; }
+    while (y < hy - 6) { const nx = x + Math.round((r() - 0.5) * 6), ny = y + 3 + Math.round(r() * 3); for (let i = 0; i <= ny - y; i += FP) lx.fillRect(fround(lerp(x, nx, i / (ny - y))), y + i, FP * 2, FP); x = nx; y = ny; } // fine steps
     lx.globalAlpha = 1;
   }
+  function artAt(c, x, y) { lx.drawImage(c, x, y, PX.artW(c), PX.artH(c)); } // (a hi-res sprite at its art size)
   function render() {
     if (!cssW) return;
     const night = safe(() => PS.clock.night(), 0), T = THEMES[V.area] || THEMES.meadow;
     // (the area only changes in launch(), which resets bgKey)
     const key = (T.fixed ? 0 : Math.round(night * 30)) + (V.boss ? 40 : 0) + (V.wild ? V.wild.step + 1 : 0) * 100 + WW * 1e3 + WH * 1e6;
     if (key !== bgKey) { bgKey = key; drawBg(night); }
+    lx.setTransform(KS, 0, 0, KS, 0, 0); lx.imageSmoothingEnabled = false;
     lx.clearRect(0, 0, WW, WH);
-    lx.drawImage(bgC, 0, 0);
+    lx.drawImage(bgC, 0, 0, WW, WH);
     const nk = T.fixed ? 0 : night;
-    if (T.clouds && nk < 0.8) { lx.globalAlpha = 1 - nk * 0.7; for (const c of V.clouds) lx.drawImage(icons().clouds[c.k], Math.round(c.x), Math.round(c.y)); lx.globalAlpha = 1; }
-    if (T.darkClouds) for (const c of V.clouds) lx.drawImage(icons().darkclouds[c.k], Math.round(c.x), Math.round(c.y * 0.6));
-    if (T.stars) for (let i = 0; i < 6; i++) { const h = hash(i * 97 + 1), on = Math.floor(V.t * 1.5 + i) % 3 === 0; if (on) px(lx, h % WW, (h >>> 7) % Math.max(1, HY() - 8), 1, 1, '#ffffff'); }
+    if (T.clouds && nk < 0.8) { lx.globalAlpha = 1 - nk * 0.7; for (const c of V.clouds) artAt(icons().clouds[c.k], Math.round(c.x), Math.round(c.y)); lx.globalAlpha = 1; }
+    if (T.darkClouds) for (const c of V.clouds) artAt(icons().darkclouds[c.k], Math.round(c.x), Math.round(c.y * 0.6));
+    if (T.stars) for (let i = 0; i < 6; i++) { const h = hash(i * 97 + 1), on = Math.floor(V.t * 1.5 + i) % 3 === 0; if (on) { const x = h % WW, y = (h >>> 7) % Math.max(1, HY() - 8); px(lx, x, y, 1, 1, '#ffffff'); px(lx, x - FP * 2, y + FP, FP * 2, FP, '#cbdbfc'); px(lx, x + 1, y + FP, FP * 2, FP, '#cbdbfc'); } } // twinkles with fine arms
     if (V.bolt) drawBolt(V.bolt);
-    if (T.torches && V.torches) for (const t of V.torches) { const f = Math.floor(V.t * 10 + t.x) % 3; px(lx, t.x - 1, t.y + 2, 3, 3, '#8f563b'); px(lx, t.x - 1, t.y - 1 - (f === 1 ? 1 : 0), 3, 3, '#df5a26'); px(lx, t.x, t.y - 2 - f % 2, 1, 3, '#fbf236'); if (f === 2) px(lx, t.x + (f - 1), t.y - 4, 1, 1, '#ff9a3a'); }
+    if (T.torches && V.torches) for (const t of V.torches) { const f = Math.floor(V.t * 10 + t.x) % 3; px(lx, t.x - 1, t.y + 2, 3, 3, '#8f563b'); px(lx, t.x - 1, t.y + 2, FP, 3, '#b8743a'); discF(lx, t.x, t.y - (f === 1 ? 1 : 0), 1, '#df5a26'); px(lx, t.x, t.y - 2 - f % 2, 1, 3, '#fbf236'); px(lx, t.x, t.y - 2 - f % 2, FP, FP, '#ffffff'); if (f === 2) px(lx, t.x + (f - 1), t.y - 4, FP, FP, '#ff9a3a'); } // soft round flames
     drawCrowd();
     drawFighter('o'); drawFighter('p');
     for (const bm of V.beams) drawBeam(bm);
@@ -2696,13 +3150,13 @@
       if (p.delay > 0 || !p.spr) continue;
       if (p.blink && ((V.t * 18 + p.blink) | 0) % 3 === 0) continue; // embers flicker, sparkles twinkle
       lx.globalAlpha = clamp(p.life * 3, 0, 1);
-      lx.drawImage(p.spr, Math.round(p.x - p.spr.width / 2), Math.round(p.y - p.spr.height / 2));
+      const w = PX.artW(p.spr), h = PX.artH(p.spr); lx.drawImage(p.spr, Math.round(p.x - w / 2), Math.round(p.y - h / 2), w, h);
     }
     lx.globalAlpha = 1;
     for (const r of V.rings) drawRing(r);
     for (const p of V.amb) {
       if (p.blink && Math.floor(V.t * 3 + p.x) % 3 === 0) continue;
-      lx.globalAlpha = p.alpha || (p.fade ? clamp(p.life / 3, 0, 1) : 1); lx.fillStyle = p.c; lx.fillRect(Math.round(p.x), Math.round(p.y), p.w, p.h);
+      lx.globalAlpha = p.alpha || (p.fade ? clamp(p.life / 3, 0, 1) : 1); lx.fillStyle = p.c; lx.fillRect(fround(p.x), fround(p.y), p.w, p.h); // (on the fine grid: smooth drift)
     }
     lx.globalAlpha = 1;
     if (V.flashT > 0) { lx.globalAlpha = clamp(V.flashT / (V.flashL || 0.3), 0, 1) * (V.flashA || 0.7); lx.fillStyle = V.flashC; lx.fillRect(0, 0, WW, WH); lx.globalAlpha = 1; }
@@ -2712,12 +3166,12 @@
     if (V.quake > 0) { const a = Math.max(1, Math.round(V.quakeA * Math.min(1, V.quake * 2))); qx = Math.round((Math.random() * 2 - 1) * a); qy = Math.round((Math.random() * 2 - 1) * a); }
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = INK; ctx.fillRect(0, 0, cv.width, cv.height);
-    const sc = SC; // whole-pixel scale: shaking shifts the picture and repeats its edge row/column into the gap (never stretches it)
+    const sc = SC, K = KS; // whole-pixel scale: shaking shifts the picture and repeats its edge row/column into the gap (never stretches it); lo is K px per world px
     ctx.drawImage(lo, qx * sc, qy * sc, WW * sc, WH * sc);
-    if (qx > 0) ctx.drawImage(lo, 0, 0, 1, WH, 0, qy * sc, qx * sc, WH * sc);
-    if (qx < 0) ctx.drawImage(lo, WW - 1, 0, 1, WH, (WW + qx) * sc, qy * sc, -qx * sc, WH * sc);
-    if (qy > 0) ctx.drawImage(lo, 0, 0, WW, 1, qx * sc, 0, WW * sc, qy * sc);
-    if (qy < 0) ctx.drawImage(lo, 0, WH - 1, WW, 1, qx * sc, (WH + qy) * sc, WW * sc, -qy * sc);
+    if (qx > 0) ctx.drawImage(lo, 0, 0, K, WH * K, 0, qy * sc, qx * sc, WH * sc);
+    if (qx < 0) ctx.drawImage(lo, (WW - 1) * K, 0, K, WH * K, (WW + qx) * sc, qy * sc, -qx * sc, WH * sc);
+    if (qy > 0) ctx.drawImage(lo, 0, 0, WW * K, K, qx * sc, 0, WW * sc, qy * sc);
+    if (qy < 0) ctx.drawImage(lo, 0, (WH - 1) * K, WW * K, K, qx * sc, (WH + qy) * sc, WW * sc, -qy * sc);
     // crisp text layer
     ctx.setTransform(dpr, 0, 0, dpr, qx * SC, qy * SC);
     for (const p of V.pops) {
@@ -2775,8 +3229,27 @@
     }
   }
 
+  // ---------------- for other screens ----------------
+  // trophies(): [{ id, name, by, kind:'league'|'legend'|'tower', got, at, isNew }]: leagues, then Legends, then Tower floors (art: PX.trophy(id)).
+  // nextChallenge(): { label, kind, go() } for the next thing to beat (the next league opponent, then a Legend, then a Tower floor), or null.
+  function nextChallenge() {
+    if (!partner()) return null;
+    const nx = nextOf(D.LEAGUES);
+    if (nx) { const npc = leagueNPC(nx.L.id, nx.i); return { label: `Beat ${npc.name}`, kind: 'league', league: nx.L.id, index: nx.i, go: () => openChallenge('leagues', () => preview(nx.L, nx.i)) }; }
+    const B = BOSSES.find(x => bossUnlocked(x) && !bossRec(x.id).wins);
+    if (B) return { label: `Beat the ${B.name}`, kind: 'legend', boss: B.id, go: () => openChallenge('legends', () => previewBoss(B)) };
+    if (towerUnlocked() && !towerRun()) { const f = TOWER_TROPHIES.find(n => (extra().tower.best || 0) < n); if (f) return { label: `Tower Floor ${f}`, kind: 'tower', floor: f, go: () => openChallenge('tower', () => previewTower()) }; }
+    return null;
+  }
+  // open the Battle screen on a tab, then show a pre-battle card
+  function openChallenge(tab, fn) {
+    hubTab = tab;
+    if (!(hubEl && !hubEl.hidden && fightEl.hidden)) safe(() => PS.ui.go('battle'));
+    setTimeout(() => { if (!V && !wipeBusy && hubEl && !hubEl.hidden) { renderHub(); safe(fn); } }, 0);
+  }
+  PS.battle = Object.assign(PS.battle || {}, { trophies: () => safe(trophyList, []), nextChallenge: () => safe(nextChallenge, null) });
   PS.scenes.battle = { mount, show, hide, frame };
-  Object.assign(window.__battle, { start: startBattle, startWild, startBoss, startTowerFloor, towerBegin, towerEnd, startFriend, renderHub, forfeit, extra, choose,
+  Object.assign(window.__battle, { trophies: trophyList, nextChallenge, kitShow, start: startBattle, startWild, startBoss, startTowerFloor, towerBegin, towerEnd, startFriend, renderHub, forfeit, extra, choose,
     tab: t => { hubTab = t; renderHub(); } });
   Object.defineProperty(window.__battle, 'V', { get: () => V });
 })();
