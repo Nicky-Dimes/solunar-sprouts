@@ -71,78 +71,100 @@
   // groups: [u, v, [[kind, dx, dy], ...]] little scenes (offsets in world px); sprinkle: [kind, weight] for the seeded scatter
   // that fills the rest (it never covers the house, trees, ponds, paths, the nest or another prop). Night is an overlay colour
   // (rgb + max alpha).
-  // mount/far/near: distant scenery layers. grass: 4 ground tones (light..dark) for the dithered lawn. deco: which ground details to scatter.
+  // mount/far/near: distant scenery layers. grass: 4 ground tones (light..dark) for the lawn's soft patches. deco: which ground
+  // details to scatter. Restyled Nov 2026 after the family's mockups (pocket-sprout/_ai/garden-mockups.webp): brighter, more
+  // saturated ground, water and sky, and a fuller garden. dens: lawn px² per scattered prop (smaller = fuller); flowers: [petal,
+  // middle] colours of the painted flower clusters; pathStyle: 'sand' (a wide sandy path) or 'dots' (a dotted trail, pathGap px
+  // apart); sandW: the shore's sand width [back, front] in world px; shadowC: the colour painted under the scenery.
   const TH = {
     meadow: {
-      sky: ['#6cc3f2', '#86cff5', '#a4dcf8', '#c4e9fb'], skyN: ['#1a1d48', '#222a5a', '#2c366c', '#3a4580'],
-      mount: ['#d4ece6', '#b4d9d2', '#94c0bc'], snow: '#f8fdff', mountAmp: 22, mountShape: 'peak',
-      far: ['#a6d98b', '#7fbf6a'], farDots: ['#79bd66', '#9ad283', '#62a456'], near: ['#8fd07a', '#66b35a'], nearDots: ['#5ea94f', '#80c56b'],
-      lawn: ['#8fd46a', '#62a855'], grass: ['#a2de76', '#8fd46a', '#83ca61', '#76bd58'], blade: '#5aa846', bladeHi: '#b8ec8c', shade: '#6cb050',
-      dots: ['#ffffff', '#fbf236', '#f7b6c8', '#c9a2f0'], dotC: '#df7126', sand: '#efe0b4', wet: '#d9c38e', sandEdge: '#c9b27a',
-      water: ['#9fe6f7', '#5fcde4', '#3f9fd0', '#2f7fb8'], foam: '#ffffff', hl: '#d6f5fd', cloud: ['#ffffff', '#dfeafc', '#bccdf0'],
-      path: ['#f2e9cf', '#e2d3ae', '#c4ae86'], night: [20, 18, 64, 0.36], dim: 0, tree: 'bigtree', house: true, deco: 'meadow', fish: '32,70,120',
+      sky: ['#1c9ff5', '#3cb3f7', '#66c7f9', '#9edcfb'], skyN: ['#1a1d48', '#222a5a', '#2c366c', '#3a4580'],
+      mount: ['#c4eaf8', '#96d2ee', '#6cb4dc'], snow: '#ffffff', mountAmp: 22, mountShape: 'peak',
+      far: ['#7ccd40', '#4fa82c'], farDots: ['#3f9a26', '#66c43a', '#2c7c1e'], near: ['#8ed83a', '#5fb024'], nearDots: ['#479c22', '#7fd040'],
+      lawn: ['#9ee034', '#5ca61a'], grass: ['#a8e63e', '#98dc2a', '#8ad21e', '#7cc418'], blade: '#5ea818', bladeHi: '#c8f25a', shade: '#5fae18', patch: 1.6,
+      dots: ['#ffffff', '#ffe23a', '#ff9ec8', '#c49cf4'], dotC: '#f6a21a', sand: '#f9e490', wet: '#ecca72', sandEdge: '#d6ae58',
+      water: ['#6af0fb', '#26d2f6', '#0aa6ee', '#0a84e0'], foam: '#ffffff', hl: '#d8fbff', cloud: ['#ffffff', '#e2f0fe', '#bcd8f4'],
+      path: ['#fff6c8', '#f4df98', '#d9b568'], pathStyle: 'sand', sandW: [8, 15], shadowC: '#3d8c12', singles: [0, 0, 1, 0, 2, 0, 3, 1],
+      flowers: [['#ffffff', '#ffc21e'], ['#ffe23a', '#f08a1a'], ['#ff9ec8', '#ffe23a'], ['#c49cf4', '#fff27a'], ['#8cc4ff', '#ffffff'], ['#ff6a6a', '#ffe23a']],
+      night: [20, 18, 64, 0.36], dim: 0, tree: 'bigtree', house: true, deco: 'meadow', fish: '32,70,120', dens: 3100,
       tree0: [0.2, 0.1], home: ['shroomhouse', 0.5, 0.44], nest: [0.68, 0.53],
       fruitTrees: [['tree', 0.86, 0.2], ['tree', 0.07, 0.52], ['tree', 0.3, 0.72], ['tree', 0.8, 0.9]],
-      ponds: [[0.2, 0.9, 25, 9]], paths: [['tree', 'dock', 0.18], ['tree', 'home', -0.24], ['home', 'pond', 0.2]],
-      props: [['bush', 0.47, 0.0], ['fence', 0.33, 0.01], ['fence', 0.62, 0.0], ['rock', 0.22, 0.34], ['stump', 0.13, 0.38], ['bench', 0.3, 0.56],
-        ['mushrooms', 0.6, 0.64], ['bush', 0.5, 0.97], ['rock', 0.04, 0.68], ['flowerbed', 0.08, 0.96], ['lamp', 0.4, 0.47], ['bush', 0.96, 0.44]],
-      groups: [[0.74, 0.35, [['flowerbed', -15, 0], ['flowerbed', 11, 3], ['bench', -2, -10]]], [0.44, 0.84, [['bench', 0, 0], ['lamp', 13, -1]]],
-        [0.09, 0.22, [['stump', 0, 0], ['mushrooms', 10, 4], ['mushrooms', -9, 5]]], [0.92, 0.66, [['rock', 0, 0], ['rock', 10, 4], ['bush', -11, 3]]],
-        [0.6, 0.8, [['tree', 0, 0], ['bush', 15, 5], ['flowerbed', -15, 6]]], [0.36, 0.2, [['bush', 0, 0], ['flowerbed', 15, 3]]]],
-      sprinkle: [['bush', 3], ['rock', 2], ['flowerbed', 2], ['mushrooms', 1], ['stump', 1], ['tree', 1]],
+      ponds: [[0.2, 0.9, 25, 11]], paths: [['tree', 'dock', 0.18], ['tree', 'home', -0.24], ['home', 'pond', 0.2]],
+      props: [['bench', 0.34, 0.27], ['bench', 0.66, 0.26], ['bench', 0.27, 0.58], ['bench', 0.7, 0.75], ['bench', 0.47, 0.93], ['lamp', 0.4, 0.47],
+        ['lamp', 0.58, 0.3], ['lamp', 0.22, 0.8], ['stump', 0.13, 0.38], ['stump', 0.9, 0.83], ['rock', 0.22, 0.34], ['rock', 0.04, 0.68], ['rock', 0.55, 0.63],
+        ['rock', 0.93, 0.36], ['rock', 0.46, 0.05], ['rock', 0.72, 0.1], ['rock', 0.37, 0.7], ['rock', 0.12, 0.97], ['rock', 0.82, 0.98],
+        ['tree', 0.5, 0.16], ['tree', 0.04, 0.1], ['bigtree', 0.95, 0.03], ['tree', 0.4, 0.37], ['tree', 0.16, 0.63], ['tree', 0.62, 0.87], ['bigtree', 0.93, 0.58],
+        ['bush', 0.47, 0.0], ['bush', 0.5, 0.97], ['bush', 0.96, 0.44], ['flowerbed', 0.08, 0.96], ['mushrooms', 0.6, 0.64]],
+      groups: [[0.74, 0.35, [['bench', -2, -10], ['bush', 14, 2], ['rock', -16, 4]]], [0.44, 0.84, [['bench', 0, 0], ['lamp', 13, -1]]],
+        [0.09, 0.22, [['stump', 0, 0], ['mushrooms', 10, 4], ['rock', -10, 5]]], [0.92, 0.66, [['rock', 0, 0], ['rock', 10, 4], ['bush', -11, 3]]],
+        [0.6, 0.8, [['tree', 0, 0], ['bush', 15, 5], ['rock', -15, 6]]], [0.36, 0.2, [['bush', 0, 0], ['flowerbed', 15, 3]]],
+        [0.12, 0.74, [['tree', 0, 0], ['tree', 20, 7]]], [0.84, 0.48, [['bigtree', 0, 0], ['rock', 18, 4]]]],
+      sprinkle: [['tree', 7], ['rock', 5], ['bigtree', 2], ['bench', 2], ['bush', 2], ['stump', 1], ['lamp', 0.8], ['flowerbed', 1], ['mushrooms', 1]],
     },
     beach: {
-      sky: ['#48b8f0', '#6fcaf5', '#98dbf8', '#c8eefc'], skyN: ['#14214a', '#1c2d5e', '#243a70', '#2f4a82'],
-      far: ['#9ccf8a', '#6fa86a'], farDots: ['#5f9a5e', '#88c07a', '#4f8a54'], near: ['#d6e9a0', '#a7c873'], nearDots: ['#b8d488', '#e6f2b8'],
-      lawn: ['#f6e3a8', '#dec486'], grass: ['#faebbd', '#f6e3a8', '#f1db9b', '#ebd290'], blade: '#e2c47e', bladeHi: '#fff6d8', shade: '#e2c47e',
-      dots: ['#f7b6c8', '#ffffff', '#f5a86a', '#fbf3dc'], dotC: '#e07ba0', sand: '#f3dc9c', wet: '#e0c283', sandEdge: '#d9bd7c',
-      water: ['#8ee8f0', '#3fc0e0', '#2a8fd0', '#1f6fb0'], foam: '#ffffff', hl: '#d6f5fd', cloud: ['#ffffff', '#dfeafc', '#bccdf0'],
-      path: null, night: [20, 18, 64, 0.36], dim: 0, tree: 'palm', surf: true, openSea: true, deco: 'beach', fish: '20,60,120',
+      sky: ['#1c9ff5', '#3cb3f7', '#66c7f9', '#a6e0fb'], skyN: ['#14214a', '#1c2d5e', '#243a70', '#2f4a82'],
+      far: ['#86cc56', '#58a83a'], farDots: ['#3f8a36', '#7cc450', '#2f7a30'], near: ['#f8e6a6', '#e6c47a'], nearDots: ['#d8b066', '#fff6d0'],
+      lawn: ['#fbeab4', '#e2bf76'], grass: ['#fef1c2', '#fbe8ac', '#f8e09e', '#f4d690'], blade: '#e2b866', bladeHi: '#fffbe6', shade: '#e6c070', patch: 1.2,
+      dots: ['#ff9ec0', '#ffffff', '#ffb070', '#fff4dc'], dotC: '#f07aa0', sand: '#f7dc8c', wet: '#e6bd6c', sandEdge: '#d4a85a',
+      water: ['#62ecf4', '#20cce8', '#0a9ade', '#0878cc'], foam: '#ffffff', hl: '#d8fbff', cloud: ['#ffffff', '#e2f0fe', '#bcd8f4'],
+      path: ['#f4dcaa', '#dcac6c', '#b07c46'], pathStyle: 'dots', pathGap: 5.6, pathR: 1.9, sandW: [6, 13], shadowC: '#cf9f4c',
+      night: [20, 18, 64, 0.36], dim: 0, tree: 'palm', surf: true, openSea: true, deco: 'beach', fish: '20,60,120', dens: 3200,
       tree0: [0.16, 0.1], home: ['beachhut', 0.32, 0.46], nest: [0.52, 0.52],
       fruitTrees: [['palm', 0.07, 0.32], ['palm', 0.06, 0.78], ['palm', 0.56, 0.68], ['palm', 0.84, 0.12]],
-      ponds: [[0.66, 0.9, 26, 10]], paths: [],
+      ponds: [[0.66, 0.9, 24, 10]], paths: [['tree', 'home', -0.22], ['home', 'pond', 0.22]],
       props: [['umbrella', 0.44, 0.04], ['shells', 0.1, 0.6], ['shells', 0.34, 0.3], ['umbrella', 0.12, 0.94], ['driftwood', 0.22, 0.72], ['ball', 0.28, 0.08],
-        ['towel', 0.48, 0.05], ['rock', 0.97, 0.3], ['shells', 0.96, 0.72], ['bucket', 0.7, 0.58], ['sandcastle', 0.04, 0.5]],
+        ['towel', 0.48, 0.05], ['rock', 0.97, 0.3], ['shells', 0.96, 0.72], ['bucket', 0.7, 0.58], ['sandcastle', 0.04, 0.5],
+        ['palm', 0.3, 0.17], ['palm', 0.46, 0.3], ['palm', 0.74, 0.44], ['palm', 0.2, 0.57], ['palm', 0.42, 0.78], ['palm', 0.92, 0.62], ['palm', 0.27, 0.95],
+        ['rock', 0.6, 0.36], ['rock', 0.36, 0.62], ['rock', 0.8, 0.8], ['rock', 0.14, 0.42], ['sandcastle', 0.62, 0.12], ['sandcastle', 0.5, 0.41], ['umbrella', 0.76, 0.3]],
       groups: [[0.72, 0.3, [['umbrella', 0, 0], ['towel', 13, 3], ['ball', -13, 4]]], [0.24, 0.6, [['umbrella', 0, 0], ['towel', 12, 4]]],
         [0.36, 0.84, [['sandcastle', 0, 0], ['bucket', 13, 3], ['shells', -12, 4]]], [0.92, 0.48, [['rockpool', 0, 0], ['rock', 13, 4], ['shells', -11, 5]]],
-        [0.9, 0.82, [['surfboard', 0, 0], ['driftwood', -15, 5]]], [0.58, 0.2, [['palm', 0, 0], ['shells', 13, 3]]]],
-      sprinkle: [['shells', 3], ['rock', 1], ['driftwood', 1], ['bucket', 1], ['sandcastle', 1], ['palm', 1]],
+        [0.9, 0.82, [['surfboard', 0, 0], ['driftwood', -15, 5]]], [0.58, 0.2, [['palm', 0, 0], ['shells', 13, 3]]],
+        [0.24, 0.24, [['palm', 0, 0], ['rock', 14, 4]]], [0.8, 0.66, [['umbrella', 0, 0], ['towel', 12, 4], ['ball', -11, 5]]]],
+      sprinkle: [['palm', 6], ['rock', 4], ['umbrella', 2], ['sandcastle', 1.5], ['shells', 2], ['towel', 1], ['bucket', 1], ['ball', 1], ['driftwood', 0.7], ['surfboard', 0.4]],
     },
     moonlit: {
-      sky: ['#3b2f6e', '#553d86', '#7a4f98', '#a868a8'], skyN: ['#110e2e', '#19153e', '#231c50', '#2f2462'],
-      mount: ['#6a6aa8', '#4c4c88', '#36366a'], snow: '#c9c4f0', mountAmp: 24, mountShape: 'spire',
-      far: ['#3e5a78', '#2c4260'], farDots: ['#243850', '#34506c', '#1c2c42'], near: ['#2f6a6a', '#1f4c50'], nearDots: ['#1c4448', '#2a5e5e'],
-      lawn: ['#3f8a72', '#2a6450'], grass: ['#4a977d', '#3f8a72', '#377e68', '#2f705d'], blade: '#27604e', bladeHi: '#7fe0c0', shade: '#2c6654',
-      dots: ['#9fd8ff', '#c9a2f0', '#a6f2d3', '#fff6c9'], dotC: '#ffffff', sand: '#b9b3cc', wet: '#8f88a8', sandEdge: '#7a7496',
-      water: ['#6a7cb8', '#4a5a98', '#36427e', '#283068'], foam: '#cbdbfc', hl: '#9fb0e8', cloud: ['#9a88c8', '#7e6cb0', '#665498'],
-      path: ['#c0c0d8', '#9a9ab8', '#6a6a8e'], night: [26, 14, 60, 0.32], dim: 0.16, tree: 'glowtree', bigMoon: true, deco: 'moonlit', fish: '10,10,40',
+      sky: ['#24187e', '#33229a', '#4a2eae', '#6a3ebe'], skyN: ['#110e2e', '#19153e', '#231c50', '#2f2462'],
+      mount: ['#5a4cb4', '#3f3496', '#2a2274'], snow: '#c8bcff', mountAmp: 24, mountShape: 'spire',
+      far: ['#1a3e62', '#102c48'], farDots: ['#0a2440', '#1c4868', '#061a30'], near: ['#14686e', '#0b4c54'], nearDots: ['#083e48', '#1a7a78'],
+      lawn: ['#1e9a98', '#0e626a'], grass: ['#26a4a0', '#1c9696', '#15888c', '#0f7a82'], blade: '#0e6670', bladeHi: '#6ff0e0', shade: '#0d6670', patch: 1.5,
+      dots: ['#9fe8ff', '#e0a8ff', '#a6f2d3', '#fff6a0'], dotC: '#ffffff', sand: '#a69ed6', wet: '#8078c0', sandEdge: '#6a62a8',
+      water: ['#5464da', '#3a48c4', '#2c38aa', '#1e2892'], foam: '#c8d4ff', hl: '#aab8ff', cloud: ['#9a88c8', '#7e6cb0', '#665498'],
+      path: ['#f8ecff', '#e2bef8', '#9c70cc'], pathStyle: 'dots', pathR: 2.15, pathGap: 6.8, sandW: [3, 7], shadowC: '#08404a', pondW: ['#8cf2ff', '#40b8f2', '#3a5ed6'],
+      flowers: [['#9fd8ff', '#ffffff'], ['#e0b0ff', '#fff6c0'], ['#a6f2d3', '#ffffff'], ['#ffb8e8', '#fff27a']],
+      night: [26, 14, 60, 0.32], dim: 0.07, tree: 'glowtree', bigMoon: true, deco: 'moonlit', fish: '10,10,40', dens: 3600,
       tree0: [0.2, 0.12], home: ['crystalcave', 0.46, 0.5], nest: [0.64, 0.58],
       fruitTrees: [['glowtree', 0.09, 0.66], ['glowtree', 0.84, 0.66], ['glowtree', 0.8, 0.14]],
-      ponds: [[0.25, 0.88, 24, 9]], paths: [['tree', 'dock', 0.2], ['tree', 'home', -0.2], ['home', 'pond', 0.2]],
+      ponds: [[0.25, 0.88, 24, 11]], paths: [['tree', 'dock', 0.2], ['tree', 'home', -0.2], ['home', 'pond', 0.2]],
       props: [['crystal', 0.44, 0.0], ['glowshroom', 0.17, 0.5], ['lantern', 0.42, 0.9], ['glowshroom', 0.62, 0.42], ['crystal', 0.07, 0.96], ['lantern', 0.31, 0.3],
-        ['mushrooms', 0.13, 0.82], ['moonstone', 0.12, 0.36], ['fern', 0.32, 0.68], ['fern', 0.04, 0.2], ['moonstone', 0.97, 0.96], ['lantern', 0.66, 0.24]],
+        ['mushrooms', 0.13, 0.82], ['moonstone', 0.12, 0.36], ['fern', 0.32, 0.68], ['fern', 0.04, 0.2], ['moonstone', 0.97, 0.96], ['lantern', 0.66, 0.24],
+        ['glowtree', 0.48, 0.14], ['glowtree', 0.04, 0.04], ['glowtree', 0.36, 0.42], ['glowtree', 0.66, 0.84], ['glowtree', 0.95, 0.42], ['lantern', 0.56, 0.62],
+        ['crystal', 0.28, 0.58], ['crystal', 0.75, 0.52], ['moonstone', 0.58, 0.04], ['glowshroom', 0.88, 0.76], ['glowshroom', 0.4, 0.76]],
       groups: [[0.84, 0.36, [['crystal', 0, 0], ['crystal', 11, 4], ['moonstone', -11, 4]]], [0.1, 0.42, [['glowshroom', 0, 0], ['mushrooms', 11, 4], ['fern', -11, 3]]],
         [0.6, 0.86, [['fern', 0, 0], ['fern', 13, 3], ['moonstone', -12, 4]]], [0.93, 0.84, [['moonstone', 0, 0], ['crystal', 11, 3]]],
-        [0.54, 0.22, [['glowtree', 0, 0], ['glowshroom', 15, 4]]]],
-      sprinkle: [['fern', 2], ['glowshroom', 2], ['moonstone', 1], ['mushrooms', 1], ['crystal', 1], ['glowtree', 1]],
+        [0.54, 0.22, [['glowtree', 0, 0], ['glowshroom', 15, 4]]], [0.2, 0.74, [['crystal', 0, 0], ['crystal', 9, 3], ['glowshroom', -10, 4]]]],
+      sprinkle: [['glowtree', 5], ['crystal', 3], ['glowshroom', 4], ['moonstone', 0.7], ['lantern', 0.8], ['mushrooms', 2], ['fern', 1], ['bush', 1]],
     },
     candy: {
-      sky: ['#f6a6d0', '#f9bcdc', '#fbd2e6', '#fde6f0'], skyN: ['#2e1a4e', '#3c2260', '#4c2a72', '#5e3484'],
-      mount: ['#fbe0f0', '#f4c4de', '#e0a4c8'], snow: '#ffffff', mountAmp: 14, mountShape: 'drop',
-      far: ['#f7c6e0', '#e89cc4'], farStripe: '#fde6f0', farDots: ['#c9a2f0', '#fff27a', '#99e5c0'], near: ['#bff0dc', '#86d6b8'], nearDots: ['#f07aa0', '#fff4f8'],
-      lawn: ['#c8f2e0', '#8fd8bc'], grass: ['#d6f7e9', '#c8f2e0', '#bcebd5', '#aee3ca'], blade: '#8fd8bc', bladeHi: '#ffffff', shade: '#a2dcc4',
-      dots: ['#f07a84', '#fff27a', '#639bff', '#ffffff'], dotC: '#f08cbc', sand: '#fde6b8', wet: '#f5c890', sandEdge: '#e8b87c',
-      water: ['#b8f5ec', '#8ee0e0', '#f5a6cc', '#e07ba0'], foam: '#ffffff', hl: '#ffffff', cloud: ['#ffffff', '#fbe4f2', '#f2c4e0'],
-      path: ['#ffffff', '#fcd8e8', '#e8a2c4'], night: [40, 16, 70, 0.36], dim: 0, tree: 'lollitree', house: true, fizz: true, deco: 'candy', fish: '150,40,100',
+      sky: ['#f46cc2', '#f786ce', '#faa4dc', '#fcc6ea'], skyN: ['#2e1a4e', '#3c2260', '#4c2a72', '#5e3484'],
+      mount: ['#fde2f4', '#f7bce6', '#e894cc'], snow: '#ffffff', mountAmp: 14, mountShape: 'drop',
+      far: ['#f8b8de', '#ea8cc6'], farStripe: '#fde6f4', farDots: ['#c9a2f0', '#fff27a', '#99e5c0'], near: ['#b6f2e8', '#7ed8cc'], nearDots: ['#f07aa0', '#fff4f8'],
+      lawn: ['#d8faf4', '#8cdcd0'], grass: ['#e0fcf8', '#cef8f0', '#bef3e9', '#b0ece2'], blade: '#8cd8cc', bladeHi: '#ffffff', shade: '#9ad8d0', patch: 1.15,
+      dots: ['#f07a84', '#fff27a', '#639bff', '#ffffff'], dotC: '#f08cbc', sand: '#fbe0a2', wet: '#efc488', sandEdge: '#dfae70',
+      water: ['#8cf6f2', '#4ee6e8', '#f886c8', '#f45cac'], foam: '#ffffff', hl: '#ffffff', cloud: ['#ffffff', '#fce6f4', '#f4c6e2'],
+      path: ['#fff0fc', '#ee9edc', '#c264b4'], pathStyle: 'dots', pathR: 2.1, pathGap: 6.8, sandW: [7, 12], shadowC: '#78cabe', bandFoam: true, pondW: ['#c8f6ff', '#7ad8f8', '#8aa0f4'],
+      night: [40, 16, 70, 0.36], dim: 0, tree: 'lollitree', house: true, fizz: true, deco: 'candy', fish: '150,40,100', dens: 3600,
       tree0: [0.22, 0.1], home: ['gingerhouse', 0.56, 0.5], nest: [0.38, 0.57],
       fruitTrees: [['lollitree', 0.66, 0.86], ['lollitree', 0.07, 0.92], ['lollitree', 0.86, 0.2], ['lollitree', 0.1, 0.46]],
-      ponds: [[0.33, 0.8, 23, 9]], paths: [['tree', 'dock', 0.2], ['tree', 'home', -0.18], ['home', 'pond', 0.22]],
+      ponds: [[0.33, 0.8, 23, 10]], paths: [['tree', 'dock', 0.2], ['tree', 'home', -0.18], ['home', 'pond', 0.22]],
       props: [['cupcake', 0.06, 0.72], ['gumdrops', 0.2, 0.94], ['candycane', 0.14, 0.99], ['gumdrops', 0.08, 0.2], ['donut', 0.5, 0.68],
-        ['lollipop', 0.25, 0.66], ['icecream', 0.3, 0.98], ['donut', 0.22, 0.56], ['gumdrops', 0.97, 0.97], ['cupcake', 0.7, 0.4]],
+        ['lollipop', 0.25, 0.66], ['icecream', 0.3, 0.98], ['donut', 0.22, 0.56], ['gumdrops', 0.97, 0.97], ['cupcake', 0.7, 0.4],
+        ['tree', 0.04, 0.06], ['bigtree', 0.48, 0.14], ['tree', 0.94, 0.38], ['tree', 0.3, 0.36], ['bigtree', 0.82, 0.96], ['tree', 0.5, 0.86], ['tree', 0.16, 0.76],
+        ['lamp', 0.66, 0.46], ['lollipop', 0.74, 0.28], ['lollipop', 0.88, 0.7], ['candycane', 0.36, 0.08], ['candycane', 0.62, 0.62], ['candycane', 0.04, 0.34]],
       groups: [[0.86, 0.56, [['gumball', 0, 0], ['cupcake', 14, 4], ['icecream', -13, 4]]], [0.44, 0.02, [['candycane', -13, 0], ['candycane', 0, 1], ['candycane', 13, 0]]],
         [0.16, 0.3, [['donut', 0, 0], ['donut', 12, 4], ['lollipop', -11, 3]]], [0.76, 0.76, [['gumdrops', 0, 0], ['gumdrops', 12, 4], ['gumdrops', -11, 5]]],
-        [0.42, 0.34, [['lollipop', 0, 0], ['lollipop', 11, 4], ['lollipop', -11, 5]]], [0.62, 0.18, [['lollitree', 0, 0], ['gumdrops', 15, 4]]]],
-      sprinkle: [['gumdrops', 2], ['lollipop', 1], ['donut', 1], ['cupcake', 1], ['candycane', 1], ['icecream', 1]],
+        [0.42, 0.34, [['lollipop', 0, 0], ['lollipop', 11, 4], ['lollipop', -11, 5]]], [0.62, 0.18, [['lollitree', 0, 0], ['gumdrops', 15, 4]]],
+        [0.26, 0.2, [['tree', 0, 0], ['candycane', 16, 4]]]],
+      sprinkle: [['tree', 4], ['bigtree', 2], ['lollipop', 4], ['candycane', 4], ['cupcake', 2], ['gumdrops', 2], ['donut', 1], ['icecream', 1], ['lamp', 0.6]],
     },
   };
   PS.gardenThemes = TH; // (the area drop-down's postcards use these colours: app.js mapPreview)
@@ -158,7 +180,7 @@
     mummy: { c: ['#fffaf0', '#e8dcc0'], fx: 'wisp', glow: '255,240,205' }, candycorn: { c: ['#ffffff', '#ff9a22', '#ffd23a'], fx: 'wisp', glow: '255,205,110' },
     vampire: { c: ['#4a3a6c', '#e8506a', '#c9a2f0'], fx: 'bat', glow: '230,90,130' }, witch: { c: ['#8e56c8', '#9ad862', '#fff27a'], fx: 'bat', glow: '190,255,150' },
   };
-  const GLOWS = { lamp: [0.5, 0.8, 8, '255,236,150'], lantern: [0.5, 0.8, 9, '255,236,150'], glowshroom: [0.5, 0.6, 7, '170,240,255'], crystal: [0.5, 0.55, 7, '180,220,255'], moonstone: [0.5, 0.5, 6, '160,230,255'], mushrooms: [0.5, 0.5, 4, '170,240,255'] };
+  const GLOWS = { glowtree: [0.5, 0.6, 14, '150,150,255'], lamp: [0.5, 0.8, 8, '255,236,150'], lantern: [0.5, 0.8, 9, '255,236,150'], glowshroom: [0.5, 0.6, 7, '170,240,255'], crystal: [0.5, 0.55, 7, '180,220,255'], moonstone: [0.5, 0.5, 6, '160,230,255'], mushrooms: [0.5, 0.5, 4, '170,240,255'] };
 
   // ---------------- seeded decoration ----------------
   let seed = 7; const srand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -184,23 +206,44 @@
   for (let i = 0; i < 9; i++) DECO.drift.push({ p: srand(), y: srand(), v: 0.03 + srand() * 0.03, ph: srand() * 6.28, c: i });
   for (let i = 0; i < 4; i++) DECO.floats.push({ a: 0.1 + srand() * 0.8, b: 0.1 + srand() * 0.8, ph: srand() * 6.28, v: 0.4 + srand() * 0.4, k: 4 + i });
   for (let i = 0; i < 4; i++) DECO.birds.push({ p: srand(), y: 0.2 + srand() * 0.4, v: 0.012 + srand() * 0.01, ph: srand() * 6 });
+  // (the restyle: more fireflies for the Moonlit Grove's twilight, added last so everything above keeps its seeded place)
+  for (let i = 0; i < 40; i++) DECO.flies.push({ p: srand() * 10, a: srand(), b: srand() });
 
   // ---------------- sprites (guarded: art is still being drawn, so nothing may crash) ----------------
   const sprCache = new Map();
   // every grid built here finishes with PX.hd (one level of detail with the Sprouts: smooth fine edges, thin inner lines, one ink ring)
   const hd = (g, o) => { try { if (PX.hd) PX.hd(g, o); else if (o && o.outline) g.outline(); } catch (e) { /* art optional */ } return g; };
   function blob(w, h, col) { const g = new PX.Grid(w, h); g.ell(w / 2, h / 2, w / 2 - 1, h / 2 - 1, col || PX.RAMPS.slate); return hd(g, { outline: true }).canvas(); }
-  function spr(key, make, fb) {
+  // The family's pictures (art-images.js) load a moment after the game starts, and the garden is the first screen: a sprite made
+  // while its picture (folder pf, id pid) was still on the way is remembered in picLate, made again once the picture is in, and
+  // the scenery already standing in the garden takes the new one (checkPics, a few times a second while the garden is open).
+  const picLate = new Map(); // sprite key -> [picture folder, id]
+  function spr(key, make, fb, pf, pid) {
     let c = sprCache.get(key); if (c) return c;
     try { c = make(); } catch (e) { c = null; }
     if (!c || !c.width) { try { c = fb(); } catch (e) { c = blob(10, 10); } }
+    try { if (pf && PX.hasPicture && !PX.hasPicture(pf, pid)) picLate.set(key, [pf, pid]); } catch (e) { /* pictures optional */ }
     sprCache.set(key, c); return c;
   }
   const themeOf = a => (D.AREAS[a] && D.AREAS[a].theme) || 'day';
-  const critterSpr = (id, f) => spr('c:' + id + ':' + (f || 0), () => PX.critter(id, f || 0), () => blob(16, 12, PX.RAMPS.peach));
-  const swimSpr = (id, f) => spr('cs:' + id + ':' + (f || 0), () => (PX.critterSwim ? PX.critterSwim(id, f || 0) : null), () => critterSpr(id, f));
-  const itemSpr = (kind, id) => spr('i:' + kind + ':' + id, () => PX.item(kind, id), () => (kind === 'fruit' ? PX.fruit('round') : blob(11, 11, PX.RAMPS.sun)));
-  const propSpr = (kind, theme) => spr('p:' + kind + ':' + theme, () => (kind === 'gumball' ? PX.gumballMachine(0) : PX.prop(kind, theme)), () => blob(14, 12));
+  const critterSpr = (id, f) => spr('c:' + id + ':' + (f || 0), () => PX.critter(id, f || 0), () => blob(16, 12, PX.RAMPS.peach), 'critters', id);
+  const swimSpr = (id, f) => spr('cs:' + id + ':' + (f || 0), () => (PX.critterSwim ? PX.critterSwim(id, f || 0) : null), () => critterSpr(id, f), 'critters', id);
+  const itemSpr = (kind, id) => spr('i:' + kind + ':' + id, () => PX.item(kind, id), () => (kind === 'fruit' ? PX.fruit('round') : blob(11, 11, PX.RAMPS.sun)), kind === 'egg' ? 'eggs' : kind === 'fruit' ? 'fruit' : null, id);
+  const propSpr = (kind, theme) => spr('p:' + kind + ':' + theme, () => (kind === 'gumball' ? PX.gumballMachine(0) : PX.prop(kind, theme)), () => blob(14, 12), kind === 'gumball' ? null : 'props', kind);
+  // (called every 0.4 s from frame(); gives up after 2 minutes of garden time, by when every picture there is has loaded)
+  let picChecks = 0;
+  function checkPics() {
+    if (!picLate.size) return;
+    if (++picChecks > 300 || !PX.hasPicture) { picLate.clear(); return; }
+    let scenery = false;
+    for (const [key, pic] of picLate) if (PX.hasPicture(pic[0], pic[1])) { picLate.delete(key); sprCache.delete(key); if (pic[0] === 'props') scenery = true; }
+    if (!scenery || !Lw.props) return;
+    // (a picture is fitted into the same canvas as the code art it replaces, so sizes, hitboxes and fruit spots stay put)
+    const theme = themeOf(area);
+    for (const q of Lw.props) q.c = propSpr(q.kind, theme);
+    for (const T of Lw.trees || []) T.c = propSpr(T.kind, theme);
+    if (Lw.home) Lw.home.c = propSpr(Lw.home.kind, theme);
+  }
   function propAt(p) { for (const q of Lw.props) if (q.kind === 'gumball' && Math.abs(p.x - q.x) < artW(q.c) / 2 + 2 && p.y <= q.y + 2 && p.y >= q.y - artH(q.c)) return q.kind; return null; }
   // hit radius in world px that stays at least ~22 screen px across, however far out the view is zoomed
   const hitR = r => Math.max(r, 11 / Z);
@@ -336,7 +379,8 @@
   // scatter is seeded by the area and the world size, so a garden looks the same on every visit.
   function buildProps() {
     const th = TH[area], theme = themeOf(area), foot = [];
-    const free = (x0, y0, x1, y1, grp) => { for (const f of foot) if (x0 < f[2] && x1 > f[0] && y0 < f[3] && y1 > f[1] && (grp == null || f[4] !== grp)) return false; return true; };
+    // (foot: [x0, y0, x1, y1, group, tallOnly]: a tallOnly patch only keeps out scenery tall enough to hide what stands behind it)
+    const free = (x0, y0, x1, y1, grp, tall) => { for (const f of foot) if (x0 < f[2] && x1 > f[0] && y0 < f[3] && y1 > f[1] && (grp == null || f[4] !== grp) && (tall || !f[5])) return false; return true; };
     Lw.ponds = (th.ponds || []).map(([u, v, rx, ry]) => { const p = atUV(u, v); return { x: p.x, y: p.y, rx, ry }; });
     for (const P of Lw.ponds) foot.push([P.x - P.rx - 4, P.y - P.ry - 6, P.x + P.rx + 4, P.y + P.ry + 4, null]);
     Lw.home = null; Lw.sign = null;
@@ -345,6 +389,8 @@
       const p = atUV(u, v), y = p.y, x = clamp(p.x, Math.round(artW(c) / 2) + 14, lawnRight(y) - Math.round(artW(c) / 2));
       Lw.home = { kind, x, y, c, info, w: info.w, h: info.h, door: { x: x + info.door[0], y: y + info.door[1] } };
       foot.push([x - info.w / 2 - 12, y - 14, x + info.w / 2 + 3, y + 10, null]); // (and the little sign by the door)
+      // (the lawn in front of the door stays open, and no tree in the fuller garden stands where it would hide the house)
+      foot.push([x - info.w / 2 - 8, y + 10, x + info.w / 2 + 8, y + 26, null]); foot.push([x - info.w / 2 - 10, y + 26, x + info.w / 2 + 10, y + 60, null, 1]);
     }
     // fruit trees: the area's main tree first (its 3 fruit slots are the ones old saves already have), then the others in the
     // order their slots are saved (new trees only ever go on the end, so every saved fruit stays on the tree it grew on)
@@ -359,7 +405,7 @@
     });
     // where eggs wait: a clear patch of lawn near the house (the heart of the garden, where Sprouts like to stay)
     const N = atUV(...(th.nest || [0.5, 0.5])); Lw.nest = N; Lw.heart = Lw.home ? { x: Lw.home.x, y: Lw.home.y + 10 } : N;
-    foot.push([N.x - 48, N.y - 18, N.x + 48, N.y + 14, null]);
+    foot.push([N.x - 48, N.y - 18, N.x + 48, N.y + 14, null]); foot.push([N.x - 48, N.y + 14, N.x + 48, N.y + 58, null, 1]); // (no tree in front hides the eggs)
     foot.push([Lw.dockX0 - 12, Lw.dockY - 8, Lw.dockX0 + 6, Lw.dockY + 6, null]); // (the dock's foot on the shore)
     buildPaths(th);
     // props: the area's own pieces, its little scenes, then the seeded scatter that fills the rest
@@ -367,7 +413,7 @@
     const add = (kind, x, y, grp) => {
       const c = propSpr(kind, theme), w = artW(c); x = Math.round(x); y = Math.round(y);
       if (x - w / 2 < 2 || x + w / 2 > lawnRight(y) || y < Lw.minY - 2 || y > Lw.maxY + 2) return false;
-      if (!free(x - w / 2 + 1, y - 6, x + w / 2 - 1, y + 3, grp) || onPathNear(x, y, w / 2) || pondAt(x, y, w / 2 + 3)) return false;
+      if (!free(x - w / 2 + 1, y - 6, x + w / 2 - 1, y + 3, grp, artH(c) > 18) || onPathNear(x, y, w / 2) || pondAt(x, y, w / 2 + 3)) return false;
       foot.push([x - w / 2, y - 6, x + w / 2, y + 3, grp == null ? null : grp]); Lw.props.push({ kind, x, y, c, i: i++ }); return true;
     };
     for (const [kind, u, v] of th.props || []) { const p = atUV(u, v); add(kind, p.x, p.y); }
@@ -377,13 +423,15 @@
     const S = th.sprinkle || [], tot = S.reduce((a, x) => a + x[1], 0);
     if (tot) {
       let rs = (AREA_IDS.indexOf(area) + 1) * 7919 + ww * 31 + wh; const rr = () => ((rs = (rs * 16807) % 2147483647) / 2147483647);
-      const want = Math.round(land / 11000);
+      const want = Math.round(land / (th.dens || 11000));
       for (let n = 0, tries = 0; n < want && tries < want * 10; tries++) {
         let r = rr() * tot, kind = S[0][0]; for (const [k, wgt] of S) { r -= wgt; if (r <= 0) { kind = k; break; } }
         const y = Lw.minY + 4 + rr() * (Lw.span - 4), x = 6 + rr() * (lawnRight(y) - 12);
         if (add(kind, x, y)) n++;
       }
     }
+    // (back to front, so the frame's depth sort has little to do with a garden this full)
+    Lw.props.sort((a, b) => a.y - b.y || a.i - b.i);
   }
   // the paths between the main tree, the house, the dock and the pond: gentle curves (quadratic, bent sideways by `bend` of
   // their length), a point every ~2 world px in Lw.pathPts. Lw.pathGrid marks the 4-px cells they cross (props keep off).
@@ -455,7 +503,10 @@
     return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
   }
   const fbm = (x, y, s) => vnoise(x, y, s) * 0.62 + vnoise(x * 2.1 + 5.3, y * 2.1 + 1.7, s + 1) * 0.38;
-  const sandW = y => Math.round(lerp(3, 9, clamp((y - Lw.waterTop) / Math.max(1, Lw.maxY - Lw.waterTop), 0, 1)));
+  // the sand between the lawn and the water: the area's width at the back and at the front (world px)
+  const SAND0 = [3, 9];
+  const sandWC = y => { const s = TH[area].sandW || SAND0; return lerp(s[0], s[1], clamp((y - Lw.waterTop) / Math.max(1, Lw.maxY - Lw.waterTop), 0, 1)); };
+  const sandW = y => Math.round(sandWC(y));
 
   // ---------------- background (cached per area / size / night level) ----------------
   // the sky, at SK x the world (soft bands instead of checker dither; stars are fine pixels). Only the part above the land is drawn.
@@ -498,7 +549,6 @@
   // the shore as a smooth line for drawing (the game's shoreAt() is the same line rounded to whole world px per row): the water
   // starts at shoreB(y) for a point at height y
   const shoreB = y => shoreX(y - 0.5) + 1;
-  const sandWC = y => lerp(3, 9, clamp((y - Lw.waterTop) / Math.max(1, Lw.maxY - Lw.waterTop), 0, 1));
   // u32 colour mix (paintLand works on raw pixels)
   const mixU = (A, B, k) => {
     const r = A & 255, g = (A >>> 8) & 255, b = (A >>> 16) & 255;
@@ -525,11 +575,11 @@
     }
   }
   // one fine row of open water (below the far-shore band): depth bands, their 50/50 mixes where two meet, the shallows by the shore
-  function waterRow(P, row, f0, FW, B, inv, XQ1, XA1, RN, WU, WM, shalU, shal2) {
+  function waterRow(P, row, f0, FW, B, inv, XQ1, XA1, RN, WU, WM, shalU, shal2, bandU) {
     for (let fi = f0; fi < FW; fi++) {
       const q = XQ1[fi], d = ((fi + 0.5) * FP - B) * inv + RN[q] + (RN[q + 1] - RN[q]) * XA1[fi];
       let c = d > 0.78 ? WU[3] : d > 0.45 ? WU[2] : d > 0.14 ? WU[1] : WU[0];
-      if (d > 0.118 && d < 0.162) c = WM[0]; else if (d > 0.428 && d < 0.472) c = WM[1]; else if (d > 0.758 && d < 0.802) c = WM[2];
+      if (d > 0.118 && d < 0.162) c = WM[0]; else if (d > 0.428 && d < 0.472) c = bandU && d > 0.441 && d < 0.457 ? bandU : WM[1]; else if (d > 0.758 && d < 0.802) c = WM[2];
       if (d < 0.035) c = d > 0.02 ? shal2 : shalU;
       P[row + fi] = c;
     }
@@ -587,8 +637,8 @@
     const G = th.grass.map(u32), T7 = [G[3], mixU(G[3], G[2], 0.5), G[2], mixU(G[2], G[1], 0.5), G[1], mixU(G[1], G[0], 0.5), G[0]];
     // (the noise is sampled every NS world px: the patches are ~20 px across, so that's plenty, and it keeps the big garden quick
     // to paint; each fine row first blends its two sample rows into RV, then each fine pixel blends two of those)
-    const NS = 2, edgeU = u32(th.lawn[1]), lipU = mixU(G[0], T7[4], 0.5), y0v = Math.max(0, lawnTop - 3), VW = Math.ceil(ww / NS) + 2, VH = Math.ceil((wh - y0v) / NS) + 2, V = f32('V', VW * VH), RV = f32('rv', VW);
-    for (let y = 0; y < VH; y++) { const yy = y * NS + y0v, g = (yy - lawnTop) / Math.max(1, wh - lawnTop), base = 0.5 + (1 - g) * 0.2 - 0.08; for (let i = 0; i < VW; i++) V[y * VW + i] = (fbm(i * NS * 0.05, yy * 0.085, AS) - 0.5) * 1.8 + base; }
+    const NS = 2, PK = th.patch || 1.8, edgeU = u32(th.lawn[1]), lipU = mixU(G[0], T7[4], 0.5), y0v = Math.max(0, lawnTop - 3), VW = Math.ceil(ww / NS) + 2, VH = Math.ceil((wh - y0v) / NS) + 2, V = f32('V', VW * VH), RV = f32('rv', VW);
+    for (let y = 0; y < VH; y++) { const yy = y * NS + y0v, g = (yy - lawnTop) / Math.max(1, wh - lawnTop), base = 0.5 + (1 - g) * 0.2 - 0.08; for (let i = 0; i < VW; i++) V[y * VW + i] = (fbm(i * NS * 0.05, yy * 0.085, AS) - 0.5) * PK + base; }
     // per fine column: the lawn's top row and where it sits between two noise samples (rows are then filled left to right)
     const TP = i32('tp', FW), XQ = i32('xq', FW), XA = f32('xa', FW); let tpMin = FH;
     for (let fi = 0; fi < FW; fi++) { const i = fc(fi), gx = clamp((i - 0.5) / NS, 0, VW - 2); TP[fi] = Math.round(lawnTopC(i - 0.5) * SK); XQ[fi] = Math.floor(gx); XA[fi] = gx - XQ[fi]; if (TP[fi] < tpMin) tpMin = TP[fi]; }
@@ -603,7 +653,7 @@
     const W0 = th.water, WU = W0.map(u32), WM = [mixU(WU[0], WU[1], 0.5), mixU(WU[1], WU[2], 0.5), mixU(WU[2], WU[3], 0.5)];
     const shalU = u32(mixH(W0[0], th.wet, 0.42)), shal2 = mixU(shalU, WU[0], 0.5), sandU = u32(th.sand), wetU = u32(th.wet), dampU = u32(mixH(th.sand, th.wet, 0.5)), sEdgeU = u32(th.sandEdge);
     const sdU = mixU(sandU, dampU, 0.5), dwU = mixU(dampU, wetU, 0.5);
-    const reflU = u32(mixH(th.openSea ? th.sky[3] : th.near[1], W0[2], th.openSea ? 0.3 : 0.5)), hlU = u32(th.hl);
+    const reflU = u32(mixH(th.openSea ? th.sky[3] : th.near[1], W0[2], th.openSea ? 0.3 : 0.5)), hlU = u32(th.hl), bandU = th.bandFoam ? u32(th.foam) : 0;
     // the depth wobble, per world px over the water's columns only (blended across each one like the lawn, through a row buffer)
     let xw0 = ww; for (let y = wt; y <= wh; y++) xw0 = Math.min(xw0, shoreAt(y)); xw0 = Math.max(0, xw0 - 4);
     const QW = ww - xw0 + 3, NH = wh - wt + 2, NW = f32('N', QW * NH), RN = f32('rn', QW), XQ1 = i32('xq1', FW), XA1 = f32('xa1', FW);
@@ -619,7 +669,7 @@
       }
       const fk = y - wt, fkF = fy - wt * SK, ny = clamp(y - 0.5 - wt, 0, NH - 2), nq = Math.floor(ny), na = ny - nq, nb = 1 - na, r0 = nq * QW, inv = 1 / Math.max(1, ww - B);
       for (let i = 0; i < QW; i++) RN[i] = NW[r0 + i] * nb + NW[r0 + QW + i] * na;
-      if (fk >= 7) { waterRow(P, row, Math.max(0, Math.round(B * SK)), FW, B, inv, XQ1, XA1, RN, WU, WM, shalU, shal2); continue; }
+      if (fk >= 7) { waterRow(P, row, Math.max(0, Math.round(B * SK)), FW, B, inv, XQ1, XA1, RN, WU, WM, shalU, shal2, bandU); continue; }
       for (let fi = Math.max(0, Math.round(B * SK)); fi < FW; fi++) {
         const q = XQ1[fi], d = (fc(fi) - B) * inv + RN[q] + (RN[q + 1] - RN[q]) * XA1[fi];
         const tn = (d > 0.14 ? 1 : 0) + (d > 0.45 ? 1 : 0) + (d > 0.78 ? 1 : 0);
@@ -636,6 +686,17 @@
         }
         P[row + fi] = c;
       }
+    }
+    // ---- the surf (the mockups' bright foam): a white scalloped band at the water's edge, a pale band behind it, and two broken
+    // lines of foam further out ----
+    const foamU = u32(th.foam), paleU = mixU(foamU, WU[0], 0.55), lineU = mixU(foamU, WU[1], 0.25);
+    for (let fy = (wt + 3) * SK; fy < FH; fy++) {
+      const y = fc(fy), B = shoreB(y), row = fy * FW, sc = 0.5 + 0.5 * Math.sin(y * 0.9 + 0.4);
+      const f0 = Math.round((B - 0.6) * SK), f1 = Math.round((B + 0.7 + 1.1 * sc * sc) * SK), f2 = f1 + Math.round((0.8 + 0.5 * sc) * SK);
+      for (let fi = Math.max(0, f0); fi < Math.min(FW, f1); fi++) P[row + fi] = foamU;
+      for (let fi = Math.max(0, f1); fi < Math.min(FW, f2); fi++) P[row + fi] = paleU;
+      if (Math.sin(y * 0.27 + 2) > -0.45) { const o = B + 4.6 + Math.sin(y * 0.42 + 1) * 0.9, w = 0.5 + 0.5 * (0.5 + 0.5 * Math.sin(y * 1.3)); for (let fi = Math.max(0, Math.round(o * SK)), e = Math.min(FW, Math.round((o + w) * SK)); fi < e; fi++) P[row + fi] = lineU; }
+      if (Math.sin(y * 0.21 + 0.8) > 0.05) { const o = B + 9.5 + Math.sin(y * 0.33 + 0.3) * 1.4; for (let fi = Math.max(0, Math.round(o * SK)), e = Math.min(FW, Math.round((o + 0.5) * SK)); fi < e; fi++) P[row + fi] = mixU(P[row + fi], foamU, 0.6); }
     }
     // ---- details on top, in fine pixels (world coordinates; each world px is SK x SK fine px). The big garden has thousands of
     // them, so they're written straight into the pixel buffer (one fillRect each would take far too long on an iPad); the few
@@ -669,6 +730,17 @@
     const stamp = (x0, y0, rows, map) => { const X0 = Math.round(x0 * SK), Y0 = Math.round(y0 * SK); rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) { const c = map[r[i]], fx = X0 + i, fy = Y0 + j; if (c && fx >= 0 && fy >= 0 && fx < FW && fy < FH) P[fy * FW + fx] = u32(c); } }); };
     // a see-through wash (k of colour c mixed into what's there)
     const wash = (x0, y0, w, h, c, k) => { const cu = u32(c), a = Math.round(x0 * SK), b = Math.round(y0 * SK); for (let j = Math.max(0, b); j < Math.min(FH, b + Math.round(h * SK)); j++) for (let i = Math.max(0, a); i < Math.min(FW, a + Math.round(w * SK)); i++) P[j * FW + i] = mixU(P[j * FW + i], cu, k); };
+    // a see-through ellipse (soft shadows and glows on the ground)
+    const mixEl = (cx, cy, rx, ry, c, k) => {
+      const cu = u32(c);
+      for (let fy = Math.max(0, Math.floor((cy - ry) * SK)); fy <= Math.min(FH - 1, Math.ceil((cy + ry) * SK)); fy++) {
+        const dy = (fy + 0.5) * FP - cy; if (Math.abs(dy) >= ry) continue;
+        const hw = rx * Math.sqrt(1 - (dy / ry) * (dy / ry)), a = Math.max(0, Math.round((cx - hw) * SK)), b = Math.min(FW, Math.round((cx + hw) * SK)), row = fy * FW;
+        for (let i = a; i < b; i++) P[row + i] = mixU(P[row + i], cu, k);
+      }
+    };
+    // an ellipse's outline, one fine pixel thick (ripple rings)
+    const ring = (cx, cy, rx, ry, c) => { const n = Math.ceil(6.2832 * Math.max(rx, ry) * SK); for (let k = 0; k < n; k++) { const a = k / n * 6.2832; dot(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, c); } };
     const later = []; // sprites for the canvas pass at the end
     const ball = (cx, cy, r, dark, mid, lit) => later.push(() => { const c = ballSpr(r, lit, mid, dark), w = artW(c), h = artH(c); X.drawImage(c, sn(cx - w / 2 + 0.5), sn(cy - h / 2 + 0.5), w, h); });
     // scenery on the ridges
@@ -710,24 +782,25 @@
     }
     // house far on the hill (a hi-res prop: drawn on the canvas at the end, so the scene buffer keeps its fine pixels)
     if (th.house) { const hc = propSpr('house', themeOf(area)); Lw.house = { x: Math.round(ww * 0.32), y: hz + 8, c: hc }; later.push(() => PX.blit(X, hc, Lw.house.x, Lw.house.y)); } else Lw.house = null;
-    // ---- the paths between the tree, the house, the dock and the pond (buildPaths) ----
+    // ---- the paths between the tree, the house, the dock and the pond (buildPaths): a wide sandy path (meadow), or a trail of
+    // round stepping dots like the mockups' (lilac in the grove, pink on Candy Isle, sandy footprints on the beach) ----
     const pathPts = Lw.pathPts || [];
     if (th.path && pathPts.length) {
       const [pl, pm, pe] = th.path;
-      if (area === 'meadow') {
-        for (const q of pathPts) el(q.x + 0.5, q.y + 1, 3.6, 2.15, pe);
-        for (const q of pathPts) el(q.x + 0.5, q.y + 0.9, 3.1, 1.75, pm);
-        for (const q of pathPts) el(q.x + 0.3, q.y + 0.1, 1.6, 0.55, pl);
-        for (let k = 3; k < pathPts.length - 2; k += 4) { const q = pathPts[k], o = hash2(k, 1, AS) > 0.5 ? 1 : -2; el(q.x + o + 0.5, q.y + 1.5, 0.6, 0.35, pe); if (k % 8 === 3) dot(q.x - o + 0.5, q.y + 0.5, '#fffaf0'); }
+      if (th.pathStyle === 'sand') {
+        for (const q of pathPts) el(q.x + 0.5, q.y + 1.2, 4.4, 2.6, pe);
+        for (const q of pathPts) el(q.x + 0.5, q.y + 0.95, 3.75, 2.1, pm);
+        for (const q of pathPts) el(q.x + 0.2, q.y + 0.35, 2.3, 0.85, pl);
+        for (let k = 3; k < pathPts.length - 2; k += 4) { const q = pathPts[k], o = hash2(k, 1, AS) > 0.5 ? 1.2 : -2.2; el(q.x + o + 0.5, q.y + 1.6, 0.65, 0.4, pe); if (k % 8 === 3) dot(q.x - o + 0.5, q.y + 0.6, '#fffaf0'); }
       } else {
-        let acc = 0;
+        const gap = th.pathGap || 6.4, r = th.pathR || 1.9, shc = th.shadowC || th.shade;
+        let acc = gap;
         for (let k = 1; k < pathPts.length; k++) {
-          acc += Math.min(7, Math.hypot(pathPts[k].x - pathPts[k - 1].x, pathPts[k].y - pathPts[k - 1].y));
-          if (acc < 7) continue; acc = 0;
-          const q = pathPts[k], w = 5 + (k % 3 === 0 ? 1 : 0), cx = q.x + 0.5;
-          el(cx + 0.5, q.y + 1.3, w / 2, 0.8, th.shade);
-          el(cx, q.y - 0.6, w / 2, 1.95, pe); el(cx, q.y - 0.75, w / 2 - FP, 1.95 - FP * 1.5, pm); el(cx - 0.4, q.y - 1.6, w / 2 - 1.3, 0.55, pl);
-          if (area === 'candy') { dot(cx - 1, q.y - 0.5, '#f7b6c8'); dot(cx + 0.5, q.y - 1, '#9fd8ff'); }
+          acc += Math.hypot(pathPts[k].x - pathPts[k - 1].x, pathPts[k].y - pathPts[k - 1].y);
+          if (acc < gap) continue; acc = 0;
+          const q = pathPts[k], cx = q.x + 0.5, cy = q.y + 0.5;
+          mixEl(cx + 0.35, cy + r * 0.55, r + 0.3, r * 0.6, shc, 0.35);
+          el(cx, cy, r, r * 0.8, pe); el(cx, cy - 0.2, r - 0.35, r * 0.8 - 0.35, pm); el(cx - r * 0.3, cy - r * 0.4, r * 0.42, r * 0.24, pl);
         }
       }
     }
@@ -735,7 +808,7 @@
     let land = 0; for (let y = lawnTop + 4; y < wh; y++) land += Math.max(0, shoreAt(y) - sandW(y) - 6);
     const spot = pad => { for (let k = 0; k < 8; k++) { const y0 = Math.round(lawnTop + 4 + rr() * (wh - lawnTop - 5)), x0 = Math.round(2 + rr() * (shoreAt(y0) - sandW(y0) - 6 - (pad || 0))); if (x0 > 1 && !onPathNear(x0, y0, 1) && !pondAt(x0, y0, 2)) return [x0, y0]; } return null; };
     const scatter = (per, fn) => { const n = Math.round(land / per); for (let k = 0; k < n; k++) { const q = spot(); if (q) fn(q[0], q[1], k); } };
-    const G2 = th.grass, sh = th.shade, bl = th.blade, bh = th.bladeHi;
+    const G2 = th.grass, sh = th.shade, bl = th.blade, bh = th.bladeHi, shc = th.shadowC || sh;
     // grass: thin fine-pixel blades leaning out from the middle, a light tip on each
     const tuft = (x0, y0, k) => {
       const n = 3 + (k % 3 === 0 ? 1 : 0);
@@ -744,44 +817,93 @@
         ln(bx0, y0 + 0.5, bx0 + lean, y0 + 0.5 - h, bl); dot(bx0 + lean, y0 + 0.5 - h, bh);
       }
     };
+    // a light wisp of grass (the mockups' bright strokes): two or three short fine blades in the light colour
+    const wisp = (x0, y0, k) => { const n = 2 + (k % 2); for (let b = 0; b < n; b++) { const bx0 = x0 + b * 0.8 + 0.25, h = 1 + hash2(x0 + b, y0, AS + 3) * 1.8; ln(bx0, y0 + 0.5, bx0 + (b - 0.5) * 0.45, y0 + 0.5 - h, bh); } };
     const FLOWER = ['..c...', '.ccc..', 'ccdcc.', '.cccs.', '..cs..', '..g...'];
     const flower = (x0, y0, k) => stamp(x0 - 0.5, y0 - 1, FLOWER, { c: th.dots[k % 4], d: th.dotC, s: mixH(th.dots[k % 4], sh, 0.45), g: bl });
     const pebble = (x0, y0, k) => { const w = k % 2 ? 2 : 3; el(x0 + w / 2, y0 + 1.1, w / 2 + 0.2, 0.5, sh); el(x0 + w / 2, y0 + 0.5, w / 2, 0.75, '#9badb7'); el(x0 + w / 2 - 0.3, y0 + 0.2, w / 2 - 0.6, 0.35, '#b7c2cc'); dot(x0 + 0.5, y0, '#dfe8fb'); };
     const SHROOM = ['..rr..', '.rwrr.', 'rrrrrw', '.oiio.', '..ii..', '..ii.s'];
     const DANDY = ['.www.', 'wwwhw', 'wwwhh', '.whh.', '..g..', '..g..', '..g..'];
+    // chunky painted flowers (the mockups' flower clusters): five round petals round a bright middle, the lower two petals a
+    // shade darker, a white glint on the top one; a cluster stands on a few dark leaves with a soft shadow
+    const FL = (th.flowers || [[th.dots[0], th.dotC]]).map(([p, m]) => [p, m, mixH(p, '#5a5a8a', 0.3), mixH(p, '#ffffff', 0.65)]);
+    const leafD = mixH(bl, '#10200a', 0.3), leafM = mixH(bl, G2[0], 0.4);
+    const bloom = (cx, cy, f, s) => {
+      for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + k * 1.2566; el(cx + Math.cos(a) * 1.85 * s, cy + Math.sin(a) * 1.65 * s, 1.36 * s, 1.22 * s, k === 2 || k === 3 ? f[2] : f[0]); }
+      el(cx, cy, 0.9 * s, 0.8 * s, f[1]); el(cx - 0.2 * s, cy - 2.25 * s, 0.6 * s, 0.35 * s, f[3]);
+    };
+    const BUNCH = [null, null, [[-2.6, 0], [2.7, 1]], [[0.3, -2.7], [-3, 0.6], [3.1, 1.1]], [[0.4, -2.9], [-3.2, 0.2], [3.3, 0.6], [0, 2.6]]];
+    const cluster = (x0, y0, k) => {
+      const n = 2 + (k % 3), f0 = FL[k % FL.length], f1 = FL[(k + 2) % FL.length], cx = x0 + 0.5, cy = y0 + 0.5, L = BUNCH[n];
+      mixEl(cx + 0.8, cy + 3.4, 6.2, 2, shc, 0.3);
+      el(cx - 3.5, cy + 2.4, 2.7, 1.1, leafD); el(cx + 3.7, cy + 2.6, 2.8, 1.1, leafD); el(cx - 2.8, cy + 1.9, 1.7, 0.65, leafM); el(cx + 3.2, cy + 2.1, 1.7, 0.65, leafM);
+      for (let i = 0; i < n; i++) bloom(cx + L[i][0], cy + L[i][1], i === n - 1 && k % 4 === 1 ? f1 : f0, i === 0 && n > 2 ? 0.85 : 1);
+    };
+    const SGL = th.singles || null;
+    const single = (x0, y0, k) => { const f = FL[SGL ? SGL[k % SGL.length] : (k * 7 + 3) % FL.length]; el(x0 + 0.5, y0 + 2.4, 2, 0.75, leafD); bloom(x0 + 0.5, y0 + 0.5, f, 0.75); };
     if (th.deco === 'meadow') {
-      scatter(70, tuft); scatter(230, flower);
-      scatter(900, (x0, y0) => { for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0]]) { el(x0 + dx * 1.6 + 0.5, y0 + dy * 1.6 + 1, 1.05, 0.95, '#4f9a3e'); dot(x0 + dx * 1.6, y0 + dy * 1.6 + 0.5, '#9fdc70'); } ln(x0 + 0.5, y0 + 1, x0 + 0.5, y0 + 2.5, bl); });
-      scatter(1100, pebble);
-      scatter(1600, (x0, y0) => stamp(x0 - 1, y0 - 3, SHROOM, { r: '#d95763', w: '#ffffff', o: '#a8404a', i: '#fbf3dc', s: sh }));
-      scatter(1300, (x0, y0) => stamp(x0 - 1, y0 - 5, DANDY, { w: '#ffffff', h: '#dfe8fb', g: bl }));
+      scatter(125, tuft); scatter(150, wisp); scatter(320, flower);
+      scatter(1100, single); scatter(2600, cluster);
+      scatter(900, (x0, y0) => { for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0]]) { el(x0 + dx * 1.6 + 0.5, y0 + dy * 1.6 + 1, 1.05, 0.95, '#3f8f1a'); dot(x0 + dx * 1.6, y0 + dy * 1.6 + 0.5, '#a8e858'); } ln(x0 + 0.5, y0 + 1, x0 + 0.5, y0 + 2.5, bl); });
+      scatter(1400, pebble);
+      scatter(2200, (x0, y0) => stamp(x0 - 1, y0 - 3, SHROOM, { r: '#e8404a', w: '#ffffff', o: '#a8303a', i: '#fbf3dc', s: sh }));
+      scatter(1500, (x0, y0) => stamp(x0 - 1, y0 - 5, DANDY, { w: '#ffffff', h: '#e8f0ff', g: bl }));
     } else if (th.deco === 'beach') {
-      scatter(95, (x0, y0) => { ln(x0 - 2, y0 + 0.5, x0 + 1.5, y0 + 0.5, G2[3]); ln(x0 + 2, y0 - 0.5, x0 + 3.5, y0 - 0.5, G2[3]); ln(x0 - 2, y0, x0 + 0.5, y0, G2[0]); });
+      // ripples in the sand, fine sparkles, little shells, red starfish (the mockup's), pebbles and seaweed
+      scatter(120, (x0, y0) => { ln(x0 - 2, y0 + 0.5, x0 + 1.5, y0 + 0.5, G2[3]); ln(x0 + 2, y0 - 0.5, x0 + 3.5, y0 - 0.5, G2[3]); ln(x0 - 2, y0, x0 + 0.5, y0, G2[0]); });
       scatter(380, (x0, y0) => dot(x0 + 0.25, y0 + 0.25, '#fffbea'));
-      scatter(700, (x0, y0, k) => { const c = th.dots[k % 4]; el(x0 + 1, y0 + 0.4, 1.1, 0.8, c); ln(x0 + 0.5, y0 + 0.5, x0 + 1.5, y0 - 0.5, mixH(c, '#ffffff', 0.5)); dot(x0 + 1.5, y0, '#ffffff'); ln(x0 + 0.3, y0 + 1.2, x0 + 1.8, y0 + 1.2, G2[3]); });
-      scatter(2600, (x0, y0) => { const cx = x0 + 0.5, cy = y0 + 0.5; for (let a = 0; a < 5; a++) { const an = -Math.PI / 2 + a * Math.PI * 2 / 5; ln(cx, cy, cx + Math.cos(an) * 2.4, cy + Math.sin(an) * 2.2, '#f08a6a', 2); } el(cx, cy, 1, 1, '#f08a6a'); dot(cx - 0.25, cy - 0.25, '#ffd0b8'); });
-      scatter(900, pebble);
-      scatter(1500, (x0, y0) => { ln(x0, y0 + 0.5, x0 + 1, y0 - 0.5, '#4b692f'); ln(x0 + 1, y0 - 0.5, x0 + 2, y0 + 0.5, '#6a8a3a'); ln(x0 + 2, y0 + 0.5, x0 + 3, y0 - 0.5, '#4b692f'); });
-      // a trail of little footprints wandering down toward the sea
-      for (let k = 0; k < 64; k++) { const y0 = Math.round(lawnTop + 30 + k * 9), x0 = Math.round(ww * 0.2 + Math.sin(k * 0.45) * 22 + k * 1.6); if (x0 > shoreAt(y0) - sandW(y0) - 4 || y0 > wh - 4) break; if (pondAt(x0, y0, 3)) continue; const fx = x0 + (k % 2) * 3; el(fx + 0.8, y0 + 0.6, 0.9, 0.55, G2[3]); el(fx + 0.5, y0 + 1.5, 0.55, 0.4, G2[3]); }
+      scatter(650, (x0, y0, k) => { const c = th.dots[k % 4]; el(x0 + 1, y0 + 0.4, 1.1, 0.8, c); ln(x0 + 0.5, y0 + 0.5, x0 + 1.5, y0 - 0.5, mixH(c, '#ffffff', 0.5)); dot(x0 + 1.5, y0, '#ffffff'); ln(x0 + 0.3, y0 + 1.2, x0 + 1.8, y0 + 1.2, G2[3]); });
+      const STAR = [['#f0483a', '#ff9a6a', '#b82a26'], ['#ff7a3a', '#ffc080', '#c8501e'], ['#f05a8a', '#ffb0c8', '#b83a62']];
+      scatter(1900, (x0, y0, k) => {
+        const cx = x0 + 0.5, cy = y0 + 0.5, s = k % 3 ? 1.3 : 1.55, c = STAR[k % 5 === 4 ? 2 : k % 3 === 1 ? 1 : 0], tw = (k % 5) * 0.25;
+        mixEl(cx + 0.5, cy + 1.2, 3 * s, 1.1 * s, shc, 0.3);
+        for (let a = 0; a < 5; a++) { const an = -Math.PI / 2 + a * 1.2566 + tw, ca = Math.cos(an), sa = Math.sin(an); for (const [d, r] of [[0.9, 1], [1.7, 0.82], [2.45, 0.62], [3.05, 0.44]]) el(cx + ca * d * s, cy + sa * d * 0.9 * s, r * s, r * 0.9 * s, a === 2 || a === 3 ? c[2] : c[0]); }
+        el(cx, cy, 1.25 * s, 1.1 * s, c[0]);
+        for (let a = 0; a < 5; a++) { const an = -Math.PI / 2 + a * 1.2566 + tw; dot(cx + Math.cos(an) * 1.4 * s, cy + Math.sin(an) * 1.25 * s, c[1]); }
+        dot(cx - 0.25, cy - 0.25, c[1]);
+      });
+      scatter(2200, pebble);
+      scatter(3600, (x0, y0) => { ln(x0, y0 + 0.5, x0 + 1, y0 - 0.5, '#4b692f'); ln(x0 + 1, y0 - 0.5, x0 + 2, y0 + 0.5, '#6a8a3a'); ln(x0 + 2, y0 + 0.5, x0 + 3, y0 - 0.5, '#4b692f'); });
     } else if (th.deco === 'moonlit') {
-      scatter(75, tuft);
+      scatter(130, tuft); scatter(190, wisp);
       scatter(620, (x0, y0, k) => { dot(x0 + 0.25, y0 + 0.25, k % 2 ? '#7fe0f0' : '#c9a2f0'); if (k % 3 === 0) dot(x0 + 1, y0 + 1, '#4fb8a8'); });
+      // glowing specks: a soft halo and a bright core (gold or ice blue), a little four-point twinkle on some
+      scatter(650, (x0, y0, k) => {
+        const cx = x0 + 0.5, cy = y0 + 0.5, c = k % 3 ? '#fff27a' : '#9ff8ff', big = k % 3 === 0;
+        mixEl(cx, cy, big ? 3.4 : 2.4, big ? 2.9 : 2.1, c, 0.2); mixEl(cx, cy, big ? 1.7 : 1.2, big ? 1.5 : 1.05, c, 0.5); el(cx, cy, 0.55, 0.5, '#ffffff');
+        if (big || k % 4 === 1) { const r = big ? 2.4 : 1.6; ln(cx - r, cy, cx + r, cy, c); ln(cx, cy - r, cx, cy + r, c); }
+      });
+      scatter(900, single); scatter(3200, cluster);
       scatter(1200, (x0, y0) => stamp(x0 - 1, y0 - 3, ['..h...', '.cccc.', 'cccccc', '..ss..', '..ss.d', '..ss..'], { h: '#c8fff8', c: '#5fe8e0', s: '#e0e8ff', d: sh }));
       scatter(1500, (x0, y0) => stamp(x0 - 1, y0 - 3, ['..w...', '..pd..', '.ppd..', '.ppdd.', 'lppdd.', '..pd..'], { w: '#ffffff', p: '#c09af0', d: '#7a50c0', l: '#8a6ad0' }));
-      scatter(1000, pebble); scatter(950, flower);
+      scatter(1400, pebble); scatter(950, flower);
     } else if (th.deco === 'candy') {
-      scatter(100, (x0, y0, k) => { const c = th.dots[k % 4]; if (k % 2) ln(x0 + 0.25, y0 + 0.25, x0 + 1.5, y0 + 0.25, c, 1); else ln(x0 + 0.25, y0 + 0.25, x0 + 0.75, y0 + 1.5, c, 1); });
-      scatter(650, (x0, y0, k) => { const c = ['#f07a84', '#99e550', '#fff27a', '#c9a2f0'][k % 4]; el(x0 + 1.7, y0 + 2.3, 1.6, 0.5, sh); el(x0 + 1.5, y0 + 1.2, 1.6, 1.25, c); el(x0 + 1, y0 + 0.6, 0.6, 0.35, '#ffffff'); });
+      scatter(105, (x0, y0, k) => { const c = th.dots[k % 4]; if (k % 2) ln(x0 + 0.25, y0 + 0.25, x0 + 1.5, y0 + 0.25, c, 1); else ln(x0 + 0.25, y0 + 0.25, x0 + 0.75, y0 + 1.5, c, 1); });
+      // gumdrops (the mockup's): one to three bright sugar domes, a lit top and a glint, a darker foot and a soft shadow
+      const GUM = ['#f04848', '#f8a030', '#f8d838', '#62cc4a', '#4a90f0', '#b070e0', '#ff7ab8'].map(c => [c, mixH(c, '#4a2a5a', 0.35), mixH(c, '#ffffff', 0.55)]);
+      const gum = (cx, cy, g, s) => {
+        mixEl(cx + 0.4, cy + 0.5, 2.2 * s, 0.75 * s, shc, 0.45);
+        el(cx, cy, 1.85 * s, 1.6 * s, g[1], cy + 0.3); el(cx - 0.1 * s, cy - 0.2 * s, 1.65 * s, 1.4 * s, g[0], cy);
+        el(cx - 0.6 * s, cy - 0.85 * s, 0.7 * s, 0.4 * s, g[2]); dot(cx - 0.8 * s, cy - 1.05 * s, '#ffffff');
+      };
+      scatter(800, (x0, y0, k) => { const n = 1 + (k % 3); for (let i = 0; i < n; i++) gum(x0 + 0.5 + [0, 3, 1.4][i] * 1.75, y0 + 0.5 + [0, 0.7, 2.2][i], GUM[(k + i * 3) % GUM.length], i === 2 ? 1.45 : 1.7); });
       scatter(750, (x0, y0) => { dot(x0 + 0.25, y0 + 0.25, '#ffffff'); dot(x0 - 0.25, y0 + 0.25, '#e8fff6'); dot(x0 + 0.75, y0 + 0.25, '#e8fff6'); dot(x0 + 0.25, y0 - 0.25, '#e8fff6'); });
       scatter(1700, (x0, y0) => { el(x0 + 0.5, y0 + 2.4, 2.6, 0.5, sh); el(x0 + 0.5, y0 + 1, 2.4, 1.1, '#ffffff'); el(x0 - 1.6, y0 + 1, 0.7, 1, '#f07a84'); el(x0 + 2.6, y0 + 1, 0.7, 1, '#f07a84'); el(x0 + 0.5, y0 + 0.9, 0.6, 0.6, '#f07a84'); });
       scatter(260, tuft);
+    }
+    // ---- soft shadows under the scenery (painted with the ground, so the props and fruit trees stand on them) ----
+    const TALL = { tree: 1, bigtree: 1, palm: 1, glowtree: 1, lollitree: 1 }, FLAT = { towel: 1, shells: 1, rockpool: 1, gumdrops: 1, donut: 1 };
+    for (const q of (Lw.props || []).concat(Lw.trees || [])) {
+      if (!q.c || FLAT[q.kind]) continue;
+      const w = artW(q.c);
+      if (TALL[q.kind]) mixEl(q.x + 1.5, q.y - 0.4, Math.max(6, w * 0.38), 2.8, shc, 0.42);
+      else mixEl(q.x + 0.8, q.y - 0.3, Math.max(3, w * 0.44), 1.8, shc, 0.34);
     }
     // ---- shore: pebbles and shells in the sand ----
     for (let y = wt + 4; y < wh; y += 5 + Math.floor(hash2(y, 1, AS) * 6)) { const s = shoreAt(y), x0 = s - sandW(y) + 1 + Math.floor(hash2(y, 2, AS) * Math.max(1, sandW(y) - 3)), c = hash2(y, 3, AS) > 0.5 ? th.sandEdge : '#fffaf0'; dot(x0 + 0.25, y + 0.25, c); dot(x0 + 0.75, y + 0.25, mixH(c, th.sand, 0.5)); }
     // ---- water: glints, then plants / reefs / an island ----
     const waterSpot = (lo, hi, avoidDock) => { for (let k = 0; k < 10; k++) { const y0 = Math.round(Lw.minY + 4 + rr() * (Lw.maxY - Lw.minY - 6)), s = shoreAt(y0), x0 = Math.round(s + 3 + (lo + rr() * (hi - lo)) * (ww - s - 6)); if (!avoidDock || Math.abs(y0 - Lw.dockY) > 7 || x0 > Lw.dockX1 + 6) return [x0, y0]; } return null; };
-    for (let k = 0; k < Math.round((ww - shoreAt(Lw.minY)) * (wh - wt) / 260); k++) { const y0 = Math.round(wt + 6 + rr() * (wh - wt - 6)), s = shoreAt(y0), x0 = Math.round(s + 4 + rr() * (ww - s - 8)), w = 2 + Math.floor(rr() * 3), c = mixH(W0[depthK(x0, y0) > 0.45 ? 2 : 1], th.hl, 0.45); R(x0, y0 + 0.5, w, FP, c); R(x0 + 0.5, y0, w - 1, FP, mixH(c, th.hl, 0.5)); }
+    for (let k = 0; k < Math.round((ww - shoreAt(Lw.minY)) * (wh - wt) / 260); k++) { const y0 = Math.round(wt + 6 + rr() * (wh - wt - 6)), s = shoreAt(y0), x0 = Math.round(s + 4 + rr() * (ww - s - 8)), w = 2 + Math.floor(rr() * 3), c = k % 3 === 0 ? '#ffffff' : mixH(W0[depthK(x0, y0) > 0.45 ? 2 : 1], th.hl, 0.5); R(x0, y0 + 0.5, w, FP, c); R(x0 + 0.5, y0, w - 1, FP, mixH(c, th.hl, 0.5)); }
     Lw.glowPts = [];
     const wk = clamp(Lw.span / 300, 1, 3); // (the big garden's lake is taller: more reeds and lily pads along it)
     const reeds = (x0, y0, n, stem, tip, glow) => {
@@ -835,18 +957,34 @@
         R(x0, y0 - 5, FP, 4, '#ffffff'); R(x0 - 3, y0 + 1, 8, FP, '#ffffff'); R(x0 - 2.5, y0 + 1 + FP, 7, FP, mixH('#ffffff', th.water[1], 0.5));
       }
     }
-    // ---- the little ponds on the lawn: a soft rim (stones, sand or icing), shallow water round a deeper middle, a lit inner edge,
-    // and the area's own touches: lily pads (meadow), glowing lotus (moonlit), pebbles and a starfish (beach), sprinkles (candy) ----
-    const RIM = { meadow: ['#a8906a', '#d8c49a'], beach: ['#a89a88', '#d8ccbc'], moonlit: ['#4a587a', '#7a88aa'], candy: ['#e8a2c4', '#fff4f8'] }[area] || ['#a8906a', '#d8c49a'];
+    // ---- the little ponds on the lawn (the mockups': a ring of round stones round bright water with soft ripple rings), and each
+    // area's own touches: lily pads (meadow), glowing stones and lotus (moonlit), a white rim and a starfish (beach), frosting
+    // rings and a sugar swirl (candy) ----
+    const STONES = { meadow: [['#e8dec6', '#a89878', '#fffaf0']], beach: [['#c8c4d0', '#8a8496', '#f4f2f8']],
+      moonlit: [['#e0a6d8', '#8a5a9a', '#fbe4ff'], ['#a88ae8', '#5a48a0', '#e8dcff'], ['#6ccab8', '#2a7a7a', '#d4fff4'], ['#9fd8ff', '#3a70a8', '#ecf8ff']] }[area];
     (Lw.ponds || []).forEach((Pd, pi) => {
-      const cx = Pd.x + 0.5, cy = Pd.y + 0.5, rx = Pd.rx, ry = Pd.ry;
-      el(cx + 0.5, cy + 1.2, rx + 2.4, ry + 1.6, th.shade);
-      el(cx, cy, rx + 1.9, ry + 1.3, RIM[0]); el(cx - 0.3, cy - 0.4, rx + 1.3, ry + 0.8, RIM[1]);
-      el(cx, cy + 0.2, rx, ry, W0[0]); el(cx + 0.2, cy + 0.6, rx - 2.2, ry - 1.4, mixH(W0[0], W0[1], 0.5)); el(cx + 0.3, cy + 0.8, rx - 3.6, ry - 2.3, W0[1]);
-      el(cx + 0.4, cy + 1, rx * 0.5, ry * 0.42, mixH(W0[1], W0[2], 0.5)); el(cx + 0.5, cy + 1.1, rx * 0.32, ry * 0.26, W0[2]);
-      // the far inner edge in shade, a lit line along the near one, and a few glints
-      for (let fx = Math.round((cx - rx + 2) * SK); fx < Math.round((cx + rx - 2) * SK); fx++) { const x = (fx + 0.5) * FP, d = (x - cx) / rx, h = ry * Math.sqrt(Math.max(0, 1 - d * d)); dot(x, cy + 0.2 - h + 0.6, mixH(W0[0], W0[2], 0.55)); dot(x, cy + 0.2 + h - 0.8, mixH(W0[0], '#ffffff', 0.45)); }
-      for (let k = 0; k < Math.round(rx / 6); k++) { const gx = cx - rx * 0.5 + rr() * rx, gy = cy - ry * 0.3 + rr() * ry * 0.8; R(gx, gy, 2, FP, mixH(W0[1], th.hl, 0.6)); R(gx + 0.5, gy - FP, 1, FP, '#ffffff'); }
+      const cx = Pd.x + 0.5, cy = Pd.y + 0.5, rx = Pd.rx, ry = Pd.ry, PW = th.pondW || W0;
+      mixEl(cx + 0.6, cy + 1.6, rx + 3.6, ry + 2.6, shc, 0.4);
+      if (area === 'candy') { el(cx, cy + 0.3, rx + 3, ry + 2.1, '#f2a46a'); el(cx, cy, rx + 2.4, ry + 1.6, '#ffd6a8'); el(cx, cy + 0.1, rx + 1.3, ry + 0.9, '#ffffff'); }
+      else if (area === 'beach') el(cx, cy + 0.2, rx + 1.6, ry + 1.1, '#ffffff');
+      else el(cx, cy + 0.3, rx + 1, ry + 0.8, mixH(PW[2], '#10204a', 0.35));
+      el(cx, cy + 0.2, rx, ry, PW[0]); el(cx + 0.2, cy + 0.6, rx - 2.2, ry - 1.4, mixH(PW[0], PW[1], 0.5)); el(cx + 0.3, cy + 0.8, rx - 3.6, ry - 2.3, PW[1]);
+      el(cx + 0.4, cy + 1, rx * 0.5, ry * 0.42, mixH(PW[1], PW[2], 0.5)); el(cx + 0.5, cy + 1.1, rx * 0.32, ry * 0.26, PW[2]);
+      // soft ripple rings, the far inner edge in shade, a lit line along the near one, and a few glints
+      ring(cx + 0.3, cy + 0.9, rx * 0.68, ry * 0.62, mixH(PW[1], '#ffffff', 0.45)); ring(cx + 0.4, cy + 1, rx * 0.4, ry * 0.36, mixH(PW[2], '#ffffff', 0.4));
+      for (let fx = Math.round((cx - rx + 2) * SK); fx < Math.round((cx + rx - 2) * SK); fx++) { const x = (fx + 0.5) * FP, d = (x - cx) / rx, h = ry * Math.sqrt(Math.max(0, 1 - d * d)); dot(x, cy + 0.2 - h + 0.6, mixH(PW[0], PW[2], 0.55)); dot(x, cy + 0.2 + h - 0.8, mixH(PW[0], '#ffffff', 0.45)); }
+      for (let k = 0; k < Math.round(rx / 6); k++) { const gx = cx - rx * 0.5 + rr() * rx, gy = cy - ry * 0.3 + rr() * ry * 0.8; R(gx, gy, 2, FP, mixH(PW[1], th.hl, 0.6)); R(gx + 0.5, gy - FP, 1, FP, '#ffffff'); }
+      // the ring of round stones, back to front (a little bush between some of them in the meadow)
+      if (STONES) {
+        const ex = rx + 1.5, ey = ry + 1.1, n = Math.round(6.2832 * Math.sqrt((ex * ex + ey * ey) / 2) / (area === 'beach' ? 5.2 : 3.4)), st = [];
+        for (let k = 0; k < n; k++) { const a = k / n * 6.2832 + 0.15; st.push([cx + Math.cos(a) * ex, cy + 0.2 + Math.sin(a) * ey, k]); }
+        st.sort((p, q) => p[1] - q[1]);
+        for (const [sx, sy, k] of st) {
+          const C = STONES[k % STONES.length], r = (area === 'beach' ? 1.4 : 1.75) + hash2(k, pi, AS + 9) * 0.5;
+          el(sx + 0.3, sy + 0.55, r + 0.15, r * 0.74, C[1]); el(sx, sy, r, r * 0.72, C[0]); el(sx - r * 0.32, sy - r * 0.3, r * 0.42, r * 0.24, C[2]);
+          if (area === 'meadow' && k % 7 === 3) { el(sx, sy - 1.1, 2.3, 1.7, '#3f9418'); el(sx - 0.3, sy - 1.5, 1.7, 1.1, '#6cc226'); dot(sx - 0.9, sy - 2, '#b8ee5a'); }
+        }
+      }
       if (area === 'meadow') {
         reeds(Math.round(cx - rx + 3), Math.round(cy - 1), 3, '#4b8a3a', '#8f563b');
         for (const [ox, oy, big, fl] of [[0.25, 0.25, 1, 1], [-0.35, 0.45, 0, 0], [0.55, -0.1, 0, 1]]) {
@@ -857,12 +995,13 @@
       } else if (area === 'moonlit') {
         reeds(Math.round(cx + rx - 3), Math.round(cy - 1), 3, '#2a4a60', '#9ff8ff', true);
         for (const [ox, oy] of [[-0.3, 0.3], [0.3, 0.45]]) { const lx = cx + ox * rx, ly = cy + oy * ry; el(lx + 0.2, ly + 0.5, 2.6, 1.1, '#1f4040'); el(lx, ly, 2.5, 1.05, '#2a5a5a'); el(lx - 0.2, ly - 0.35, 1.7, 0.55, '#3f7a70'); stamp(lx - 1.5, ly - 3, ['..w...', '.eee..', 'peeep.', '.ppp..'], { w: '#ffffff', e: '#e0d0ff', p: '#c09af0' }); Lw.glowPts.push({ x: Math.round(lx - 0.5), y: Math.round(ly - 2.5) }); }
+        // (the glowing pond: a few soft lights in the water)
+        for (const [ox, oy] of [[-0.55, -0.05], [0.05, 0.1], [0.5, -0.2]]) Lw.glowPts.push({ x: Math.round(cx + ox * rx), y: Math.round(cy + oy * ry) });
       } else if (area === 'beach') {
-        for (let k = 0; k < 10; k++) { const a = k / 10 * 6.283 + 0.3, px = cx + Math.cos(a) * (rx + 1.6), py = cy + Math.sin(a) * (ry + 1.1); el(px + 0.2, py + 0.6, 1.5, 0.8, '#8a7e70'); el(px, py, 1.4, 0.9, '#b8b0a4'); dot(px - 0.5, py - 0.5, '#e8e2d8'); }
-        const sx = cx + rx * 0.35, sy = cy + ry * 0.3; for (let a = 0; a < 5; a++) { const an = -Math.PI / 2 + a * Math.PI * 2 / 5; ln(sx, sy, sx + Math.cos(an) * 2, sy + Math.sin(an) * 1.6, '#f08a6a', 2); } el(sx, sy, 0.8, 0.8, '#f08a6a');
+        const sx = cx + rx * 0.35, sy = cy + ry * 0.3; for (let a = 0; a < 5; a++) { const an = -Math.PI / 2 + a * Math.PI * 2 / 5; ln(sx, sy, sx + Math.cos(an) * 2, sy + Math.sin(an) * 1.6, '#f05a3a', 2); } el(sx, sy, 0.8, 0.8, '#f05a3a');
       } else if (area === 'candy') {
-        for (let k = 0; k < Math.round(rx * 0.8); k++) { const a = rr() * 6.28, d = Math.sqrt(rr()) * 0.8, px = cx + Math.cos(a) * rx * d, py = cy + Math.sin(a) * ry * d; dot(px, py, ['#ffffff', '#fff27a', '#9fd8ff'][k % 3]); }
-        el(cx - rx * 0.3 + 0.5, cy + 1.6, 3.4, 0.9, mixH(W0[1], '#7a4a6a', 0.3)); el(cx - rx * 0.3, cy, 3, 2.4, '#c9a2f0'); el(cx - rx * 0.3 - 0.8, cy - 0.9, 1.2, 0.7, '#f0e2ff'); dot(cx - rx * 0.3 - 1.2, cy - 1.3, '#ffffff');
+        ring(cx + 0.4, cy + 0.9, rx * 0.55, ry * 0.5, '#f6a6d8'); ring(cx + 0.5, cy + 1, rx * 0.28, ry * 0.26, '#c9a2f0');
+        for (let k = 0; k < Math.round(rx * 0.8); k++) { const a = rr() * 6.28, d = Math.sqrt(rr()) * 0.8, px = cx + Math.cos(a) * rx * d, py = cy + Math.sin(a) * ry * d; dot(px, py, ['#ffffff', '#fff27a', '#f6a6d8'][k % 3]); }
       }
       Pd.i = pi;
     });
@@ -1707,7 +1846,7 @@
       }
       case 'bush': puff(6, 'leaf', x, top + h * 0.3, w / 2); if (Math.random() < 0.4) flutterOut(x, top + 2); break;
       case 'leafy': // a tree that bears no fruit: leaves (or sweets) shake down and sometimes a butterfly flutters out
-        if (q.kind === 'lollitree') puff(7, 'bit', x, top + h * 0.3, w * 0.4, SWEETS);
+        if (q.kind === 'lollitree' || area === 'candy') puff(7, 'bit', x, top + h * 0.3, w * 0.4, SWEETS);
         else { puff(q.kind === 'glowtree' ? 5 : 7, 'leaf', x, top + h * 0.3, w * 0.4); if (q.kind === 'glowtree') puff(4, 'spark', x, top + h * 0.35, w * 0.4, ['#c8fff8', '#ffffff']); }
         if (Math.random() < 0.45) flutterOut(x, top + 3);
         break;
@@ -2005,9 +2144,8 @@
     return -1;
   }
   function drawTree(ti, hintT) {
-    const T = Lw.trees[ti], c = T.c;
-    shadow(T.x, T.y, Math.round(artW(c) * 0.6));
-    drawProp(T);
+    const T = Lw.trees[ti];
+    drawProp(T); // (its shadow is painted with the ground: paintLand)
     const sl = treeSlots(), hint = hintT === ti, ox = T.ox || 0;
     if (ox) bx.translate(ox, 0);
     sl.forEach((s, i) => {
@@ -2323,7 +2461,7 @@
     // lamps, windows, glowing props
     if (Lw.lamp) { glow(Lw.lamp.x, Lw.lamp.y, 7, '255,236,150', 0.35 * lit); lampLit(Lw.lamp); }
     if (Lw.house) { const hc = Lw.house.c, X = Lw.house.x - Math.floor(artW(hc) / 2) + Math.round(artW(hc) * 0.64), Y = Lw.house.y - artH(hc) + Math.round(artH(hc) * 0.62); glow(X, Y, 5, '255,236,150', 0.4 * lit); bx.fillStyle = '#fff27a'; bx.fillRect(X - 1, Y - 1, 1.5, 1.5); bx.fillStyle = '#fffbd0'; bx.fillRect(X - 1, Y - 1, FP, FP); }
-    for (const p of Lw.props) { const g = GLOWS[p.kind]; if (!g || p.x < VR.x0 - 12 || p.x > VR.x1 + 12 || p.y < VR.y0 - 4 || p.y - 30 > VR.y1) continue; const pulse = 0.8 + Math.sin(t * 2 + p.x) * 0.2; glow(p.x, p.y - artH(p.c) * g[1], g[2], g[3], 0.3 * lit * pulse); }
+    for (let n2 = 0; n2 < 2; n2++) for (const p of n2 ? Lw.trees || [] : Lw.props) { const g = GLOWS[p.kind]; if (!g || p.x < VR.x0 - 16 || p.x > VR.x1 + 16 || p.y < VR.y0 - 4 || p.y - 50 > VR.y1) continue; const pulse = 0.8 + Math.sin(t * 2 + p.x) * 0.2; glow(p.x, p.y - artH(p.c) * g[1], g[2], g[3], 0.3 * lit * pulse); }
     // the rest house's windows light up (brighter when someone is inside)
     if (Lw.home) {
       const H = Lw.home; let full = false; for (const s of PS.S.sprouts) if (s.area === area && s.home) { full = true; break; }
@@ -2338,7 +2476,7 @@
     if (Lw.beacon && Math.floor(t * 1.2) % 3 !== 2) { glow(Lw.beacon.x, Lw.beacon.y, 5, '255,242,170', 0.5 * lit); bx.fillStyle = '#fff27a'; bx.fillRect(Lw.beacon.x - 1, Lw.beacon.y, 3, 1); bx.fillStyle = '#ffffff'; bx.fillRect(Lw.beacon.x - FP, Lw.beacon.y, 1, FP); }
     if (area === 'moonlit') for (let i = 0; i < FLOAT_MOON.length; i++) { const p = floatPos(DECO.floats[i]); if (!p || p.x < VR.x0 - 8 || p.x > VR.x1 + 8 || p.y < VR.y0 - 4 || p.y > VR.y1 + 8) continue; glow(p.x, p.y - 4, 6, '255,220,140', 0.28 * lit); const Y = p.y - 4.5 + (Math.floor(t * DECO.floats[i].v * 2 + DECO.floats[i].ph) % 2); bx.fillStyle = '#fff27a'; bx.fillRect(p.x, Y, 1, 1); bx.fillStyle = '#ffffff'; bx.fillRect(p.x, Y, FP, FP); }
     // fireflies: a glowing dot with a white-hot centre
-    const count = Math.round(((th.bigMoon ? 6 : 0) + 10 * n) * (Lw.landK || 1)); // (the big garden has more, spread all over it)
+    const count = Math.round(((th.bigMoon ? 16 : 0) + 10 * n) * (Lw.landK || 1)); // (the big garden has more, spread all over it)
     for (let i = 0; i < Math.min(count, DECO.flies.length); i++) {
       const f = DECO.flies[i], p = t * 0.25 + f.p;
       const x = Math.round(8 + (Math.sin(p * 1.3 + f.a * 6) * 0.5 + 0.5) * (shoreAt(Lw.minY + 20) - 12)), y = Math.round(Lw.minY - 6 + (Math.sin(p * 1.9 + f.b * 6) * 0.5 + 0.5) * Lw.span * 0.8);
@@ -3735,6 +3873,7 @@
     uiT -= dt;
     if (uiT <= 0) {
       uiT = 0.4;
+      checkPics();
       // hints pop up briefly on arrival; the holding hint, a new player's first-egg hint and the first lessons stay while they apply
       if (hintReset) { hintReset = false; hintUntil = t + 4; }
       const holding = here.some(r => r.state === 'held'), firstEgg = !PS.S.sprouts.length && PS.S.eggs.some(e => e.area === area);
