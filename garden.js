@@ -3528,8 +3528,8 @@
 .g-arrow svg{width:18px;height:18px}
 .g-pill{background:var(--panel);border:2px solid var(--line);border-bottom:4px solid var(--edge);border-radius:16px;padding:4px 14px 5px;text-align:center;min-width:0;max-width:240px;flex:0 1 auto;color:var(--ink);cursor:pointer;-webkit-tap-highlight-color:transparent}
 .g-pill:active{transform:translateY(2px);border-bottom-width:2px;margin-top:2px}
-.g-pill b{display:flex;align-items:center;justify-content:center;gap:5px;font-family:var(--f-px);font-weight:700;font-size:18px;line-height:1.1;white-space:nowrap}
-.g-pill .g-dd{width:11px;height:7px;flex:0 0 auto;color:var(--ink-soft);margin-top:1px}
+.g-pill b{display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--f-px);font-weight:700;font-size:18px;line-height:1.1;white-space:nowrap}
+.g-pill .g-dd{width:26px;height:26px;flex:0 0 auto;box-sizing:border-box;padding:2px;border-radius:50%;background:var(--accent);border:2px solid var(--accent-edge);box-shadow:0 2px 0 var(--accent-edge);color:#fff}
 .g-pill .g-ps{display:block;font-size:13px;color:var(--ink-soft);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .g-dots{display:flex;gap:5px;justify-content:center;margin-top:3px}
 .g-dots i{width:7px;height:7px;border-radius:2px;background:var(--line)}
@@ -3618,7 +3618,7 @@
       <canvas class="g-cv" aria-label="The garden. Tap and drag to care for your Sprouts."></canvas>
       <div class="g-top">
         <button class="g-arrow" data-d="-1" type="button">${chev(-1)}</button>
-        <button class="g-pill" type="button" aria-haspopup="dialog"><b><span class="g-pn"></span><svg class="g-dd" viewBox="0 0 7 4" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path d="M0 0h7v1H6v1H5v1H4v1H3V3H2V2H1V1H0z"/></svg></b><span class="g-ps"></span><span class="g-dots">${AREA_IDS.map(() => '<i></i>').join('')}</span></button>
+        <button class="g-pill" type="button" aria-haspopup="dialog"><b><span class="g-pn"></span><svg class="g-dd" viewBox="0 0 9 9" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path d="M1 2h1v2H1zM2 3h1v2H2zM3 4h1v2H3zM4 5h1v2H4zM5 4h1v2H5zM6 3h1v2H6zM7 2h1v2H7z"/></svg></b><span class="g-ps"></span><span class="g-dots">${AREA_IDS.map(() => '<i></i>').join('')}</span></button>
         <button class="g-arrow" data-d="1" type="button">${chev(1)}</button>
       </div>
       <button class="g-zoom" type="button" aria-label="See the whole garden"><svg viewBox="0 0 16 16" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true">
