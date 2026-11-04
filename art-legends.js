@@ -404,7 +404,7 @@
   // a battle (box 78 = 156 fine px) draws it 1:1. Once a picture has loaded, PX.legend draws it for every frame and size; until
   // then, or in Node (tools/check_game.js), the code art below stands in (the original six fall back to their rare-creature art).
   const IMG_IDS = ['golem', 'yeti', 'griffin', 'dinosaur', 'kraken', 'phoenix', 'dragon', 'stormwhale', 'moonwolf', 'crystaltortoise', 'sunlion', 'starserpent'];
-  const FACES_LEFT = { crystaltortoise: 1, sunlion: 1, starserpent: 1 }; // (mirrored so every Legend faces right, like the code art)
+  const FACES_LEFT = { starserpent: 1 }; // (mirrored so every Legend faces right, like the code art)
   const IMG = {};
   if (typeof window.Image === 'function') for (const id of IMG_IDS) {
     const im = new window.Image();
