@@ -12,6 +12,9 @@
 //                          below 0.6 no hi-hats; below 0.5 the second voice (countermelody / arpeggios) fades, silent at 0;
 //                          below 0.35 no snare; below 0.15 no drums at all (melody and bass always play). Back to 1 when the
 //                          track changes, so call it after play().
+// Night raids (Nov 2026, part B): tracks 'raid' (the Gloomlings' night attack) and 'raid-boss' (the Gloom King), jingles 'raid-win'
+// and 'raid-lose' (both lead back to the garden track that was playing before the raid), sounds 'gloom' (one appears), 'poof'
+// (one is beaten) and 'portal' (a shadow portal opens).
 // Style: a cosy, magical sun-and-moon garden. Bright, bouncy and sunny by day (never a lullaby), twinkly and dreamy but still
 // upbeat at night, sporty for races, plucky and heroic for battles (straight rhythm, no swing), grand for the Legends, playful in
 // the arcade. Square-wave chiptune voices like the rest of Solunar's sounds.
@@ -111,6 +114,10 @@
       cheer: () => { sweep(0.7, 0.07, 900, 2400, 0, 0.8); [784, 988, 1175, 1568].forEach((f, i) => tone(f, f, 0.1, 'square', 0.026, i * 0.06)); },
       bloop: () => { tone(280, 820, 0.11, 'sine', 0.09); tone(820, 520, 0.06, 'triangle', 0.035, 0.09); },
       twinkle: () => { [2093, 2794, 2637, 3520].forEach((f, i) => tone(f, f * 0.99, 0.09, 'triangle', 0.035, i * 0.05)); },
+      // night raids (part B): cute-spooky, never scary
+      gloom: () => { tone(185, 370, 0.16, 'triangle', 0.09); tone(370, 294, 0.17, 'triangle', 0.07, 0.14); sweep(0.32, 0.03, 300, 1100, 0, 3); }, // a soft "bwoo-ooh" as one pops out
+      poof: () => { noise(0.12, 0.09, 1100); [1568, 2093, 2637].forEach((f, i) => tone(f, f * 1.01, 0.08, 'triangle', 0.03, 0.06 + i * 0.045)); }, // a puff, then sparkles
+      portal: () => { sweep(0.7, 0.055, 220, 1500, 0, 2.2); tone(110, 330, 0.55, 'triangle', 0.08); tone(220, 660, 0.55, 'sine', 0.03, 0.05); [988, 1319].forEach((f, i) => tone(f, f, 0.14, 'sine', 0.03, 0.5 + i * 0.07)); },
     };
     // (no more than 8 sounds start in any quarter second.) Only when the audio is really running: an iPad Home Screen app often
     // leaves it paused ('suspended' / 'interrupted'), and sounds queued on a paused clock never end, so they piled up by the
@@ -157,7 +164,7 @@
       get state() { return ac ? ac.state : 'none'; },
       get muted() { return muted; }, set muted(v) { const was = muted; muted = !!v; if (was !== muted) emit('mute'); },
       names: Object.keys(fx),
-      // dev only (test page): render one sound offline and measure it
+      // dev only (test page): render one sound offline and measure it (o.keep: also return the samples as pcm)
       _render(n, o) {
         const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
         if (!OC || !fx[n]) return Promise.resolve(null);
@@ -167,7 +174,9 @@
         return off.startRendering().then(b => {
           const x = b.getChannelData(0); let pk = 0, ss = 0, nan = 0, end = 0;
           for (let i = 0; i < x.length; i++) { const v = x[i]; if (v !== v) { nan++; continue; } const av = Math.abs(v); if (av > pk) pk = av; ss += v * v; if (av > 1e-4) end = i; }
-          return { name: n, peak: +pk.toFixed(4), rms: +Math.sqrt(ss / x.length).toFixed(4), nan, end: +(end / 44100).toFixed(2) };
+          const r = { name: n, peak: +pk.toFixed(4), rms: +Math.sqrt(ss / x.length).toFixed(4), nan, end: +(end / 44100).toFixed(2) };
+          if (o && o.keep) r.pcm = x;
+          return r;
         });
       },
     };
@@ -589,6 +598,37 @@
         mel: 'C6:4 E6:4 A6:4 G6:4 | E6:4 G6:4 B6:4 G6:4 | F6:4 A6:4 C7:4 A6:4 | G6:4 B6:4 D7:8 | ' +
           'E6:2 D6:2 C6:2 E6:2 A6:4 C7:4 | B6:2 A6:2 G6:2 E6:2 B5:4 E6:4 | A6:2 G6:2 F6:2 C6:2 A5:4 C6:4 | D6:1 E6:1 F6:1 G6:1 A6:1 B6:1 C7:1 D7:1 G6:4> r:4' } } };
 
+  // Night raid — "Shadows on the Lawn" (F# minor, 156): the Gloomlings tiptoe in over a sly bass and a creepy little half-step
+  // wobble (Am / Bb, the Neapolitan), then the Sprouts answer with a bright hook that climbs a step at a time; an arpeggio middle
+  // and a tiptoe breakdown before it loops. Tense but bouncy: a game of tag in the dark, never scary.
+  const RAIDT = { name: 'Shadows on the Lawn', bpm: 156, key: -3, wave: [25, 12], form: 'i | A B A2 C',
+    S: {
+      i: { chords: 'Am | E7', bass: 'pedal', drums: 'sneak', fill: 'up', every: 2,
+        mel: "A4:2' r:2 C5:2' r:2 E5:2' r:2 D#5:2 E5:2 | G#4:2' r:2 B4:2' r:2 D5:2' F5:2' E5:4>" },
+      A: { chords: 'Am:8 Bb:8 | Am | Am:8 Bb:8 | E7 | F | G | Am:8 F:8 | E7', harm: 'off', bass: 'sly', drums: 'raid', fill: 'fill', every: 4,
+        mel: "A4:2 C5:2 E5:2 F5:2 D5:2' F5:2' Bb5:4 | A5:3 G#5:1 A5:2 E5:2 C5:2 E5:2 A4:4 | A4:2 C5:2 E5:2 A5:2 Bb5:2' A5:2' F5:2 D5:2 | E5:2 G#5:2 B5:2 D6:2 C6:2 B5:2 G#5:4 | " +
+          "A5:2 C6:2 F6:4 E6:2 C6:2 A5:4 | B5:2 D6:2 G6:4 F6:2 D6:2 B5:4 | C6:2 E6:2 A6:2 G6:2 F6:2 E6:2 D6:2 C6:2 | B5:2 G#5:2 E5:2 G#5:2 B5:4> r:4" },
+      A2: { base: 'A', harm: 'harm3', drums: 'drive' },
+      B: { chords: 'Dm | Dm | Am | Am | F | E7 | Am:8 F:8 | E7', harm: 'arp8', bass: 'walk', drums: 'rock', fill: 'fill2', every: 8,
+        mel: 'D6:4 F6:4 A6:6 G#6:2 | A6:2 G6:2 F6:2 E6:2 D6:8 | C6:4 E6:4 A6:6 G6:2 | A6:2 G6:2 E6:2 C6:2 A5:8 | ' +
+          'A5:2 C6:2 F6:2 A6:2 C7:4 A6:4 | G#6:2 B6:2 D7:2 B6:2 G#6:4 E6:4 | A6:4 E6:2 C6:2 F6:4 C6:2 A5:2 | B5:2 C6:2 D6:2 E6:2 G#6:4> B6:4>' },
+      C: { chords: 'Am | Bb | Am | E7', harm: 'skip', bass: 'pedal', drums: 'sneak', fill: 'up', every: 4,
+        mel: "A5:1' r:1 A5:1' r:1 C6:1' r:1 E6:1' r:1 A6:2' r:2 G#6:2 A6:2 | Bb5:1' r:1 Bb5:1' r:1 D6:1' r:1 F6:1' r:1 Bb6:2' r:2 A6:2 Bb6:2 | " +
+          "A6:2 E6:2 C6:2 A5:2 E5:2 C5:2 A4:4 | E5:1 F5:1 G#5:1 A5:1 B5:1 C6:1 D6:1 E6:1 G#6:4> r:4" } } };
+
+  // Raid boss — "The Gloom King's Waltz" (G minor, 3/4, 174): the King waddles in to his own pompous haunted-carnival organ
+  // waltz (oom-pah-pah), a show-off major middle, then a tiptoe and a big "ta-da" before it loops. Silly-grand, never scary.
+  const KINGW = { name: "The Gloom King's Waltz", bpm: 174, key: -2, bar: 12, wave: ['org', 25], vol: [1.1, 0.8, 1.1, 0.85], form: 'i | A B A2 C',
+    S: {
+      i: { chords: 'Am | E7', harm: 'waltz', bass: 'waltz', drums: 'wsoft', mel: "A4:4> C5:4> E5:4> | G#5:8~ E5:2' r:2" },
+      A: { chords: 'Am | Am | Dm | Dm | E7 | E7 | Am | E7', harm: 'waltz', bass: 'waltz', drums: 'waltz', fill: 'wfill', every: 4,
+        mel: "E5:4 A5:4 C6:4 | B5:2 C6:2 B5:2 A5:2 E5:4 | F5:4 A5:4 D6:4 | C6:2 D6:2 C6:2 A5:2 F5:4 | E5:4 G#5:4 B5:4 | D6:2 C6:2 B5:2 G#5:2 E5:4 | A5:2 B5:2 C6:2 E6:2 A6:4> | G#6:4 E6:4 B5:2' r:2" },
+      A2: { base: 'A', harm: 'harm3', bass: 'wl' },
+      B: { chords: 'F | G | C | Am | Dm | G7 | C | E7', harm: 'waltz', bass: 'wl', drums: 'waltz', fill: 'wfill', every: 8,
+        mel: 'A5:6 C6:2 F6:4 | D6:6 B5:2 G5:4 | E6:4 G6:4 C7:4 | B6:2 C7:2 B6:2 A6:2 E6:4 | F6:6 E6:2 D6:4 | F6:2 E6:2 D6:2 B5:2 G5:4 | C6:4 E6:4 G6:4 | G#6:4 B6:4 E7:4>' },
+      C: { chords: 'Am | Bb | Am | E7', harm: 'waltz', bass: 'waltz', drums: 'wsoft', fill: 'wfill', every: 4,
+        mel: "A5:2' r:2 C6:2' r:2 E6:2' r:2 | Bb5:2' r:2 D6:2' r:2 F6:2' r:2 | E6:2 C6:2 A5:2 E5:2 C5:2 A4:2 | B4:2 D5:2 E5:2 G#5:2 B5:4>" } } };
+
   // track id -> one song, or a playlist (each song plays its loops, then hands over to the next on the beat)
   const DEF = {
     title: TITLE,
@@ -603,6 +643,8 @@
     victory: VICTORY,
     evolve: EVOLVE,
     'hatch-wait': EGGWAIT,
+    raid: RAIDT,
+    'raid-boss': KINGW,
   };
   // short fanfares (one-shot): hand-written second voice and bass, raw drum strings
   const J = {
@@ -624,6 +666,12 @@
     daily: { bpm: 140, mel: "G5:2 C6:1 D6:1 E6:2 C6:1 E6:1 G6:2' E6:1 G6:1 C7:4>", harm: 'mel:E5:2 G5:1 G5:1 C6:2 G5:1 C6:1 E6:2 C6:1 E6:1 E6:4',
       bass: 'mel:C3:4 F2:2 G2:2 C3:2 G2:2 C3:4', dr: 'K...K.S.K...SSo.' },
     newpage: { bpm: 150, mel: 'D6:1 E6:1 G6:1 A6:1 G6:1 A6:1 C7:4>', harm: 'mel:B5:1 C6:1 E6:1 F6:1 E6:1 F6:1 E6:4', bass: 'mel:G2:2 C3:2 F2:2 C3:4' },
+    // the gloom is chased off: a bright moonlit fanfare that skips up to a twinkling high chord
+    'raid-win': { bpm: 150, mel: "E5:1 G5:1 C6:1 E6:1 D6:2' C6:1 D6:1 E6:1 G6:1 A6:2' G6:1 E6:1 C7:6>",
+      harm: "mel:C5:1 E5:1 G5:1 C6:1 B5:2' A5:1 B5:1 C6:1 E6:1 F6:2' E6:1 C6:1 G6:6", bass: 'mel:C3:4 G2:2 C3:2 F2:2 G2:2 C3:8', dr: 'K...S...K.K.S.S.K...' },
+    // the Moon Owl saved the night: a gentle music-box "that's all right" that dips and then climbs home (warm, not sad)
+    'raid-lose': { bpm: 132, gain: 0.9, wave: ['tri', 'sine'], vol: [1.1, 0.75, 0.8, 1], gate: 0.9, mel: "G5:2 E5:2 C5:3 D5:1 E5:2 F5:2 E5:2 D5:2 C5:1 D5:1 E5:1 G5:1 C6:6~",
+      harm: 'mel:E5:2 C5:2 A4:3 B4:1 C5:2 D5:2 C5:2 B4:2 A4:1 B4:1 C5:1 E5:1 G5:6', bass: 'mel:C3:4 A2:4 F2:4 G2:4 F2:2 G2:2 C3:6' },
   };
 
   // ================= synth =================
@@ -764,6 +812,7 @@
 
   // ================= player =================
   const ACTION = new Set(['battle', 'battle-boss', 'tower', 'race', 'arcade']); // (a win after these leads into the victory loop)
+  const RAIDS = new Set(['raid', 'raid-boss']); // (garden night raids: never the hub; 'raid-win' / 'raid-lose' lead back to the hub)
   const KEY = 'solunar:music'; // '0' = music off on this device, '1' / missing = on
   let mOff = false; try { mOff = localStorage.getItem(KEY) === '0'; } catch (e) { /* default: music on */ }
   let want = null, cur = null, decks = [], jdk = null, jAfter, jBlock = false, hub = null, resumeAt = null;
@@ -841,7 +890,7 @@
       if (!DEF[id]) return; // unknown ids are ignored
       if (id === want && cur && !jBlock && timer) return; // same track already playing: nothing to do (scenes may call this every frame)
       jAfter = undefined; // a scene's own choice beats a fanfare's planned follow-up
-      if (id !== want) { tempoK = 1; inten = 1; if (want && !ACTION.has(want) && want !== 'evolve' && want !== 'victory' && want !== 'hatch-wait') hub = want; want = id; }
+      if (id !== want) { tempoK = 1; inten = 1; if (want && !ACTION.has(want) && !RAIDS.has(want) && want !== 'evolve' && want !== 'victory' && want !== 'hatch-wait') hub = want; want = id; }
       sync();
     } catch (e) { /* optional */ }
   }
@@ -854,7 +903,8 @@
   function tempo(k) { tempoK = Math.max(0.5, Math.min(2, +k || 1)); } // resets to 1 when the track changes
   function intensity(k) { const v = k == null ? 1 : +k; inten = v === v ? Math.max(0, Math.min(1, v)) : 1; } // resets to 1 too
   // Fanfares duck the music to 30% and bring it back. After a battle / race / tower / arcade track, "victory" and "trophy"
-  // lead into the victory loop and "lose" into quiet; "evolved" after the evolve loop (and "hatch" after hatch-wait) returns to the track from before it.
+  // lead into the victory loop and "lose" into quiet; "evolved" after the evolve loop (and "hatch" after hatch-wait) returns to the track from before it;
+  // "raid-win" / "raid-lose" after a raid track return to the garden track from before the raid.
   function jingle(id) {
     try {
       const song = fanfare(id); if (!song) return;
@@ -865,6 +915,7 @@
       else if (id === 'lose' && ACTION.has(now)) after = null;
       else if (id === 'evolved' && now === 'evolve') after = hub;
       else if (id === 'hatch' && now === 'hatch-wait') after = hub;
+      else if ((id === 'raid-win' || id === 'raid-lose') && RAIDS.has(now)) after = hub;
       if (!canRun()) { if (after !== undefined) { want = after; jAfter = undefined; } return; } // no stale fanfare later, only its follow-up
       if (jdk) { kill(jdk, 0.03); jdk = null; }
       jAfter = after; jBlock = after !== undefined;

@@ -117,6 +117,11 @@
     }
     const d = s.daily;
     if (d) for (const k of ['gift', 'at', 'n']) if (d[k] != null && typeof d[k] !== 'number') { repairs.push('daily.' + k); delete d[k]; }
+    // night raids (garden.js, made when first needed): raidsOff = the grown-up switch (true = no raids); raids = { night: the
+    // clock phase of the last raid (one a night), wins, losses, kings (Gloom Kings beaten) }. A wrong type starts it over.
+    if (s.raidsOff != null && typeof s.raidsOff !== 'boolean') { repairs.push('raidsOff'); if (s.raidsOff === 1 || s.raidsOff === 'true') s.raidsOff = true; else delete s.raidsOff; }
+    if (s.raids != null && !isObj(s.raids)) { repairs.push('raids'); delete s.raids; }
+    if (s.raids) for (const k of ['night', 'wins', 'losses', 'kings']) if (s.raids[k] != null && (typeof s.raids[k] !== 'number' || !isFinite(s.raids[k]))) { repairs.push('raids.' + k); delete s.raids[k]; }
   }
   // battle.js keeps its own progress in progress.battleExtra (bosses, tower, friend, snack, seen, wild). Only wrong types are fixed;
   // missing parts are fine (battle.js fills them in when it needs them).

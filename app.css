@@ -298,3 +298,36 @@ html body .screen :is(.r-head .label,.r-head .r-sub){color:#fff;text-shadow:0 1p
   .sv-evo.done .sv-cel-hero{animation:svFade .3s ease-out both}
   .goal-chip.pop{animation:none}
 }
+
+/* ---------- the garden's area drop-down (app.js pickMap: tap the garden's name) ---------- */
+.am-drop{position:absolute;inset:0;z-index:30}
+.am-back{position:absolute;inset:0;background:rgba(60,44,24,.28);animation:svFade .18s ease-out both}
+.am-panel{position:absolute;left:50%;top:120px;transform:translateX(-50%);width:calc(100% - 16px);max-width:690px;background:var(--panel);
+  border:2px solid var(--line);border-bottom:5px solid var(--edge);border-radius:22px;padding:8px 10px 10px;box-shadow:0 12px 34px rgba(60,44,24,.3);
+  transform-origin:50% 0;animation:amDrop .22s ease-out both}
+.am-panel::before{content:'';position:absolute;left:50%;top:-11px;margin-left:-10px;border:10px solid transparent;border-top:0;border-bottom:10px solid var(--line)}
+.am-panel::after{content:'';position:absolute;left:50%;top:-8px;margin-left:-8px;border:8px solid transparent;border-top:0;border-bottom:8px solid var(--panel)}
+.am-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 0 6px 6px}
+.am-head b{font-size:21px;color:var(--ink)}
+.am-x{width:40px;height:40px;border-radius:12px;border:2px solid var(--line);background:var(--slot);display:grid;place-items:center;padding:0;color:var(--ink)}
+.am-x:active{transform:translateY(2px)}
+.am-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(154px,1fr));gap:8px;max-height:calc(100vh - 230px);overflow-y:auto;touch-action:pan-y;overscroll-behavior:contain;padding:2px}
+.am-card{display:grid;justify-items:center;align-content:start;gap:3px;background:var(--field);border:2px solid var(--line);border-bottom-width:4px;border-radius:16px;padding:6px 4px 6px;color:var(--ink);min-height:48px}
+.am-card:active{transform:translateY(2px);border-bottom-width:2px;margin-bottom:2px}
+.am-card.on{background:#fff4c2;border-color:var(--sun-edge)}
+.am-card:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.am-pic{position:relative;display:block;line-height:0}
+.am-pv{width:150px;height:84px;border-radius:10px;box-shadow:0 0 0 2px var(--line)}
+.am-card.on .am-pv{box-shadow:0 0 0 2px var(--sun-edge)}
+.am-here{position:absolute;left:5px;top:5px;font:700 13px/18px var(--f-ui);font-style:normal;background:var(--sun);border:2px solid var(--sun-edge);color:#4a3210;border-radius:8px;padding:0 6px}
+.am-egg{position:absolute;right:4px;bottom:3px;width:20px;height:24px;animation:amEgg 1.6s ease-in-out infinite}
+.am-name{font-size:17px;line-height:1.1;margin-top:2px}
+.am-who{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:0;min-height:32px}
+.am-face{width:32px;height:32px;margin:0 -3px}
+.am-more,.am-none{font:600 13.5px var(--f-ui);font-style:normal;color:var(--ink-soft);margin-left:6px}
+.am-none{margin-left:0}
+.am-drop.am-out .am-panel{animation:amUp .16s ease-in forwards}.am-drop.am-out .am-back{animation:svFadeOut .16s forwards}
+@keyframes amDrop{from{opacity:0;transform:translate(-50%,-12px) scaleY(.94)}to{opacity:1;transform:translateX(-50%)}}
+@keyframes amUp{to{opacity:0;transform:translate(-50%,-10px) scaleY(.96)}}
+@keyframes amEgg{0%,80%,100%{transform:none}86%{transform:rotate(-9deg)}92%{transform:rotate(8deg)}}
+@media (prefers-reduced-motion:reduce){.am-panel,.am-back{animation:svFade .15s ease-out both}.am-egg{animation:none}.am-drop.am-out .am-panel{animation:svFadeOut .15s forwards}}

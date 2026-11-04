@@ -40,10 +40,14 @@
     holdDelay: 0.28, rubStep: 10, walkSpeed: 10, walkPerRunLv: 0.2, gravity: 420, flutterFall: 20, flutterAt: 8, holdLift: 16,
     drainDay: 0.2, drainNight: 0.38, sleepAt: 15, regenDay: 9, regenNight: 6, happyDecay: 0.012,
     maxCritters: 2, maxDrops: 3, dropLife: 40, flutterXpMax: 3, flutterCooldown: 8, xpFlushSec: 3,
-    // camera: the world is sized so it all fits at zoomMin; you start at zoomDef x zoomMin and can pinch between.
-    // (1.5 css px per world px zoomed out; the default 2x = 3 css px per world px, the same close-up size as before.)
-    // (zoomMin fits worldW across or worldH down, whichever is smaller, so a landscape iPad isn't zoomed right in)
-    worldW: 280, worldH: 250, zoomMinPx: 1.5, zoomDef: 2, zoomMax: 4, edgePan: 90, smellRange: 85, maxGroundFruit: 12,
+    // camera: at zoomMin the screen shows about worldW x worldH world px (it fits worldW across or worldH down, whichever is
+    // smaller, so a landscape iPad isn't zoomed right in). The garden itself is mapW x mapH that view (a big garden to explore,
+    // like PVZ Garden's), and zooming all the way out (the magnifier, a double tap) shows the whole of it at once. You start at
+    // zoomDef x zoomMin (the same close-up size as before) and can pinch between. Sprouts wander a little at a time (up to
+    // wander px a walk) and drift back toward the heart of their garden (the house) when they're more than homeRange px from
+    // it, so a small child can always find them.
+    worldW: 280, worldH: 250, mapW: 2.05, mapH: 1.7, zoomMinPx: 1.5, zoomDef: 1.6, zoomMax: 4, edgePan: 90, smellRange: 85, maxGroundFruit: 12,
+    wander: 80, homeRange: 190,
   };
   const PART_NAMES = { wings: 'wings', ears: 'long ears', fins: 'fins', horns: 'horns', tail: 'a tail', shell: 'a shell', antennae: 'antennae',
     claws: 'claws', spikes: 'spikes', fluff: 'fluff', tentacles: 'tentacles', spots: 'star spots', batwings: 'bat wings', fairywings: 'fairy wings',
@@ -59,7 +63,14 @@
   const plantFrame = c => (PX.critterFrames && PX.critterFrames(c.id) > 1 ? FRAME_SEQ[Math.floor(t * 3 + c.ph * 3) % FRAME_SEQ.length] : 0);
 
   // ---------------- Area themes ----------------
-  // props: [kind, x as share of width, y as share of the walkable span]. Night is an overlay colour (rgb + max alpha).
+  // Layout of the big garden. Positions are [u, v]: u = share of the lawn's width at that height (0 = the left edge, 1 = the sand
+  // by the water), v = share of the lawn's height (0 = the back, by the hills; 1 = the front). tree0: the main fruit tree (its 3
+  // fruit slots are the ones old saves have); fruitTrees: the other fruit trees, in the order their saved slots come (new trees
+  // only ever go on the end); home: the rest house; nest: where eggs wait; ponds: [u, v, rx, ry] little ponds (world px);
+  // paths: [from, to, bend] between 'tree', 'home', 'dock', 'pond' or a [u, v] point; props: single pieces of scenery;
+  // groups: [u, v, [[kind, dx, dy], ...]] little scenes (offsets in world px); sprinkle: [kind, weight] for the seeded scatter
+  // that fills the rest (it never covers the house, trees, ponds, paths, the nest or another prop). Night is an overlay colour
+  // (rgb + max alpha).
   // mount/far/near: distant scenery layers. grass: 4 ground tones (light..dark) for the dithered lawn. deco: which ground details to scatter.
   const TH = {
     meadow: {
@@ -70,10 +81,15 @@
       dots: ['#ffffff', '#fbf236', '#f7b6c8', '#c9a2f0'], dotC: '#df7126', sand: '#efe0b4', wet: '#d9c38e', sandEdge: '#c9b27a',
       water: ['#9fe6f7', '#5fcde4', '#3f9fd0', '#2f7fb8'], foam: '#ffffff', hl: '#d6f5fd', cloud: ['#ffffff', '#dfeafc', '#bccdf0'],
       path: ['#f2e9cf', '#e2d3ae', '#c4ae86'], night: [20, 18, 64, 0.36], dim: 0, tree: 'bigtree', house: true, deco: 'meadow', fish: '32,70,120',
-      props: [['bush', 0.5, 0.0], ['fence', 0.33, 0.01], ['rock', 0.2, 0.7], ['flowerbed', 0.42, 0.9], ['bush', 0.05, 0.22], ['stump', 0.16, 0.44],
-        ['flowerbed', 0.1, 0.96], ['bench', 0.28, 0.62], ['mushrooms', 0.5, 0.8], ['bush', 0.48, 0.99], ['rock', 0.05, 0.39]],
-      home: ['shroomhouse', 0.42, 0.72],
-      fruitTrees: [['tree', 0.5, 0.56], ['tree', 0.06, 0.66], ['tree', 0.26, 0.88]],
+      tree0: [0.2, 0.1], home: ['shroomhouse', 0.5, 0.44], nest: [0.68, 0.53],
+      fruitTrees: [['tree', 0.86, 0.2], ['tree', 0.07, 0.52], ['tree', 0.3, 0.72], ['tree', 0.8, 0.9]],
+      ponds: [[0.2, 0.9, 25, 9]], paths: [['tree', 'dock', 0.18], ['tree', 'home', -0.24], ['home', 'pond', 0.2]],
+      props: [['bush', 0.47, 0.0], ['fence', 0.33, 0.01], ['fence', 0.62, 0.0], ['rock', 0.22, 0.34], ['stump', 0.13, 0.38], ['bench', 0.3, 0.56],
+        ['mushrooms', 0.6, 0.64], ['bush', 0.5, 0.97], ['rock', 0.04, 0.68], ['flowerbed', 0.08, 0.96], ['lamp', 0.4, 0.47], ['bush', 0.96, 0.44]],
+      groups: [[0.74, 0.35, [['flowerbed', -15, 0], ['flowerbed', 11, 3], ['bench', -2, -10]]], [0.44, 0.84, [['bench', 0, 0], ['lamp', 13, -1]]],
+        [0.09, 0.22, [['stump', 0, 0], ['mushrooms', 10, 4], ['mushrooms', -9, 5]]], [0.92, 0.66, [['rock', 0, 0], ['rock', 10, 4], ['bush', -11, 3]]],
+        [0.6, 0.8, [['tree', 0, 0], ['bush', 15, 5], ['flowerbed', -15, 6]]], [0.36, 0.2, [['bush', 0, 0], ['flowerbed', 15, 3]]]],
+      sprinkle: [['bush', 3], ['rock', 2], ['flowerbed', 2], ['mushrooms', 1], ['stump', 1], ['tree', 1]],
     },
     beach: {
       sky: ['#48b8f0', '#6fcaf5', '#98dbf8', '#c8eefc'], skyN: ['#14214a', '#1c2d5e', '#243a70', '#2f4a82'],
@@ -82,11 +98,15 @@
       dots: ['#f7b6c8', '#ffffff', '#f5a86a', '#fbf3dc'], dotC: '#e07ba0', sand: '#f3dc9c', wet: '#e0c283', sandEdge: '#d9bd7c',
       water: ['#8ee8f0', '#3fc0e0', '#2a8fd0', '#1f6fb0'], foam: '#ffffff', hl: '#d6f5fd', cloud: ['#ffffff', '#dfeafc', '#bccdf0'],
       path: null, night: [20, 18, 64, 0.36], dim: 0, tree: 'palm', surf: true, openSea: true, deco: 'beach', fish: '20,60,120',
-      props: [['umbrella', 0.44, 0.04], ['sandcastle', 0.33, 0.86], ['shells', 0.08, 0.62], ['rockpool', 0.47, 0.97], ['shells', 0.34, 0.3],
-        ['umbrella', 0.12, 0.93], ['driftwood', 0.2, 0.7], ['surfboard', 0.47, 0.6], ['bucket', 0.42, 0.88], ['ball', 0.28, 0.08],
-        ['towel', 0.44, 0.46], ['rock', 0.47, 0.36], ['shells', 0.46, 0.76]],
-      home: ['beachhut', 0.14, 0.52],
-      fruitTrees: [['palm', 0.06, 0.34], ['palm', 0.05, 0.8], ['palm', 0.32, 0.68]],
+      tree0: [0.16, 0.1], home: ['beachhut', 0.32, 0.46], nest: [0.52, 0.52],
+      fruitTrees: [['palm', 0.07, 0.32], ['palm', 0.06, 0.78], ['palm', 0.56, 0.68], ['palm', 0.84, 0.12]],
+      ponds: [[0.66, 0.9, 26, 10]], paths: [],
+      props: [['umbrella', 0.44, 0.04], ['shells', 0.1, 0.6], ['shells', 0.34, 0.3], ['umbrella', 0.12, 0.94], ['driftwood', 0.22, 0.72], ['ball', 0.28, 0.08],
+        ['towel', 0.48, 0.05], ['rock', 0.97, 0.3], ['shells', 0.96, 0.72], ['bucket', 0.7, 0.58], ['sandcastle', 0.04, 0.5]],
+      groups: [[0.72, 0.3, [['umbrella', 0, 0], ['towel', 13, 3], ['ball', -13, 4]]], [0.24, 0.6, [['umbrella', 0, 0], ['towel', 12, 4]]],
+        [0.36, 0.84, [['sandcastle', 0, 0], ['bucket', 13, 3], ['shells', -12, 4]]], [0.92, 0.48, [['rockpool', 0, 0], ['rock', 13, 4], ['shells', -11, 5]]],
+        [0.9, 0.82, [['surfboard', 0, 0], ['driftwood', -15, 5]]], [0.58, 0.2, [['palm', 0, 0], ['shells', 13, 3]]]],
+      sprinkle: [['shells', 3], ['rock', 1], ['driftwood', 1], ['bucket', 1], ['sandcastle', 1], ['palm', 1]],
     },
     moonlit: {
       sky: ['#3b2f6e', '#553d86', '#7a4f98', '#a868a8'], skyN: ['#110e2e', '#19153e', '#231c50', '#2f2462'],
@@ -96,10 +116,15 @@
       dots: ['#9fd8ff', '#c9a2f0', '#a6f2d3', '#fff6c9'], dotC: '#ffffff', sand: '#b9b3cc', wet: '#8f88a8', sandEdge: '#7a7496',
       water: ['#6a7cb8', '#4a5a98', '#36427e', '#283068'], foam: '#cbdbfc', hl: '#9fb0e8', cloud: ['#9a88c8', '#7e6cb0', '#665498'],
       path: ['#c0c0d8', '#9a9ab8', '#6a6a8e'], night: [26, 14, 60, 0.32], dim: 0.16, tree: 'glowtree', bigMoon: true, deco: 'moonlit', fish: '10,10,40',
-      props: [['crystal', 0.44, 0.0], ['glowshroom', 0.16, 0.56], ['lantern', 0.44, 0.9], ['glowshroom', 0.48, 0.5], ['crystal', 0.08, 0.95], ['lantern', 0.3, 0.3],
-        ['mushrooms', 0.16, 0.9], ['moonstone', 0.12, 0.4], ['fern', 0.3, 0.72], ['fern', 0.04, 0.2], ['moonstone', 0.49, 0.96]],
-      home: ['crystalcave', 0.3, 0.9],
-      fruitTrees: [['glowtree', 0.08, 0.76], ['glowtree', 0.46, 0.72]],
+      tree0: [0.2, 0.12], home: ['crystalcave', 0.46, 0.5], nest: [0.64, 0.58],
+      fruitTrees: [['glowtree', 0.09, 0.66], ['glowtree', 0.84, 0.66], ['glowtree', 0.8, 0.14]],
+      ponds: [[0.25, 0.88, 24, 9]], paths: [['tree', 'dock', 0.2], ['tree', 'home', -0.2], ['home', 'pond', 0.2]],
+      props: [['crystal', 0.44, 0.0], ['glowshroom', 0.17, 0.5], ['lantern', 0.42, 0.9], ['glowshroom', 0.62, 0.42], ['crystal', 0.07, 0.96], ['lantern', 0.31, 0.3],
+        ['mushrooms', 0.13, 0.82], ['moonstone', 0.12, 0.36], ['fern', 0.32, 0.68], ['fern', 0.04, 0.2], ['moonstone', 0.97, 0.96], ['lantern', 0.66, 0.24]],
+      groups: [[0.84, 0.36, [['crystal', 0, 0], ['crystal', 11, 4], ['moonstone', -11, 4]]], [0.1, 0.42, [['glowshroom', 0, 0], ['mushrooms', 11, 4], ['fern', -11, 3]]],
+        [0.6, 0.86, [['fern', 0, 0], ['fern', 13, 3], ['moonstone', -12, 4]]], [0.93, 0.84, [['moonstone', 0, 0], ['crystal', 11, 3]]],
+        [0.54, 0.22, [['glowtree', 0, 0], ['glowshroom', 15, 4]]]],
+      sprinkle: [['fern', 2], ['glowshroom', 2], ['moonstone', 1], ['mushrooms', 1], ['crystal', 1], ['glowtree', 1]],
     },
     candy: {
       sky: ['#f6a6d0', '#f9bcdc', '#fbd2e6', '#fde6f0'], skyN: ['#2e1a4e', '#3c2260', '#4c2a72', '#5e3484'],
@@ -109,12 +134,18 @@
       dots: ['#f07a84', '#fff27a', '#639bff', '#ffffff'], dotC: '#f08cbc', sand: '#fde6b8', wet: '#f5c890', sandEdge: '#e8b87c',
       water: ['#b8f5ec', '#8ee0e0', '#f5a6cc', '#e07ba0'], foam: '#ffffff', hl: '#ffffff', cloud: ['#ffffff', '#fbe4f2', '#f2c4e0'],
       path: ['#ffffff', '#fcd8e8', '#e8a2c4'], night: [40, 16, 70, 0.36], dim: 0, tree: 'lollitree', house: true, fizz: true, deco: 'candy', fish: '150,40,100',
-      props: [['candycane', 0.5, 0.03], ['cupcake', 0.07, 0.74], ['gumdrops', 0.2, 0.9], ['gumball', 0.12, 0.46], ['candycane', 0.14, 0.98], ['gumdrops', 0.1, 0.2],
-        ['donut', 0.47, 0.62], ['lollipop', 0.26, 0.72], ['lollipop', 0.47, 0.45], ['icecream', 0.3, 0.98], ['donut', 0.2, 0.6], ['gumdrops', 0.48, 0.97]],
-      home: ['gingerhouse', 0.5, 0.83],
-      fruitTrees: [['lollitree', 0.36, 0.84], ['lollitree', 0.06, 0.92], ['lollitree', 0.45, 0.2]],
+      tree0: [0.22, 0.1], home: ['gingerhouse', 0.56, 0.5], nest: [0.38, 0.57],
+      fruitTrees: [['lollitree', 0.66, 0.86], ['lollitree', 0.07, 0.92], ['lollitree', 0.86, 0.2], ['lollitree', 0.1, 0.46]],
+      ponds: [[0.33, 0.8, 23, 9]], paths: [['tree', 'dock', 0.2], ['tree', 'home', -0.18], ['home', 'pond', 0.22]],
+      props: [['cupcake', 0.06, 0.72], ['gumdrops', 0.2, 0.94], ['candycane', 0.14, 0.99], ['gumdrops', 0.08, 0.2], ['donut', 0.5, 0.68],
+        ['lollipop', 0.25, 0.66], ['icecream', 0.3, 0.98], ['donut', 0.22, 0.56], ['gumdrops', 0.97, 0.97], ['cupcake', 0.7, 0.4]],
+      groups: [[0.86, 0.56, [['gumball', 0, 0], ['cupcake', 14, 4], ['icecream', -13, 4]]], [0.44, 0.02, [['candycane', -13, 0], ['candycane', 0, 1], ['candycane', 13, 0]]],
+        [0.16, 0.3, [['donut', 0, 0], ['donut', 12, 4], ['lollipop', -11, 3]]], [0.76, 0.76, [['gumdrops', 0, 0], ['gumdrops', 12, 4], ['gumdrops', -11, 5]]],
+        [0.42, 0.34, [['lollipop', 0, 0], ['lollipop', 11, 4], ['lollipop', -11, 5]]], [0.62, 0.18, [['lollitree', 0, 0], ['gumdrops', 15, 4]]]],
+      sprinkle: [['gumdrops', 2], ['lollipop', 1], ['donut', 1], ['cupcake', 1], ['candycane', 1], ['icecream', 1]],
     },
   };
+  PS.gardenThemes = TH; // (the area drop-down's postcards use these colours: app.js mapPreview)
   // where fruit hangs on each tree (share of sprite width/height from the base)
   const TREE_SLOTS = {
     palm: [[-0.08, -0.74], [0.14, -0.69], [0.34, -0.76]],
@@ -127,7 +158,7 @@
     mummy: { c: ['#fffaf0', '#e8dcc0'], fx: 'wisp', glow: '255,240,205' }, candycorn: { c: ['#ffffff', '#ff9a22', '#ffd23a'], fx: 'wisp', glow: '255,205,110' },
     vampire: { c: ['#4a3a6c', '#e8506a', '#c9a2f0'], fx: 'bat', glow: '230,90,130' }, witch: { c: ['#8e56c8', '#9ad862', '#fff27a'], fx: 'bat', glow: '190,255,150' },
   };
-  const GLOWS = { lantern: [0.5, 0.8, 9, '255,236,150'], glowshroom: [0.5, 0.6, 7, '170,240,255'], crystal: [0.5, 0.55, 7, '180,220,255'], moonstone: [0.5, 0.5, 6, '160,230,255'], mushrooms: [0.5, 0.5, 4, '170,240,255'] };
+  const GLOWS = { lamp: [0.5, 0.8, 8, '255,236,150'], lantern: [0.5, 0.8, 9, '255,236,150'], glowshroom: [0.5, 0.6, 7, '170,240,255'], crystal: [0.5, 0.55, 7, '180,220,255'], moonstone: [0.5, 0.5, 6, '160,230,255'], mushrooms: [0.5, 0.5, 4, '170,240,255'] };
 
   // ---------------- seeded decoration ----------------
   let seed = 7; const srand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -143,6 +174,16 @@
   for (let i = 0; i < 3; i++) DECO.birds.push({ p: srand(), y: 0.2 + srand() * 0.4, v: 0.012 + srand() * 0.01, ph: srand() * 6 });
   // (more fireflies for the night sky; added last so everything above keeps its old seeded place)
   for (let i = 0; i < 6; i++) DECO.flies.push({ p: srand() * 10, a: srand(), b: srand() });
+  // (the big garden: more of everything, spread over it; each is drawn only when it's on screen)
+  for (let i = 0; i < 60; i++) DECO.stars.push({ x: srand(), y: srand(), tw: srand() > 0.78, ph: srand() * 6 });
+  for (let i = 0; i < 90; i++) DECO.waves.push({ x: srand(), y: srand(), ph: srand() * 6.28, w: 2 + Math.floor(srand() * 3) });
+  for (let i = 0; i < 7; i++) DECO.clouds.push({ x: srand(), y: 0.1 + srand() * 0.45, s: i % 3, v: 0.8 + srand() * 1.4 });
+  for (let i = 0; i < 44; i++) DECO.flies.push({ p: srand() * 10, a: srand(), b: srand() });
+  for (let i = 0; i < 6; i++) DECO.fish.push({ a: 0.15 + srand() * 0.6, b: srand(), r: 0.08 + srand() * 0.12, v: 0.05 + srand() * 0.06, ph: srand() * 6.28, big: i === 2 });
+  for (let i = 0; i < 9; i++) DECO.bugs.push({ p: srand() * 10, a: srand(), b: srand(), c: i });
+  for (let i = 0; i < 9; i++) DECO.drift.push({ p: srand(), y: srand(), v: 0.03 + srand() * 0.03, ph: srand() * 6.28, c: i });
+  for (let i = 0; i < 4; i++) DECO.floats.push({ a: 0.1 + srand() * 0.8, b: 0.1 + srand() * 0.8, ph: srand() * 6.28, v: 0.4 + srand() * 0.4, k: 4 + i });
+  for (let i = 0; i < 4; i++) DECO.birds.push({ p: srand(), y: 0.2 + srand() * 0.4, v: 0.012 + srand() * 0.01, ph: srand() * 6 });
 
   // ---------------- sprites (guarded: art is still being drawn, so nothing may crash) ----------------
   const sprCache = new Map();
@@ -221,6 +262,13 @@
   let W = 0, H = 0, DPR = 1, ww = 0, wh = 0, t = 0, visible = false, mounted = false, area = 'meadow';
   // camera (Z = CSS px per world px; cam = world px at the top-left of the screen)
   let Z = 3, ZMIN = 2, ZMAX = 6, camX = 0, camY = 0, zoomAnim = null, pinch = null, camV = { x: 0, y: 0 }, lastTapBg = null, zoomSnapT = 0;
+  // ZFAR: zoomed all the way out, the whole garden fits above the tray. follow: the Sprout the camera gently keeps in view (the
+  // partner when you arrive, one you tapped or found); a drag or pinch lets it go. VR: the world px on screen this frame.
+  let ZFAR = 1, follow = null, findEl = null, findId = '', findKey = '';
+  // night raids (see 'night raids' below): the one going on (only ever in one area), and when the next may come
+  let raid = null;
+  const raidHere = () => !!raid && raid.area === area;
+  const VR = { x0: 0, y0: 0, x1: 0, y1: 0 };
   let zoomBack = null, zoomBtn = null, cryAt = -9, lampT = -9, signT = -9, nextShoot = 0, hatchWait = 0;
   const touches = new Map();          // pointerId -> {x, y} (client coords) for fingers that went down on the garden
   const lastClient = { x: -1, y: -1, on: false };
@@ -244,70 +292,152 @@
   let hintUntil = 0, hintReset = true;
 
   // ---------------- geometry ----------------
-  const shoreAt = y => Lw.shore[clamp(Math.round(y), 0, Lw.shore.length - 1)] || ww * 0.6;
+  const shoreAt = y => Lw.shore[clamp(Math.round(y), 0, Lw.shore.length - 1)] || ww * 0.75;
   const onDock = (x, y) => x >= Lw.dockX0 && x <= Lw.dockX1 && Math.abs(y - Lw.dockY) <= 2;
   const inWater = (x, y) => y >= Lw.waterTop + 1 && x > shoreAt(y) + 1 && !onDock(x, y);
   const depthK = (x, y) => { const s = shoreAt(y); return clamp((x - s) / Math.max(1, ww - s), 0, 1); };
   const isDeep = (x, y) => inWater(x, y) && depthK(x, y) >= 0.45;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  // the little ponds on the lawn (Lw.ponds: {x, y, rx, ry}); m widens the test by m world px
+  function pondAt(x, y, m) { for (const P of Lw.ponds || []) { const dx = (x - P.x) / (P.rx + (m || 0)), dy = (y - P.y) / (P.ry + (m || 0) * 0.6); if (dx * dx + dy * dy < 1) return P; } return null; }
+  // the shore as a smooth line: the water starts at shoreX(y) (shoreAt is the same line rounded to whole world px per row). It
+  // leans out a little toward the front and wanders gently, so the big garden's coast isn't a ruler-straight edge.
+  function shoreX(y) { const k = clamp((y - Lw.waterTop) / Math.max(1, Lw.maxY - Lw.waterTop), 0, 1.3); return ww * (0.71 + 0.05 * k) + Math.sin(k * 6 + 0.6) * 5 + Math.sin(k * 15 + 2) * 1.5; }
+  // a layout position [u, v] -> world px (u along the lawn's width at that height, v down the lawn); lawnRight: the lawn's edge
+  const lawnRight = y => shoreAt(y) - sandW(y) - 4;
+  const atUV = (u, v) => { const y = Math.round(Lw.minY + clamp(v, 0, 1) * Lw.span); return { x: Math.round(clamp(u, 0, 1) * lawnRight(y)), y }; };
 
   function layout() {
     const trayH = trayEl.offsetHeight || 110;
-    Lw.hz = Math.round(wh * 0.2);
+    // the sky keeps its height (a fifth of the screen at zoomMin); the big lawn fills the rest of the map
+    Lw.hz = Math.round(H / ZMIN * 0.2);
     Lw.minY = Lw.hz + 18;
-    Lw.maxY = Math.max(Lw.minY + 30, Math.floor((H - trayH - 16) / ZMIN));
+    Lw.maxY = Math.max(Lw.minY + 30, wh - 14);
     Lw.span = Lw.maxY - Lw.minY;
+    // zoomed all the way out, the whole garden fits the screen above the tray (a whole number of device px per world px when
+    // that's close)
+    const fit = Math.min(W / ww, (H - trayH - 8) / (Lw.maxY + 12));
+    let zf = Math.floor(fit * DPR) / DPR; if (zf < fit * 0.9) zf = fit;
+    ZFAR = Math.max(0.3, Math.min(ZMIN, zf));
+    if (Z < ZFAR - 0.001 && !pinch && !zoomAnim) Z = ZFAR;
     Lw.waterTop = Lw.hz + 2;
     Lw.shore.length = 0;
-    for (let y = 0; y <= wh + 2; y++) {
-      const k = clamp((y - Lw.waterTop) / Math.max(1, Lw.maxY - Lw.waterTop), 0, 1.3);
-      Lw.shore[y] = Math.round(ww * (0.55 + 0.09 * k) + Math.sin(k * 5.5 + 0.6) * 2.2);
-    }
+    for (let y = 0; y <= wh + 2; y++) Lw.shore[y] = Math.round(shoreX(y));
     // (the same shore as a smooth line, per world row, for drawing the foam and surf)
     Lw.sb = new Float32Array(wh + 3); for (let y = 0; y < wh + 3; y++) Lw.sb[y] = shoreB(y + 0.5);
     Lw.dockY = Math.round(Lw.minY + Lw.span * 0.3);
-    Lw.dockX0 = shoreAt(Lw.dockY) - 4; Lw.dockX1 = shoreAt(Lw.dockY) + Math.round((ww - shoreAt(Lw.dockY)) * 0.4);
-    Lw.tree = { x: Math.round(ww * 0.2), y: Math.round(Lw.minY + Lw.span * 0.14) };
+    Lw.dockX0 = shoreAt(Lw.dockY) - 4; Lw.dockX1 = shoreAt(Lw.dockY) + Math.round((ww - shoreAt(Lw.dockY)) * 0.36);
     hintEl.style.bottom = (trayH + 18) + 'px';
     buildProps();
     bgKey = ''; skyKey = '';
   }
+  // The scenery for this area at this size: ponds, the house, the fruit trees, the nest, the paths, then the props, each kept
+  // clear of what's already there (their bases never overlap, and nothing stands on a path, in a pond or in the water). The
+  // scatter is seeded by the area and the world size, so a garden looks the same on every visit.
   function buildProps() {
-    const th = TH[area], theme = themeOf(area);
+    const th = TH[area], theme = themeOf(area), foot = [];
+    const free = (x0, y0, x1, y1, grp) => { for (const f of foot) if (x0 < f[2] && x1 > f[0] && y0 < f[3] && y1 > f[1] && (grp == null || f[4] !== grp)) return false; return true; };
+    Lw.ponds = (th.ponds || []).map(([u, v, rx, ry]) => { const p = atUV(u, v); return { x: p.x, y: p.y, rx, ry }; });
+    for (const P of Lw.ponds) foot.push([P.x - P.rx - 4, P.y - P.ry - 6, P.x + P.rx + 4, P.y + P.ry + 4, null]);
     Lw.home = null; Lw.sign = null;
     if (th.home) {
-      const [kind, fx, fy] = th.home, c = propSpr(kind, theme), y = Math.round(Lw.minY + Lw.span * fy), info = (PX.HOMES && PX.HOMES[kind]) || { door: [0, 0], win: [], w: artW(c) - 8, h: artH(c) - 2 };
-      const x = Math.max(Math.round(artW(c) / 2) + 1, Math.round(Math.min(ww * fx, shoreAt(y) - artW(c) / 2 - 3)));
+      const [kind, u, v] = th.home, c = propSpr(kind, theme), info = (PX.HOMES && PX.HOMES[kind]) || { door: [0, 0], win: [], w: artW(c) - 8, h: artH(c) - 2 };
+      const p = atUV(u, v), y = p.y, x = clamp(p.x, Math.round(artW(c) / 2) + 14, lawnRight(y) - Math.round(artW(c) / 2));
       Lw.home = { kind, x, y, c, info, w: info.w, h: info.h, door: { x: x + info.door[0], y: y + info.door[1] } };
+      foot.push([x - info.w / 2 - 12, y - 14, x + info.w / 2 + 3, y + 10, null]); // (and the little sign by the door)
     }
-    const H = Lw.home;
-    Lw.props = th.props.map(([kind, fx, fy], i) => {
-      const c = propSpr(kind, theme), y = Math.round(Lw.minY + Lw.span * fy);
-      const x = Math.round(Math.min(ww * fx, shoreAt(y) - artW(c) / 2 - 3));
-      return { kind, x: Math.max(Math.round(artW(c) / 2) + 1, x), y, c, i };
-    }).filter(p => !H || Math.abs(p.x - H.x) > (artW(p.c) + H.w) / 2 - 2 || p.y < H.y - H.h + 4 || p.y - artH(p.c) > H.y - 2);
-    // fruit trees: the area's main tree first (its 3 fruit slots are the ones old saves already have), then the others
-    Lw.trees = [{ kind: th.tree, x: Lw.tree.x, y: Lw.tree.y }].concat((th.fruitTrees || []).map(([kind, fx, fy]) => {
-      const c = propSpr(kind, theme), y = Math.round(Lw.minY + Lw.span * fy);
-      return { kind, y, x: Math.max(Math.round(artW(c) / 2) + 1, Math.round(Math.min(ww * fx, shoreAt(y) - artW(c) / 2 - 3))) };
-    }));
+    // fruit trees: the area's main tree first (its 3 fruit slots are the ones old saves already have), then the others in the
+    // order their slots are saved (new trees only ever go on the end, so every saved fruit stays on the tree it grew on)
+    const t0 = atUV(...(th.tree0 || [0.2, 0.12])); Lw.tree = t0;
+    Lw.trees = [{ kind: th.tree, x: t0.x, y: t0.y }].concat((th.fruitTrees || []).map(([kind, u, v]) => { const p = atUV(u, v); return { kind, x: p.x, y: p.y }; }));
     Lw.slots = [];
     Lw.trees.forEach((T, ti) => {
-      T.c = propSpr(T.kind, theme);
-      for (const [fx, fy] of TREE_SLOTS[T.kind] || TREE_SLOTS.default) Lw.slots.push({ x: Math.round(T.x + fx * artW(T.c)), y: Math.round(T.y + fy * artH(T.c)), tree: ti });
+      T.c = propSpr(T.kind, theme); const w = artW(T.c);
+      T.x = clamp(T.x, Math.round(w / 2) + 1, lawnRight(T.y) - Math.round(w / 2));
+      foot.push([T.x - w * 0.32, T.y - 7, T.x + w * 0.32, T.y + 4, null]);
+      for (const [fx, fy] of TREE_SLOTS[T.kind] || TREE_SLOTS.default) Lw.slots.push({ x: Math.round(T.x + fx * w), y: Math.round(T.y + fy * artH(T.c)), tree: ti });
     });
+    // where eggs wait: a clear patch of lawn near the house (the heart of the garden, where Sprouts like to stay)
+    const N = atUV(...(th.nest || [0.5, 0.5])); Lw.nest = N; Lw.heart = Lw.home ? { x: Lw.home.x, y: Lw.home.y + 10 } : N;
+    foot.push([N.x - 48, N.y - 18, N.x + 48, N.y + 14, null]);
+    foot.push([Lw.dockX0 - 12, Lw.dockY - 8, Lw.dockX0 + 6, Lw.dockY + 6, null]); // (the dock's foot on the shore)
+    buildPaths(th);
+    // props: the area's own pieces, its little scenes, then the seeded scatter that fills the rest
+    Lw.props = []; let i = 0;
+    const add = (kind, x, y, grp) => {
+      const c = propSpr(kind, theme), w = artW(c); x = Math.round(x); y = Math.round(y);
+      if (x - w / 2 < 2 || x + w / 2 > lawnRight(y) || y < Lw.minY - 2 || y > Lw.maxY + 2) return false;
+      if (!free(x - w / 2 + 1, y - 6, x + w / 2 - 1, y + 3, grp) || onPathNear(x, y, w / 2) || pondAt(x, y, w / 2 + 3)) return false;
+      foot.push([x - w / 2, y - 6, x + w / 2, y + 3, grp == null ? null : grp]); Lw.props.push({ kind, x, y, c, i: i++ }); return true;
+    };
+    for (const [kind, u, v] of th.props || []) { const p = atUV(u, v); add(kind, p.x, p.y); }
+    (th.groups || []).forEach(([u, v, list], g) => { const p = atUV(u, v); for (const [kind, dx, dy] of list) add(kind, p.x + dx, p.y + dy, 'g' + g); });
+    let land = 0; for (let y = Lw.minY; y <= Lw.maxY; y += 4) land += Math.max(0, lawnRight(y)) * 4;
+    Lw.landK = clamp(land / 60000, 1, 4); // (how much bigger than the old one-screen garden: more fireflies and butterflies)
+    const S = th.sprinkle || [], tot = S.reduce((a, x) => a + x[1], 0);
+    if (tot) {
+      let rs = (AREA_IDS.indexOf(area) + 1) * 7919 + ww * 31 + wh; const rr = () => ((rs = (rs * 16807) % 2147483647) / 2147483647);
+      const want = Math.round(land / 11000);
+      for (let n = 0, tries = 0; n < want && tries < want * 10; tries++) {
+        let r = rr() * tot, kind = S[0][0]; for (const [k, wgt] of S) { r -= wgt; if (r <= 0) { kind = k; break; } }
+        const y = Lw.minY + 4 + rr() * (Lw.span - 4), x = 6 + rr() * (lawnRight(y) - 12);
+        if (add(kind, x, y)) n++;
+      }
+    }
   }
-  function lawnPoint() {
+  // the paths between the main tree, the house, the dock and the pond: gentle curves (quadratic, bent sideways by `bend` of
+  // their length), a point every ~2 world px in Lw.pathPts. Lw.pathGrid marks the 4-px cells they cross (props keep off).
+  function buildPaths(th) {
+    Lw.pathPts = []; const GW = Math.ceil(ww / 4) + 1, G = Lw.pathGrid = new Uint8Array(GW * (Math.ceil(wh / 4) + 1)); Lw.pathGW = GW;
+    if (!th.path) return;
+    const end = (k, o) => {
+      if (Array.isArray(k)) return atUV(k[0], k[1]);
+      if (k === 'tree') return { x: Lw.tree.x + 9, y: Lw.tree.y + 4 };
+      if (k === 'dock') return { x: Lw.dockX0 - 3, y: Lw.dockY + 1 };
+      if (k === 'home' && Lw.home) return { x: Lw.home.door.x, y: Lw.home.door.y + 4 };
+      if (k === 'pond' && Lw.ponds.length) { const P = Lw.ponds[0], q = o || { x: P.x + 1, y: P.y }, a = Math.atan2((q.y - P.y) / P.ry, (q.x - P.x) / P.rx); return { x: P.x + Math.cos(a) * (P.rx + 3), y: P.y + Math.sin(a) * (P.ry + 2) }; }
+      return null;
+    };
+    for (const [a, b, bend] of th.paths || []) {
+      let p0 = end(a); const p2 = end(b, p0); if (!p0 || !p2) continue;
+      if (a === 'pond') p0 = end(a, p2);
+      const L = Math.hypot(p2.x - p0.x, p2.y - p0.y); if (L < 8) continue;
+      const nx = -(p2.y - p0.y) / L, ny = (p2.x - p0.x) / L, k1 = L * (bend || 0), p1 = { x: (p0.x + p2.x) / 2 + nx * k1, y: (p0.y + p2.y) / 2 + ny * k1 };
+      const n = Math.max(20, Math.ceil(L / 2));
+      for (let k = 0; k <= n; k++) {
+        const u = k / n, A = (1 - u) * (1 - u), B = 2 * u * (1 - u), C = u * u, q = { x: A * p0.x + B * p1.x + C * p2.x, y: A * p0.y + B * p1.y + C * p2.y };
+        Lw.pathPts.push(q);
+        for (let gy = Math.floor((q.y - 5) / 4); gy <= Math.floor((q.y + 5) / 4); gy++) for (let gx = Math.floor((q.x - 6) / 4); gx <= Math.floor((q.x + 6) / 4); gx++) if (gx >= 0 && gy >= 0 && gx < GW) G[gy * GW + gx] = 1;
+      }
+    }
+  }
+  function onPathNear(x, y, r) {
+    const G = Lw.pathGrid, GW = Lw.pathGW; if (!G) return false;
+    for (let gy = Math.floor((y - 3) / 4); gy <= Math.floor((y + 2) / 4); gy++) for (let gx = Math.floor((x - r) / 4); gx <= Math.floor((x + r) / 4); gx++) if (gx >= 0 && gy >= 0 && gx < GW && G[gy * GW + gx]) return true;
+    return false;
+  }
+  // a free spot on the lawn (not on the house, a tree, a prop, a pond or in the water); near (x0, y0), up to rad px away, if given
+  function lawnPoint(x0, y0, rad) {
     for (let i = 0; i < 40; i++) {
-      const y = rand(Lw.minY + 2, Lw.maxY), x = rand(8, shoreAt(y) - 8);
+      let x, y;
+      if (x0 != null) { const a = rand(0, 6.283), d = rand(rad * 0.25, rad); x = x0 + Math.cos(a) * d; y = clamp(y0 + Math.sin(a) * d * 0.7, Lw.minY + 2, Lw.maxY); }
+      else { y = rand(Lw.minY + 2, Lw.maxY); x = rand(8, shoreAt(y) - 8); }
+      if (x < 8 || x > shoreAt(y) - 8) continue;
       if ((Lw.trees || []).some(T => Math.abs(x - T.x) < 8 && Math.abs(y - T.y) < 6)) continue;
       if (Lw.home && Math.abs(x - Lw.home.x) < Lw.home.w / 2 + 3 && y > Lw.home.y - 12 && y < Lw.home.y + 6) continue;
       if (Lw.props.some(p => Math.abs(x - p.x) < artW(p.c) / 2 && Math.abs(y - p.y) < 4)) continue;
+      if (pondAt(x, y, 4)) continue;
       return { x, y };
     }
-    return { x: ww * 0.3, y: Lw.maxY - 6 };
+    return x0 != null ? lawnPoint() : { x: Math.min(ww * 0.3, shoreAt(Lw.maxY - 6) - 10), y: Lw.maxY - 6 };
   }
-  function shallowPoint() { const y = rand(Lw.minY + 3, Lw.maxY - 2), s = shoreAt(y); return { x: s + 4 + rand(0, 0.3) * (ww - s - 4), y }; }
+  // where a Sprout wanders next: a short walk from where it is, drifting back toward the house when it's far from home
+  function wanderPoint(r) {
+    const h = Lw.heart || { x: ww * 0.4, y: Lw.minY + Lw.span * 0.5 };
+    return Math.hypot(r.x - h.x, (r.y - h.y) * 1.2) > TUNE.homeRange ? lawnPoint(lerp(r.x, h.x, 0.45), lerp(r.y, h.y, 0.45), TUNE.wander * 0.6) : lawnPoint(r.x, r.y, TUNE.wander);
+  }
+  // a spot in the shallows (near height y0 when given, so a swim doesn't cross the whole garden)
+  function shallowPoint(y0) { const y = y0 == null ? rand(Lw.minY + 3, Lw.maxY - 2) : clamp(y0 + rand(-40, 40), Lw.minY + 3, Lw.maxY - 2), s = shoreAt(y); return { x: s + 4 + rand(0, 0.3) * (ww - s - 4), y }; }
   function waterPoint(lo, hi) { const y = rand(Lw.minY + 2, Lw.maxY - 1), s = shoreAt(y); return { x: s + 3 + rand(lo, hi) * (ww - s - 6), y }; }
   function coastPoint(y0) { const y = y0 == null ? rand(Lw.minY + 4, Lw.maxY - 2) : clamp(y0, Lw.minY + 2, Lw.maxY - 1); return { x: shoreAt(y) - rand(1, 4.5), y }; }
 
@@ -367,7 +497,7 @@
   }
   // the shore as a smooth line for drawing (the game's shoreAt() is the same line rounded to whole world px per row): the water
   // starts at shoreB(y) for a point at height y
-  const shoreB = y => { const k = clamp((y - 0.5 - Lw.waterTop) / Math.max(1, Lw.maxY - Lw.waterTop), 0, 1.3); return ww * (0.55 + 0.09 * k) + Math.sin(k * 5.5 + 0.6) * 2.2 + 1; };
+  const shoreB = y => shoreX(y - 0.5) + 1;
   const sandWC = y => lerp(3, 9, clamp((y - Lw.waterTop) / Math.max(1, Lw.maxY - Lw.waterTop), 0, 1));
   // u32 colour mix (paintLand works on raw pixels)
   const mixU = (A, B, k) => {
@@ -382,7 +512,28 @@
     g.ell(n / 2, n / 2, r + 0.25, r, [lit, mid, dark]); PX.hd(g, { outer: false });
     c = g.canvas(); if (bgSpr.size > 120) bgSpr.clear(); bgSpr.set(key, c); return c;
   }
-  const landBuf = { V: null, N: null, tp: null, xq: null, xa: null };
+  const landBuf = { V: null, N: null, tp: null, xq: null, xa: null, rv: null, rn: null, xq1: null, xa1: null };
+  // the two hot loops of paintLand, as small functions of their own (so they stay fast whichever area is being painted)
+  // one fine row of lawn: patches of the 7 tones from the row's blended noise RV
+  function lawnRow(P, row, fy, fEnd, TP, XQ, XA, RV, T7, edgeU, g0, lipU) {
+    for (let fi = 0; fi < fEnd; fi++) {
+      const d = fy - TP[fi]; if (d < 0) continue;
+      if (d < 3) { P[row + fi] = d === 0 ? edgeU : d === 1 ? g0 : lipU; continue; }
+      const q = XQ[fi], v = RV[q] + (RV[q + 1] - RV[q]) * XA[fi];
+      const s = (v < 0 ? 0 : v > 0.9999 ? 0.9999 : v) * 4, b = s | 0, f = s - b;
+      P[row + fi] = T7[2 * b + (f < 0.13 && b > 0 ? -1 : f > 0.87 && b < 3 ? 1 : 0)];
+    }
+  }
+  // one fine row of open water (below the far-shore band): depth bands, their 50/50 mixes where two meet, the shallows by the shore
+  function waterRow(P, row, f0, FW, B, inv, XQ1, XA1, RN, WU, WM, shalU, shal2) {
+    for (let fi = f0; fi < FW; fi++) {
+      const q = XQ1[fi], d = ((fi + 0.5) * FP - B) * inv + RN[q] + (RN[q + 1] - RN[q]) * XA1[fi];
+      let c = d > 0.78 ? WU[3] : d > 0.45 ? WU[2] : d > 0.14 ? WU[1] : WU[0];
+      if (d > 0.118 && d < 0.162) c = WM[0]; else if (d > 0.428 && d < 0.472) c = WM[1]; else if (d > 0.758 && d < 0.802) c = WM[2];
+      if (d < 0.035) c = d > 0.02 ? shal2 : shalU;
+      P[row + fi] = c;
+    }
+  }
   const f32 = (k, n) => (landBuf[k] && landBuf[k].length >= n ? landBuf[k] : (landBuf[k] = new Float32Array(n)));
   const i32 = (k, n) => (landBuf[k] && landBuf[k].length >= n ? landBuf[k] : (landBuf[k] = new Int32Array(n)));
   function paintLand() {
@@ -434,29 +585,30 @@
     // ---- the lawn: soft patches of 4 tones (and their 50/50 mixes where two meet), lighter toward the back ----
     // the patch noise is worked out per world px and blended across each one, so patch edges are smooth fine-pixel curves
     const G = th.grass.map(u32), T7 = [G[3], mixU(G[3], G[2], 0.5), G[2], mixU(G[2], G[1], 0.5), G[1], mixU(G[1], G[0], 0.5), G[0]];
-    const edgeU = u32(th.lawn[1]), lipU = mixU(G[0], T7[4], 0.5), y0v = Math.max(0, lawnTop - 3), VW = ww + 1, VH = wh - y0v + 1, V = f32('V', VW * VH);
-    for (let y = 0; y < VH; y++) for (let i = 0; i < VW; i++) { const yy = y + y0v, g = (yy - lawnTop) / Math.max(1, wh - lawnTop); V[y * VW + i] = (fbm(i * 0.05, yy * 0.085, AS) - 0.5) * 1.8 + 0.5 + (1 - g) * 0.2 - 0.08; }
+    // (the noise is sampled every NS world px: the patches are ~20 px across, so that's plenty, and it keeps the big garden quick
+    // to paint; each fine row first blends its two sample rows into RV, then each fine pixel blends two of those)
+    const NS = 2, edgeU = u32(th.lawn[1]), lipU = mixU(G[0], T7[4], 0.5), y0v = Math.max(0, lawnTop - 3), VW = Math.ceil(ww / NS) + 2, VH = Math.ceil((wh - y0v) / NS) + 2, V = f32('V', VW * VH), RV = f32('rv', VW);
+    for (let y = 0; y < VH; y++) { const yy = y * NS + y0v, g = (yy - lawnTop) / Math.max(1, wh - lawnTop), base = 0.5 + (1 - g) * 0.2 - 0.08; for (let i = 0; i < VW; i++) V[y * VW + i] = (fbm(i * NS * 0.05, yy * 0.085, AS) - 0.5) * 1.8 + base; }
     // per fine column: the lawn's top row and where it sits between two noise samples (rows are then filled left to right)
     const TP = i32('tp', FW), XQ = i32('xq', FW), XA = f32('xa', FW); let tpMin = FH;
-    for (let fi = 0; fi < FW; fi++) { const i = fc(fi), gx = clamp(i - 0.5, 0, ww - 1); TP[fi] = Math.round(lawnTopC(i - 0.5) * SK); XQ[fi] = Math.floor(gx); XA[fi] = gx - XQ[fi]; if (TP[fi] < tpMin) tpMin = TP[fi]; }
+    for (let fi = 0; fi < FW; fi++) { const i = fc(fi), gx = clamp((i - 0.5) / NS, 0, VW - 2); TP[fi] = Math.round(lawnTopC(i - 0.5) * SK); XQ[fi] = Math.floor(gx); XA[fi] = gx - XQ[fi]; if (TP[fi] < tpMin) tpMin = TP[fi]; }
     for (let fy = tpMin; fy < FH; fy++) {
-      const gy = clamp(fc(fy) - 0.5 - y0v, 0, VH - 2), yq = Math.floor(gy), ay = gy - yq, by = 1 - ay, row = fy * FW, r0 = yq * VW;
-      for (let fi = 0; fi < FW; fi++) {
-        const d = fy - TP[fi]; if (d < 0) continue;
-        if (d < 3) { P[row + fi] = d === 0 ? edgeU : d === 1 ? G[0] : lipU; continue; }
-        const j = r0 + XQ[fi], ax = XA[fi], v = (V[j] + (V[j + 1] - V[j]) * ax) * by + (V[j + VW] + (V[j + VW + 1] - V[j + VW]) * ax) * ay;
-        const s = (v < 0 ? 0 : v > 0.9999 ? 0.9999 : v) * 4, b = s | 0, f = s - b;
-        P[row + fi] = T7[2 * b + (f < 0.13 && b > 0 ? -1 : f > 0.87 && b < 3 ? 1 : 0)];
-      }
+      const yw = fc(fy), gy = clamp((yw - 0.5 - y0v) / NS, 0, VH - 2), yq = Math.floor(gy), ay = gy - yq, by = 1 - ay, row = fy * FW, r0 = yq * VW;
+      for (let i = 0; i < VW; i++) RV[i] = V[r0 + i] * by + V[r0 + VW + i] * ay;
+      // (the sand and water are painted over everything right of the lawn's edge, so the lawn stops there)
+      const fEnd = yw >= wt ? Math.min(FW, Math.floor((shoreB(yw) - sandWC(yw) - 1) * SK) + 2) : FW;
+      lawnRow(P, row, fy, fEnd, TP, XQ, XA, RV, T7, edgeU, G[0], lipU);
     }
     // ---- sandy shore (dry -> damp -> wet, soft steps) and water in depth bands ----
     const W0 = th.water, WU = W0.map(u32), WM = [mixU(WU[0], WU[1], 0.5), mixU(WU[1], WU[2], 0.5), mixU(WU[2], WU[3], 0.5)];
     const shalU = u32(mixH(W0[0], th.wet, 0.42)), shal2 = mixU(shalU, WU[0], 0.5), sandU = u32(th.sand), wetU = u32(th.wet), dampU = u32(mixH(th.sand, th.wet, 0.5)), sEdgeU = u32(th.sandEdge);
     const sdU = mixU(sandU, dampU, 0.5), dwU = mixU(dampU, wetU, 0.5);
     const reflU = u32(mixH(th.openSea ? th.sky[3] : th.near[1], W0[2], th.openSea ? 0.3 : 0.5)), hlU = u32(th.hl);
-    // the depth wobble, per world px (blended across each one like the lawn)
-    const NH = wh - wt + 2, NW = f32('N', VW * NH);
-    for (let y = 0; y < NH; y++) for (let i = 0; i < VW; i++) NW[y * VW + i] = (vnoise(i * 0.13, (y + wt) * 0.3, AS + 5) - 0.5) * 0.05;
+    // the depth wobble, per world px over the water's columns only (blended across each one like the lawn, through a row buffer)
+    let xw0 = ww; for (let y = wt; y <= wh; y++) xw0 = Math.min(xw0, shoreAt(y)); xw0 = Math.max(0, xw0 - 4);
+    const QW = ww - xw0 + 3, NH = wh - wt + 2, NW = f32('N', QW * NH), RN = f32('rn', QW), XQ1 = i32('xq1', FW), XA1 = f32('xa1', FW);
+    for (let y = 0; y < NH; y++) for (let i = 0; i < QW; i++) NW[y * QW + i] = (vnoise((i + xw0) * 0.13, (y + wt) * 0.3, AS + 5) - 0.5) * 0.05;
+    for (let fi = 0; fi < FW; fi++) { const gx = clamp(fc(fi) - 0.5 - xw0, 0, QW - 2); XQ1[fi] = Math.floor(gx); XA1[fi] = gx - XQ1[fi]; }
     for (let fy = wt * SK; fy < FH; fy++) {
       const y = fc(fy), B = shoreB(y), sw = sandWC(y), x0 = B - sw - 1, row = fy * FW;
       // sand: from the lawn's edge (a soft 1-fine-px darker rim) to the water
@@ -465,10 +617,11 @@
         const u = (fc(fi) - x0) / (sw + 1);
         P[row + fi] = u < 0.45 ? sandU : u < 0.6 ? sdU : u < 0.8 ? dampU : u < 0.9 ? dwU : wetU;
       }
-      const fk = y - wt, fkF = fy - wt * SK, ny = clamp(y - 0.5 - wt, 0, NH - 2), nq = Math.floor(ny), na = ny - nq, nb = 1 - na, r0 = nq * VW, inv = 1 / Math.max(1, ww - B);
+      const fk = y - wt, fkF = fy - wt * SK, ny = clamp(y - 0.5 - wt, 0, NH - 2), nq = Math.floor(ny), na = ny - nq, nb = 1 - na, r0 = nq * QW, inv = 1 / Math.max(1, ww - B);
+      for (let i = 0; i < QW; i++) RN[i] = NW[r0 + i] * nb + NW[r0 + QW + i] * na;
+      if (fk >= 7) { waterRow(P, row, Math.max(0, Math.round(B * SK)), FW, B, inv, XQ1, XA1, RN, WU, WM, shalU, shal2); continue; }
       for (let fi = Math.max(0, Math.round(B * SK)); fi < FW; fi++) {
-        const j = r0 + XQ[fi], xa = XA[fi];
-        const d = (fc(fi) - B) * inv + (NW[j] + (NW[j + 1] - NW[j]) * xa) * nb + (NW[j + VW] + (NW[j + VW + 1] - NW[j + VW]) * xa) * na;
+        const q = XQ1[fi], d = (fc(fi) - B) * inv + RN[q] + (RN[q + 1] - RN[q]) * XA1[fi];
         const tn = (d > 0.14 ? 1 : 0) + (d > 0.45 ? 1 : 0) + (d > 0.78 ? 1 : 0);
         let c = WU[tn];
         if (d > 0.118 && d < 0.162) c = WM[0]; else if (d > 0.428 && d < 0.472) c = WM[1]; else if (d > 0.758 && d < 0.802) c = WM[2];
@@ -484,35 +637,44 @@
         P[row + fi] = c;
       }
     }
-    X.putImageData(img, 0, 0);
-
-    // ---- details on top, in fine pixels (world coordinates, SK buffer px each) ----
-    X.setTransform(SK, 0, 0, SK, 0, 0);
+    // ---- details on top, in fine pixels (world coordinates; each world px is SK x SK fine px). The big garden has thousands of
+    // them, so they're written straight into the pixel buffer (one fillRect each would take far too long on an iPad); the few
+    // sprites (shrubs on the ridges, the far house) go on the canvas afterwards. ----
     let rs = AS * 7919 + 1; const rr = () => ((rs = (rs * 16807) % 2147483647) / 2147483647);
     const sn = v => Math.round(v * SK) * FP; // snap to the fine grid
-    const R = (x0, y0, w, h, c) => { X.fillStyle = c; X.fillRect(sn(x0), sn(y0), w, h); };
-    const dot = (x0, y0, c) => R(x0, y0, FP, FP, c);
+    // a fine rect: (x0, y0) snapped to the fine grid, w x h world px
+    const R = (x0, y0, w, h, c) => {
+      const cu = u32(c), a = Math.round(x0 * SK), b = Math.round(y0 * SK), i1 = Math.min(FW, a + Math.max(1, Math.round(w * SK))), j1 = Math.min(FH, b + Math.max(1, Math.round(h * SK)));
+      for (let j = Math.max(0, b); j < j1; j++) { const row = j * FW; for (let i = Math.max(0, a); i < i1; i++) P[row + i] = cu; }
+    };
+    const dot = (x0, y0, c) => { const i = Math.round(x0 * SK), j = Math.round(y0 * SK); if (i >= 0 && j >= 0 && i < FW && j < FH) P[j * FW + i] = u32(c); };
     // a fine line (wd fine px thick)
     const ln = (x0, y0, x1, y1, c, wd) => {
-      const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * SK)), s = (wd || 1) * FP; X.fillStyle = c;
-      for (let k = 0; k <= n; k++) { const u = k / n; X.fillRect(sn(x0 + (x1 - x0) * u), sn(y0 + (y1 - y0) * u), s, s); }
+      const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * SK)), s = wd || 1, cu = u32(c);
+      for (let k = 0; k <= n; k++) {
+        const u = k / n, a = Math.round((x0 + (x1 - x0) * u) * SK), b = Math.round((y0 + (y1 - y0) * u) * SK);
+        for (let j = Math.max(0, b); j < Math.min(FH, b + s); j++) for (let i = Math.max(0, a); i < Math.min(FW, a + s); i++) P[j * FW + i] = cu;
+      }
     };
     // a filled ellipse in fine rows
     const el = (cx, cy, rx, ry, c, ymax) => {
-      X.fillStyle = c;
-      for (let fy = Math.floor((cy - ry) * SK); fy <= Math.ceil((cy + ry) * SK); fy++) {
+      const cu = u32(c);
+      for (let fy = Math.max(0, Math.floor((cy - ry) * SK)); fy <= Math.min(FH - 1, Math.ceil((cy + ry) * SK)); fy++) {
         const dy = (fy + 0.5) * FP - cy; if (Math.abs(dy) >= ry || (ymax != null && (fy + 0.5) * FP > ymax)) continue;
-        const hw = rx * Math.sqrt(1 - (dy / ry) * (dy / ry)), a = Math.round((cx - hw) * SK), b = Math.round((cx + hw) * SK);
-        if (b > a) X.fillRect(a * FP, fy * FP, (b - a) * FP, FP);
+        const hw = rx * Math.sqrt(1 - (dy / ry) * (dy / ry)), a = Math.max(0, Math.round((cx - hw) * SK)), b = Math.min(FW, Math.round((cx + hw) * SK)), row = fy * FW;
+        for (let i = a; i < b; i++) P[row + i] = cu;
       }
     };
     // a small picture in fine pixels: one character per fine pixel ('.' = clear), top-left at (x0, y0)
-    const stamp = (x0, y0, rows, map) => { const X0 = sn(x0), Y0 = sn(y0); rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) { const c = map[r[i]]; if (c) { X.fillStyle = c; X.fillRect(X0 + i * FP, Y0 + j * FP, FP, FP); } } }); };
-    const ball = (cx, cy, r, dark, mid, lit) => { const c = ballSpr(r, lit, mid, dark), w = artW(c), h = artH(c); X.drawImage(c, sn(cx - w / 2 + 0.5), sn(cy - h / 2 + 0.5), w, h); };
+    const stamp = (x0, y0, rows, map) => { const X0 = Math.round(x0 * SK), Y0 = Math.round(y0 * SK); rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) { const c = map[r[i]], fx = X0 + i, fy = Y0 + j; if (c && fx >= 0 && fy >= 0 && fx < FW && fy < FH) P[fy * FW + fx] = u32(c); } }); };
+    // a see-through wash (k of colour c mixed into what's there)
+    const wash = (x0, y0, w, h, c, k) => { const cu = u32(c), a = Math.round(x0 * SK), b = Math.round(y0 * SK); for (let j = Math.max(0, b); j < Math.min(FH, b + Math.round(h * SK)); j++) for (let i = Math.max(0, a); i < Math.min(FW, a + Math.round(w * SK)); i++) P[j * FW + i] = mixU(P[j * FW + i], cu, k); };
+    const later = []; // sprites for the canvas pass at the end
+    const ball = (cx, cy, r, dark, mid, lit) => later.push(() => { const c = ballSpr(r, lit, mid, dark), w = artW(c), h = artH(c); X.drawImage(c, sn(cx - w / 2 + 0.5), sn(cy - h / 2 + 0.5), w, h); });
     // scenery on the ridges
     if (area === 'meadow') {
       for (let i = 4; i < ww; i += 5 + Math.floor(hash2(i, 2, AS) * 9)) if (hash2(i, 3, AS) > 0.3) { const r = hash2(i, 4, AS) > 0.6 ? 3 : 2; ball(i, fTop[i] + 1, r, th.farDots[2], th.farDots[0], th.farDots[1]); if (r === 3 && hash2(i, 5, AS) > 0.5) ball(i + 4, fTop[Math.min(ww - 1, i + 4)] + 2, 2, th.farDots[2], th.farDots[0], th.farDots[1]); }
-      for (let i = 8; i < ww; i += 12 + Math.floor(hash2(i, 6, AS) * 18)) { if (Math.abs(i - ww * 0.42) < 16) continue; ball(i, nTop[i] + 1, 2, th.nearDots[0], th.nearDots[1], th.nearDots[1]); ln(i + 3, nTop[Math.min(ww - 1, i + 3)] + 1.5, i + 3.5, nTop[Math.min(ww - 1, i + 3)] - 0.5, th.nearDots[0]); }
+      for (let i = 8; i < ww; i += 12 + Math.floor(hash2(i, 6, AS) * 18)) { if (Math.abs(i - ww * 0.32) < 16) continue; ball(i, nTop[i] + 1, 2, th.nearDots[0], th.nearDots[1], th.nearDots[1]); ln(i + 3, nTop[Math.min(ww - 1, i + 3)] + 1.5, i + 3.5, nTop[Math.min(ww - 1, i + 3)] - 0.5, th.nearDots[0]); }
     } else if (area === 'beach') {
       for (let i = 6; i < seaX - 8; i += 16 + Math.floor(hash2(i, 2, AS) * 14)) { // little palms on the headland
         const b = fTop[i] + 1, lean = hash2(i, 3, AS) > 0.5 ? 1 : -1, c = th.farDots[2], tx = i + lean + 0.5, ty = b - 6;
@@ -540,19 +702,17 @@
         el(i + 0.5, b + 1, 2.5, 3, c, b + 1); el(i - 0.3, b - 0.9, 0.8, 0.45, '#ffffff');
       }
       for (let i = 12; i < ww; i += 26 + Math.floor(hash2(i, 4, AS) * 26)) { // lollipops on the near hills
-        if (Math.abs(i - ww * 0.42) < 18) continue;
+        if (Math.abs(i - ww * 0.32) < 18) continue;
         const b = nTop[i], hgt = 6 + Math.floor(hash2(i, 5, AS) * 4), c = th.nearDots[Math.floor(hash2(i, 6, AS) * 2)];
         R(i, b - hgt, FP * 2, hgt, '#fff4f8'); R(i + 0.5, b - hgt, FP, hgt, '#e8c8d8');
         el(i + 0.5, b - hgt - 2, 2.6, 2.4, c); el(i + 0.5, b - hgt - 2, 1.4, 1.3, mixH(c, '#ffffff', 0.45)); dot(i - 0.5, b - hgt - 3.5, '#ffffff'); dot(i, b - hgt - 3.5, '#ffffff');
       }
     }
-    // house far on the hill (a hi-res prop: the scene buffer keeps its fine pixels)
-    if (th.house) { const hc = propSpr('house', themeOf(area)); Lw.house = { x: Math.round(ww * 0.42), y: hz + 8, c: hc }; PX.blit(X, hc, Lw.house.x, Lw.house.y); } else Lw.house = null;
-    // ---- path from the tree to the dock ----
-    const pathPts = [];
-    if (th.path) {
-      const p0 = { x: Lw.tree.x + 9, y: Lw.tree.y + 4 }, p2 = { x: Lw.dockX0 - 3, y: Lw.dockY + 1 }, p1 = { x: (p0.x + p2.x) / 2 - 8, y: Math.max(p0.y, p2.y) + 12 };
-      for (let k = 0; k <= 60; k++) { const u = k / 60, a = (1 - u) * (1 - u), b = 2 * u * (1 - u), c = u * u; pathPts.push({ x: a * p0.x + b * p1.x + c * p2.x, y: a * p0.y + b * p1.y + c * p2.y }); }
+    // house far on the hill (a hi-res prop: drawn on the canvas at the end, so the scene buffer keeps its fine pixels)
+    if (th.house) { const hc = propSpr('house', themeOf(area)); Lw.house = { x: Math.round(ww * 0.32), y: hz + 8, c: hc }; later.push(() => PX.blit(X, hc, Lw.house.x, Lw.house.y)); } else Lw.house = null;
+    // ---- the paths between the tree, the house, the dock and the pond (buildPaths) ----
+    const pathPts = Lw.pathPts || [];
+    if (th.path && pathPts.length) {
       const [pl, pm, pe] = th.path;
       if (area === 'meadow') {
         for (const q of pathPts) el(q.x + 0.5, q.y + 1, 3.6, 2.15, pe);
@@ -562,7 +722,7 @@
       } else {
         let acc = 0;
         for (let k = 1; k < pathPts.length; k++) {
-          acc += Math.hypot(pathPts[k].x - pathPts[k - 1].x, pathPts[k].y - pathPts[k - 1].y);
+          acc += Math.min(7, Math.hypot(pathPts[k].x - pathPts[k - 1].x, pathPts[k].y - pathPts[k - 1].y));
           if (acc < 7) continue; acc = 0;
           const q = pathPts[k], w = 5 + (k % 3 === 0 ? 1 : 0), cx = q.x + 0.5;
           el(cx + 0.5, q.y + 1.3, w / 2, 0.8, th.shade);
@@ -573,8 +733,7 @@
     }
     // ---- ground details, scattered by area (counts scale with the size of the land) ----
     let land = 0; for (let y = lawnTop + 4; y < wh; y++) land += Math.max(0, shoreAt(y) - sandW(y) - 6);
-    const onPath = (x0, y0) => pathPts.some(q => Math.abs(q.x - x0) < 5 && Math.abs(q.y - y0) < 4);
-    const spot = pad => { for (let k = 0; k < 8; k++) { const y0 = Math.round(lawnTop + 4 + rr() * (wh - lawnTop - 5)), x0 = Math.round(2 + rr() * (shoreAt(y0) - sandW(y0) - 6 - (pad || 0))); if (x0 > 1 && !onPath(x0, y0)) return [x0, y0]; } return null; };
+    const spot = pad => { for (let k = 0; k < 8; k++) { const y0 = Math.round(lawnTop + 4 + rr() * (wh - lawnTop - 5)), x0 = Math.round(2 + rr() * (shoreAt(y0) - sandW(y0) - 6 - (pad || 0))); if (x0 > 1 && !onPathNear(x0, y0, 1) && !pondAt(x0, y0, 2)) return [x0, y0]; } return null; };
     const scatter = (per, fn) => { const n = Math.round(land / per); for (let k = 0; k < n; k++) { const q = spot(); if (q) fn(q[0], q[1], k); } };
     const G2 = th.grass, sh = th.shade, bl = th.blade, bh = th.bladeHi;
     // grass: thin fine-pixel blades leaning out from the middle, a light tip on each
@@ -604,7 +763,7 @@
       scatter(900, pebble);
       scatter(1500, (x0, y0) => { ln(x0, y0 + 0.5, x0 + 1, y0 - 0.5, '#4b692f'); ln(x0 + 1, y0 - 0.5, x0 + 2, y0 + 0.5, '#6a8a3a'); ln(x0 + 2, y0 + 0.5, x0 + 3, y0 - 0.5, '#4b692f'); });
       // a trail of little footprints wandering down toward the sea
-      for (let k = 0; k < 16; k++) { const y0 = Math.round(lawnTop + 30 + k * 9), x0 = Math.round(ww * 0.28 + Math.sin(k * 0.55) * 14 + k * 1.2); if (x0 > shoreAt(y0) - sandW(y0) - 4 || y0 > wh - 4) break; const fx = x0 + (k % 2) * 3; el(fx + 0.8, y0 + 0.6, 0.9, 0.55, G2[3]); el(fx + 0.5, y0 + 1.5, 0.55, 0.4, G2[3]); }
+      for (let k = 0; k < 64; k++) { const y0 = Math.round(lawnTop + 30 + k * 9), x0 = Math.round(ww * 0.2 + Math.sin(k * 0.45) * 22 + k * 1.6); if (x0 > shoreAt(y0) - sandW(y0) - 4 || y0 > wh - 4) break; if (pondAt(x0, y0, 3)) continue; const fx = x0 + (k % 2) * 3; el(fx + 0.8, y0 + 0.6, 0.9, 0.55, G2[3]); el(fx + 0.5, y0 + 1.5, 0.55, 0.4, G2[3]); }
     } else if (th.deco === 'moonlit') {
       scatter(75, tuft);
       scatter(620, (x0, y0, k) => { dot(x0 + 0.25, y0 + 0.25, k % 2 ? '#7fe0f0' : '#c9a2f0'); if (k % 3 === 0) dot(x0 + 1, y0 + 1, '#4fb8a8'); });
@@ -624,6 +783,7 @@
     const waterSpot = (lo, hi, avoidDock) => { for (let k = 0; k < 10; k++) { const y0 = Math.round(Lw.minY + 4 + rr() * (Lw.maxY - Lw.minY - 6)), s = shoreAt(y0), x0 = Math.round(s + 3 + (lo + rr() * (hi - lo)) * (ww - s - 6)); if (!avoidDock || Math.abs(y0 - Lw.dockY) > 7 || x0 > Lw.dockX1 + 6) return [x0, y0]; } return null; };
     for (let k = 0; k < Math.round((ww - shoreAt(Lw.minY)) * (wh - wt) / 260); k++) { const y0 = Math.round(wt + 6 + rr() * (wh - wt - 6)), s = shoreAt(y0), x0 = Math.round(s + 4 + rr() * (ww - s - 8)), w = 2 + Math.floor(rr() * 3), c = mixH(W0[depthK(x0, y0) > 0.45 ? 2 : 1], th.hl, 0.45); R(x0, y0 + 0.5, w, FP, c); R(x0 + 0.5, y0, w - 1, FP, mixH(c, th.hl, 0.5)); }
     Lw.glowPts = [];
+    const wk = clamp(Lw.span / 300, 1, 3); // (the big garden's lake is taller: more reeds and lily pads along it)
     const reeds = (x0, y0, n, stem, tip, glow) => {
       for (let k = 0; k < n; k++) {
         const x1 = x0 + k * 2 - n + (k % 2), h = 4 + Math.floor(hash2(x0 + k, y0, AS) * 5), xs = x1 + 0.25, top = y0 - h;
@@ -634,21 +794,21 @@
       R(x0 - n, y0 + 1, n * 2 + 1, FP, mixH(th.water[0], stem, 0.3)); R(x0 - n + 0.5, y0 + 1.5, n * 2, FP, mixH(th.water[0], th.hl, 0.4));
     };
     if (area === 'meadow') {
-      for (let k = 0; k < 4; k++) { const y0 = Math.round(Lw.minY + 12 + (k + rr() * 0.6) * (Lw.span / 4.2)); if (Math.abs(y0 - Lw.dockY) < 8) continue; reeds(shoreAt(y0) + 2, y0, 3 + (k % 2), '#4b8a3a', '#8f563b'); }
-      for (let k = 0; k < 7; k++) { // lily pads, some with a flower
+      const nr = Math.round(4 * wk); for (let k = 0; k < nr; k++) { const y0 = Math.round(Lw.minY + 12 + (k + rr() * 0.6) * (Lw.span / (nr + 0.2))); if (Math.abs(y0 - Lw.dockY) < 8) continue; reeds(shoreAt(y0) + 2, y0, 3 + (k % 2), '#4b8a3a', '#8f563b'); }
+      for (let k = 0; k < Math.round(7 * wk); k++) { // lily pads, some with a flower
         const q = waterSpot(0.1, 0.5, true); if (!q) continue; const [x0, y0] = q, big = k % 3 === 0, rx = big ? 3.4 : 2.4, cx = x0 + 0.5, cy = y0 + 0.5;
         el(cx + 0.3, cy + 0.6, rx, 1.3, '#2f6a3a'); el(cx, cy, rx, 1.35, '#3f8a3a'); el(cx - 0.3, cy - 0.35, rx - 0.7, 0.8, '#6abe30'); el(cx - rx * 0.45, cy - 0.5, 0.7, 0.35, '#99e550');
         ln(cx + 0.5, cy - 0.25, cx + rx - 0.3, cy - 0.75, '#2f6a3a');
         if (k % 2 === 0) stamp(cx - 1.5, cy - 3, ['..w...', '.pwp..', 'ppdpp.', '.ppp..'], { w: '#ffffff', p: '#f7b6c8', d: '#e07ba0' });
       }
     } else if (area === 'beach') {
-      for (let k = 0; k < 7; k++) { // reef shadows, with a little coral in the shallower ones
+      for (let k = 0; k < Math.round(7 * wk); k++) { // reef shadows, with a little coral in the shallower ones
         const q = waterSpot(0.25, 0.85, true); if (!q) continue; const [x0, y0] = q, c = mixH(th.water[2], '#123a6a', 0.35);
         el(x0 + 0.5, y0 + 0.5, 5.5, 2.4, mixH(th.water[2], c, 0.5)); el(x0 + 0.5, y0 + 0.5, 4.2, 1.7, c);
         if (depthK(x0, y0) < 0.5) { ln(x0 - 1.75, y0 + 1, x0 - 1.75, y0 - 1, '#f07a84', 2); dot(x0 - 2.25, y0 - 0.5, '#f07a84'); ln(x0 + 1.25, y0 + 0.5, x0 + 1.5, y0 - 2, '#f5a86a', 2); el(x0 + 3.5, y0 - 0.5, 0.6, 0.6, '#f7b6c8'); }
       }
       // a far island with a palm and a tiny lighthouse
-      const ix = Math.round(ww * 0.82), iy = wt;
+      const ix = Math.round(ww * 0.88), iy = wt;
       el(ix, iy + 0.2, 12.2, 1.6, th.sand); el(ix, iy - 1.8, 10.2, 1.8, '#8cc47a'); el(ix - 1, iy - 4, 6.8, 1.6, '#9ccf8a'); el(ix - 1.5, iy - 5.2, 3.2, 0.9, mixH('#9ccf8a', '#ffffff', 0.25));
       R(ix - 12, iy + 1, 24, FP, '#ffffff'); R(ix - 10, iy + 1 + FP, 20, FP, mixH('#ffffff', th.water[1], 0.5));
       R(ix + 3, iy - 13, 3, 8, '#ffffff'); R(ix + 5, iy - 13, 1, 8, '#dfe8fb'); R(ix + 3, iy - 11, 3, 2, '#e8404a'); R(ix + 3, iy - 7, 3, 2, '#e8404a'); R(ix + 5, iy - 11, 1, 2, '#b8303a'); R(ix + 5, iy - 7, 1, 2, '#b8303a');
@@ -660,24 +820,55 @@
       el(ptx, pty, 1.8, 0.9, '#6fa86a'); dot(ptx - 0.5, pty - 0.5, '#9fd88a');
     } else Lw.beacon = null;
     if (area === 'moonlit') {
-      for (let k = 0; k < 5; k++) { const y0 = Math.round(Lw.minY + 10 + (k + rr() * 0.6) * (Lw.span / 5.2)); if (Math.abs(y0 - Lw.dockY) < 8) continue; reeds(shoreAt(y0) + 2, y0, 3, '#2a4a60', '#9ff8ff', true); }
-      for (let k = 0; k < 5; k++) { // lotus pads, some with a glowing bud
+      const nr = Math.round(5 * wk); for (let k = 0; k < nr; k++) { const y0 = Math.round(Lw.minY + 10 + (k + rr() * 0.6) * (Lw.span / (nr + 0.2))); if (Math.abs(y0 - Lw.dockY) < 8) continue; reeds(shoreAt(y0) + 2, y0, 3, '#2a4a60', '#9ff8ff', true); }
+      for (let k = 0; k < Math.round(5 * wk); k++) { // lotus pads, some with a glowing bud
         const q = waterSpot(0.1, 0.55, true); if (!q) continue; const [x0, y0] = q, cx = x0 + 0.5, cy = y0 + 0.5;
         el(cx + 0.2, cy + 0.5, 2.6, 1.1, '#1f4040'); el(cx, cy, 2.5, 1.05, '#2a5a5a'); el(cx - 0.2, cy - 0.35, 1.7, 0.55, '#3f7a70');
         if (k % 2 === 0) { stamp(cx - 1.5, cy - 3, ['..w...', '.eee..', 'peeep.', '.ppp..'], { w: '#ffffff', e: '#e0d0ff', p: '#c09af0' }); Lw.glowPts.push({ x: x0, y: y0 - 2 }); }
       }
     }
     if (area === 'candy') {
-      for (let k = 0; k < 16; k++) { const q = waterSpot(0.05, 0.95, false); if (!q) continue; const [x0, y0] = q; if (k % 3) dot(x0 + 0.25, y0 + 0.25, '#ffffff'); else stamp(x0 - 0.5, y0 - 0.5, ['.w.', 'w.w', '.w.'], { w: '#ffffff' }); }
-      for (let k = 0; k < 3; k++) { // rock-candy crystals poking out of the soda
-        const q = waterSpot(0.3, 0.8, true); if (!q) continue; const [x0, y0] = q, c = ['#f7b6c8', '#c9a2f0', '#9fd8ff'][k], dk = mixH(c, '#7a6a9a', 0.3), lt = mixH(c, '#ffffff', 0.5);
+      for (let k = 0; k < Math.round(16 * wk); k++) { const q = waterSpot(0.05, 0.95, false); if (!q) continue; const [x0, y0] = q; if (k % 3) dot(x0 + 0.25, y0 + 0.25, '#ffffff'); else stamp(x0 - 0.5, y0 - 0.5, ['.w.', 'w.w', '.w.'], { w: '#ffffff' }); }
+      for (let k = 0; k < Math.round(3 * wk); k++) { // rock-candy crystals poking out of the soda
+        const q = waterSpot(0.3, 0.8, true); if (!q) continue; const [x0, y0] = q, c = ['#f7b6c8', '#c9a2f0', '#9fd8ff'][k % 3], dk = mixH(c, '#7a6a9a', 0.3), lt = mixH(c, '#ffffff', 0.5);
         for (const [x, top, w] of [[x0 - 2, y0 - 3, 2], [x0, y0 - 5, 2], [x0 + 2, y0 - 2, 2]]) { R(x, top + 0.5, w, y0 + 1 - top - 0.5, c); R(x + 0.5, top, w - 1, FP, c); R(x + w - FP, top + 0.5, FP, y0 + 1 - top - 0.5, dk); R(x, top + 0.5, FP, y0 + 1 - top - 1, lt); }
         R(x0, y0 - 5, FP, 4, '#ffffff'); R(x0 - 3, y0 + 1, 8, FP, '#ffffff'); R(x0 - 2.5, y0 + 1 + FP, 7, FP, mixH('#ffffff', th.water[1], 0.5));
       }
     }
+    // ---- the little ponds on the lawn: a soft rim (stones, sand or icing), shallow water round a deeper middle, a lit inner edge,
+    // and the area's own touches: lily pads (meadow), glowing lotus (moonlit), pebbles and a starfish (beach), sprinkles (candy) ----
+    const RIM = { meadow: ['#a8906a', '#d8c49a'], beach: ['#a89a88', '#d8ccbc'], moonlit: ['#4a587a', '#7a88aa'], candy: ['#e8a2c4', '#fff4f8'] }[area] || ['#a8906a', '#d8c49a'];
+    (Lw.ponds || []).forEach((Pd, pi) => {
+      const cx = Pd.x + 0.5, cy = Pd.y + 0.5, rx = Pd.rx, ry = Pd.ry;
+      el(cx + 0.5, cy + 1.2, rx + 2.4, ry + 1.6, th.shade);
+      el(cx, cy, rx + 1.9, ry + 1.3, RIM[0]); el(cx - 0.3, cy - 0.4, rx + 1.3, ry + 0.8, RIM[1]);
+      el(cx, cy + 0.2, rx, ry, W0[0]); el(cx + 0.2, cy + 0.6, rx - 2.2, ry - 1.4, mixH(W0[0], W0[1], 0.5)); el(cx + 0.3, cy + 0.8, rx - 3.6, ry - 2.3, W0[1]);
+      el(cx + 0.4, cy + 1, rx * 0.5, ry * 0.42, mixH(W0[1], W0[2], 0.5)); el(cx + 0.5, cy + 1.1, rx * 0.32, ry * 0.26, W0[2]);
+      // the far inner edge in shade, a lit line along the near one, and a few glints
+      for (let fx = Math.round((cx - rx + 2) * SK); fx < Math.round((cx + rx - 2) * SK); fx++) { const x = (fx + 0.5) * FP, d = (x - cx) / rx, h = ry * Math.sqrt(Math.max(0, 1 - d * d)); dot(x, cy + 0.2 - h + 0.6, mixH(W0[0], W0[2], 0.55)); dot(x, cy + 0.2 + h - 0.8, mixH(W0[0], '#ffffff', 0.45)); }
+      for (let k = 0; k < Math.round(rx / 6); k++) { const gx = cx - rx * 0.5 + rr() * rx, gy = cy - ry * 0.3 + rr() * ry * 0.8; R(gx, gy, 2, FP, mixH(W0[1], th.hl, 0.6)); R(gx + 0.5, gy - FP, 1, FP, '#ffffff'); }
+      if (area === 'meadow') {
+        reeds(Math.round(cx - rx + 3), Math.round(cy - 1), 3, '#4b8a3a', '#8f563b');
+        for (const [ox, oy, big, fl] of [[0.25, 0.25, 1, 1], [-0.35, 0.45, 0, 0], [0.55, -0.1, 0, 1]]) {
+          const lx = cx + ox * rx, ly = cy + oy * ry, prx = big ? 3.2 : 2.3;
+          el(lx + 0.3, ly + 0.6, prx, 1.25, '#2f6a3a'); el(lx, ly, prx, 1.3, '#3f8a3a'); el(lx - 0.3, ly - 0.35, prx - 0.7, 0.75, '#6abe30'); el(lx - prx * 0.45, ly - 0.5, 0.7, 0.35, '#99e550');
+          if (fl) stamp(lx - 1.5, ly - 3, ['..w...', '.pwp..', 'ppdpp.', '.ppp..'], { w: '#ffffff', p: '#f7b6c8', d: '#e07ba0' });
+        }
+      } else if (area === 'moonlit') {
+        reeds(Math.round(cx + rx - 3), Math.round(cy - 1), 3, '#2a4a60', '#9ff8ff', true);
+        for (const [ox, oy] of [[-0.3, 0.3], [0.3, 0.45]]) { const lx = cx + ox * rx, ly = cy + oy * ry; el(lx + 0.2, ly + 0.5, 2.6, 1.1, '#1f4040'); el(lx, ly, 2.5, 1.05, '#2a5a5a'); el(lx - 0.2, ly - 0.35, 1.7, 0.55, '#3f7a70'); stamp(lx - 1.5, ly - 3, ['..w...', '.eee..', 'peeep.', '.ppp..'], { w: '#ffffff', e: '#e0d0ff', p: '#c09af0' }); Lw.glowPts.push({ x: Math.round(lx - 0.5), y: Math.round(ly - 2.5) }); }
+      } else if (area === 'beach') {
+        for (let k = 0; k < 10; k++) { const a = k / 10 * 6.283 + 0.3, px = cx + Math.cos(a) * (rx + 1.6), py = cy + Math.sin(a) * (ry + 1.1); el(px + 0.2, py + 0.6, 1.5, 0.8, '#8a7e70'); el(px, py, 1.4, 0.9, '#b8b0a4'); dot(px - 0.5, py - 0.5, '#e8e2d8'); }
+        const sx = cx + rx * 0.35, sy = cy + ry * 0.3; for (let a = 0; a < 5; a++) { const an = -Math.PI / 2 + a * Math.PI * 2 / 5; ln(sx, sy, sx + Math.cos(an) * 2, sy + Math.sin(an) * 1.6, '#f08a6a', 2); } el(sx, sy, 0.8, 0.8, '#f08a6a');
+      } else if (area === 'candy') {
+        for (let k = 0; k < Math.round(rx * 0.8); k++) { const a = rr() * 6.28, d = Math.sqrt(rr()) * 0.8, px = cx + Math.cos(a) * rx * d, py = cy + Math.sin(a) * ry * d; dot(px, py, ['#ffffff', '#fff27a', '#9fd8ff'][k % 3]); }
+        el(cx - rx * 0.3 + 0.5, cy + 1.6, 3.4, 0.9, mixH(W0[1], '#7a4a6a', 0.3)); el(cx - rx * 0.3, cy, 3, 2.4, '#c9a2f0'); el(cx - rx * 0.3 - 0.8, cy - 0.9, 1.2, 0.7, '#f0e2ff'); dot(cx - rx * 0.3 - 1.2, cy - 1.3, '#ffffff');
+      }
+      Pd.i = pi;
+    });
     // ---- dock: planks on posts, a lamp at the end (an object: the same ink ring as the props, fine lines inside) ----
     const dy = Lw.dockY, x0 = Lw.dockX0, x1 = Lw.dockX1;
-    X.fillStyle = 'rgba(34,32,52,.22)'; X.fillRect(x0 + 2, dy + 1, x1 - x0, 2);
+    wash(x0 + 2, dy + 1, x1 - x0, 2, INK, 0.22);
     for (const px of [x0 + 5, Math.round((x0 + x1) / 2) + 2, x1 - 1]) { R(px, dy - 1, 1, 4, '#663931'); R(px, dy - 1, FP, 4, '#8f563b'); R(px - 1, dy + 3, 3, FP, W0[0]); R(px - 1.5, dy + 3.5, 1, FP, W0[0]); R(px + 1.5, dy + 3.5, 1, FP, W0[0]); }
     R(x0 - 1, dy - 4, x1 - x0 + 3, 1, INK); R(x0 - 1, dy - 3, 1, 3, INK); R(x1 + 1, dy - 3, 1, 3, INK); R(x0 - 1, dy, x1 - x0 + 3, 1, INK);
     R(x0, dy - 3, x1 - x0 + 1, 1, '#e4b27a'); R(x0, dy - 2, x1 - x0 + 1, 2, '#b8743a'); R(x0, dy - 1, x1 - x0 + 1, 1, '#9a5f32');
@@ -688,6 +879,11 @@
     R(x1 - 2, dy - 14, 5, 5, INK); R(x1 - 1, dy - 15, 3, 1, INK); R(x1 - 1, dy - 9, 3, 6, INK);
     R(x1, dy - 9, 1, 5, '#595a70'); R(x1, dy - 9, FP, 5, '#7a7c94'); R(x1 - 1, dy - 14, 3, 1, '#595a70'); R(x1 - 1, dy - 14, 3, FP, '#7a7c94');
     R(x1 - 1, dy - 13, 3, 3, '#f6c83a'); R(x1 - 1, dy - 13, 1.5, 2, '#fff27a'); dot(x1 - 1, dy - 13, '#ffffff'); R(x1 + 1.5, dy - 13, FP, 3, '#e0a830');
+      X.putImageData(img, 0, 0);
+    // the sprites go on top, at SK x the world
+    X.setTransform(SK, 0, 0, SK, 0, 0); X.imageSmoothingEnabled = false;
+    for (const f of later) f();
+    X.setTransform(1, 0, 0, 1, 0, 0);
   }
   function ensureBg(n) {
     const nq = Math.round(n * 20) / 20;
@@ -701,13 +897,13 @@
     const r = root.getBoundingClientRect();
     if (r.width < 10 || r.height < 10) return false;
     DPR = Math.min(2, window.devicePixelRatio || 1);
-    const oldW = ww, oldMin = Lw.minY, oldSpan = Lw.span, k0 = ZMIN ? Z / ZMIN : 0;
+    const oldW = ww, oldMin = Lw.minY, oldSpan = Lw.span, k0 = ww ? Z / ZMIN : 0;
     W = r.width; H = r.height;
-    // the whole world fits the screen at ZMIN (about TUNE.worldW world pixels across)
-    // (rounded to whole device pixels, so the zoomed-out view is crisp too; wide screens get a slightly wider world)
+    // at ZMIN the screen shows about TUNE.worldW world pixels across (rounded to whole device pixels, so it's crisp too; wide
+    // screens get a slightly wider world); the garden is mapW x mapH that view, so there is plenty to explore
     ZMIN = Math.max(TUNE.zoomMinPx, Math.floor(Math.min(W / TUNE.worldW, H / TUNE.worldH) * DPR) / DPR);
     ZMIN = Math.ceil(ZMIN * DPR - 0.001) / DPR; ZMAX = ZMIN * TUNE.zoomMax;
-    ww = Math.ceil(W / ZMIN); wh = Math.ceil(H / ZMIN);
+    ww = Math.ceil(W / ZMIN * TUNE.mapW); wh = Math.ceil(H / ZMIN * TUNE.mapH);
     // the world buffer and the ground are SK x finer than the world (the sky sizes itself in paintSky: it only needs the top)
     for (const c of [buf, bgC]) { c.width = ww * SK; c.height = wh * SK; }
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
@@ -715,22 +911,24 @@
     // keep everything where it was relative to the (possibly resized) world
     const fx = oldW ? ww / oldW : 1;
     for (const r2 of RT.values()) { r2.x = clamp(r2.x * fx, 6, ww + 20); r2.y = clamp(oldSpan ? Lw.minY + (r2.y - oldMin) / oldSpan * Lw.span : r2.y, Lw.minY, Lw.maxY); }
-    for (const a in ground) for (const f of ground[a]) { f.x = clamp(f.x * fx, 5, ww - 5); f.y = clamp(oldSpan ? Lw.minY + (f.y - oldMin) / oldSpan * Lw.span : f.y, Lw.minY, Lw.maxY); }
-    Z = snapZ(ZMIN * (k0 || zoomPref || TUNE.zoomDef));
+    for (const a in ground) for (const f of ground[a]) { f.y = clamp(oldSpan ? Lw.minY + (f.y - oldMin) / oldSpan * Lw.span : f.y, Lw.minY, Lw.maxY); f.x = clamp(f.x * fx, 5, lawnRight(f.y) - 2); }
+    // (first time: the zoom you last used, if it was a close one; a garden left zoomed all the way out opens at the usual size)
+    Z = snapZ(ZMIN * (k0 || (zoomPref >= 1.5 ? Math.min(zoomPref, TUNE.zoomMax) : TUNE.zoomDef)));
     if (!k0) focusCamera(); else clampCam();
     return true;
   }
 
   // ---------------- camera ----------------
   const viewW = () => W / Z, viewH = () => H / Z;
-  // crisp pixels: at rest the zoom is a whole number of device pixels per world pixel
+  // crisp pixels: at rest the zoom is a whole number of device pixels per world pixel; all the way out it's ZFAR (the whole garden)
   function snapZ(z) {
-    z = clamp(z, ZMIN, ZMAX);
+    z = clamp(z, ZFAR, ZMAX);
+    if (z < ZFAR * 1.04) return ZFAR;
     let s = Math.round(z * DPR) / DPR;
-    // prefer a whole number of device pixels per fine pixel (every fine pixel the same size); the zoomed-out view keeps ZMIN
+    // prefer a whole number of device pixels per fine pixel (every fine pixel the same size)
     const s2 = Math.round(z * DPR / SK) * SK / DPR;
-    if (s2 >= ZMIN - 0.001 && s2 <= ZMAX + 0.001 && Math.abs(s2 - z) <= 0.5 / DPR + 0.001) s = s2;
-    if (s < ZMIN - 0.001) s = Math.ceil(ZMIN * DPR) / DPR;
+    if (s2 >= ZFAR - 0.001 && s2 <= ZMAX + 0.001 && Math.abs(s2 - z) <= 0.5 / DPR + 0.001) s = s2;
+    if (s < ZFAR - 0.001) s = ZFAR;
     if (s > ZMAX + 0.001) s = Math.floor(ZMAX * DPR) / DPR;
     return s;
   }
@@ -741,14 +939,17 @@
     const maxY = Math.max(0, Math.min(wh - viewH(), Lw.maxY + 12 - (H - trayH - 8) / Z));
     return { maxX, maxY };
   }
-  function clampCam() { const L = camLimits(); camX = clamp(camX, 0, L.maxX); camY = clamp(camY, 0, L.maxY); }
-  // start the view on your partner (or an egg) in this area
+  // (a view wider than the garden keeps it in the middle)
+  function clampCam() { const L = camLimits(), vw = viewW(); camX = vw > ww ? (ww - vw) / 2 : clamp(camX, 0, L.maxX); camY = clamp(camY, 0, L.maxY); }
+  // start the view on your partner (or an egg, or the house) in this area, and keep the partner in view while it wanders
   function focusCamera() {
-    let fx = ww * 0.42, fy = Lw.minY + Lw.span * 0.5;
+    let fx = Lw.heart ? Lw.heart.x : ww * 0.4, fy = Lw.heart ? Lw.heart.y - 10 : Lw.minY + Lw.span * 0.5;
     const mine = PS.S.sprouts.filter(isOut), act = ST.active();
     const s0 = mine.includes(act) ? act : mine[0], r = s0 && RT.get(s0.id);
-    if (r) { fx = r.x; fy = r.y - 10; } else { const e = PS.S.eggs.find(x => x.area === area); if (e) fy = Lw.minY + Lw.span * 0.46; else if (Lw.home && PS.S.sprouts.some(x => x.area === area)) { fx = Lw.home.x; fy = Lw.home.y - 20; } }
-    camX = fx - viewW() * 0.45; camY = fy - viewH() * 0.52; camV.x = camV.y = 0; zoomAnim = null;
+    follow = null;
+    if (r) { fx = r.x; fy = r.y - 10; follow = r.id; }
+    else { const o = eggsHere()[0]; if (o) { fx = o.x; fy = o.y - 10; } else if (Lw.home && PS.S.sprouts.some(x => x.area === area)) { fx = Lw.home.x; fy = Lw.home.y - 20; } }
+    camX = fx - viewW() * 0.5; camY = fy - viewH() * 0.48; camV.x = camV.y = 0; zoomAnim = null;
     clampCam();
   }
   const clientToWorld = (cx, cy) => { const r = cv.getBoundingClientRect(); return { x: (cx - r.left) / Z + camX, y: (cy - r.top) / Z + camY }; };
@@ -756,16 +957,18 @@
   // zoom to z keeping the world point under screen point (sx, sy) in place
   function zoomAt(z, sx, sy) {
     const wx = sx / Z + camX, wy = sy / Z + camY;
-    Z = clamp(z, ZMIN * 0.85, ZMAX * 1.15);
+    Z = clamp(z, ZFAR * 0.85, ZMAX * 1.15);
     camX = wx - sx / Z; camY = wy - sy / Z; clampCam();
   }
   function animateZoom(to, sx, sy) { zoomAnim = { from: Z, to: snapZ(to), sx: sx == null ? W / 2 : sx, sy: sy == null ? H / 2 : sy, k: 0 }; }
+  // glide the view (and zoom) so world point (x, y) is in the middle
+  function glideTo(x, y, z) { zoomAnim = { from: Z, to: snapZ(z || Z), k: 0, c: [camX + viewW() / 2, camY + viewH() / 2, x, y] }; camV.x = camV.y = 0; }
   function saveZoomPref() { zoomPref = Z / ZMIN; try { localStorage.setItem(ZKEY, zoomPref.toFixed(3)); } catch (e) { /* blocked */ } }
   function updateCamera(dt) {
     if (zoomAnim) {
-      zoomAnim.k = Math.min(1, zoomAnim.k + dt / (zoomAnim.c ? 0.4 : 0.22));
+      zoomAnim.k = Math.min(1, zoomAnim.k + dt / (zoomAnim.c ? 0.45 : 0.22));
       const e = 1 - Math.pow(1 - zoomAnim.k, 3), c = zoomAnim.c;
-      // (the magnifier button glides the view's centre too: c = [from x, from y, to x, to y] in world px)
+      // (the magnifier button and the finder glide the view's centre too: c = [from x, from y, to x, to y] in world px)
       if (c) { Z = lerp(zoomAnim.from, zoomAnim.to, e); camX = lerp(c[0], c[2], e) - viewW() / 2; camY = lerp(c[1], c[3], e) - viewH() / 2; clampCam(); }
       else zoomAt(lerp(zoomAnim.from, zoomAnim.to, e), zoomAnim.sx, zoomAnim.sy);
       if (zoomAnim.k >= 1) { Z = zoomAnim.to; clampCam(); zoomAnim = null; saveZoomPref(); }
@@ -786,6 +989,21 @@
         if (camX !== ox || camY !== oy) { const p = clientToWorld(lastClient.x, lastClient.y); ptr.x = p.x; ptr.y = p.y; }
       }
     }
+    followCam(dt);
+  }
+  // the gentle follow: while nobody is touching the garden, the camera keeps the followed Sprout comfortably on screen as it
+  // wanders (it lets go when you drag the view away, pinch, or the Sprout swims off)
+  function followCam(dt) {
+    if (!follow || pinch || zoomAnim || drag || touches.size || (press && press.kind === 'bg') || Z <= ZFAR * 1.03) return;
+    const r = RT.get(follow);
+    if (!r || !here.includes(r) || r.state === 'travel' || r.state === 'held' || r.state === 'enter') { follow = null; return; }
+    const vw = viewW(), vh = viewH(), mx = vw * 0.2, top = 96 / Z + vh * 0.08, bot = (H - (cardEl && !cardEl.hidden ? cardEl.offsetHeight : trayEl.offsetHeight) - 24) / Z - vh * 0.06;
+    const fx = r.x, fy = (r.state === 'fall' ? r.y - r.z : r.y) - 12;
+    let tx = camX, ty = camY;
+    if (fx < camX + mx) tx = fx - mx; else if (fx > camX + vw - mx) tx = fx - vw + mx;
+    if (fy < camY + top) ty = fy - top; else if (fy > camY + bot) ty = fy - bot;
+    if (tx === camX && ty === camY) return;
+    const k = Math.min(1, dt * 2.2); camX += (tx - camX) * k; camY += (ty - camY) * k; clampCam();
   }
   let lastTrayH = 0;
   function checkSize() {
@@ -819,7 +1037,13 @@
   function groundList(a) {
     if (!ground[a]) {
       const G = PS.S.garden && PS.S.garden.ground && PS.S.garden.ground[a];
-      ground[a] = (Array.isArray(G) ? G : []).filter(g => D.FRUITS[g.kind]).map(g => ({ kind: g.kind, x: clamp(g.fx * ww, 5, ww - 5), y: clamp(Lw.minY + g.fy * Lw.span, Lw.minY, Lw.maxY), z: 0, vz: 0 }));
+      // (saved as shares of the garden's width and height, so they map onto any size of garden; one that would land in the
+      // water or a pond is set down on the bank instead, never dropped)
+      ground[a] = (Array.isArray(G) ? G : []).filter(g => D.FRUITS[g.kind]).map(g => {
+        const y = clamp(Lw.minY + (+g.fy || 0) * Lw.span, Lw.minY, Lw.maxY), f = { kind: g.kind, x: clamp((+g.fx || 0) * ww, 5, lawnRight(y) - 2), y, z: 0, vz: 0 };
+        const P = pondAt(f.x, f.y, 2); if (P) f.y = Math.min(Lw.maxY, P.y + P.ry + 4);
+        return f;
+      });
     }
     return ground[a];
   }
@@ -860,12 +1084,12 @@
       let x, y, state = 'idle';
       const sp = spawnAt.get(s.id);
       if (sp) { x = sp.x; y = sp.y; spawnAt.delete(s.id); }
-      else if (arrivals.has(s.id)) { arrivals.delete(s.id); y = rand(Lw.minY + 4, Lw.maxY - 4); x = ww + 8; state = 'arrive'; }
-      else { const q = lawnPoint(); x = q.x; y = q.y; }
+      else if (arrivals.has(s.id)) { arrivals.delete(s.id); y = clamp(ww ? camY + viewH() * rand(0.3, 0.7) : rand(Lw.minY + 4, Lw.maxY - 4), Lw.minY + 4, Lw.maxY - 4); x = ww + 8; state = 'arrive'; }
+      else { const h = Lw.heart, q = h ? lawnPoint(h.x, h.y, 110) : lawnPoint(); x = q.x; y = q.y; }
       r = { id: s.id, s, x, y, z: 0, vz: 0, state, timer: rand(0.4, 2), tx: x, ty: y, facing: Math.random() < 0.5 ? 1 : -1, emote: null, emoteT: 0,
         blinkT: rand(1, 4), mood: null, target: null, flutter: false, z0: 0, eat: null, cheerT: 0, hopT: 0, feetY: y, dangle: 0, acc: {}, look: null, lookT: 0,
         flutterAt: -99, dest: null, ripT: 0, awake: t + 25, ph: Math.random() * 2 };
-      if (state === 'arrive') { const q = shallowPoint(); r.tx = q.x; r.ty = y; r.facing = -1; emote(r, '!', 1.4); }
+      if (state === 'arrive') { const q = shallowPoint(y); r.tx = q.x; r.ty = y; r.facing = -1; emote(r, '!', 1.4); }
       RT.set(s.id, r);
     }
     r.s = s; return r;
@@ -873,7 +1097,7 @@
   function lookFor(r) { if (!r.look || t > r.lookT) { r.look = ST.lookOf(r.s); r.lookT = t + 1.2; } return r.look; }
   function emote(r, e, dur) { r.emote = e; r.emoteT = dur || 1.6; }
   function hop(r) { r.hopT = 0.35; }
-  const busy = r => ['held', 'fall', 'travel', 'arrive', 'cocoon', 'wait', 'enter'].includes(r.state);
+  const busy = r => ['held', 'fall', 'travel', 'arrive', 'cocoon', 'wait', 'enter', 'ko'].includes(r.state);
   function headY(r) { const base = r.state === 'held' ? r.feetY : r.state === 'fall' ? r.y - r.z : r.y; return base - (r.s.stage === 2 ? 30 : 23); }
   function addXp(r, stat, amt) { r.acc[stat] = (r.acc[stat] || 0) + amt; }
   function flushXp(r) {
@@ -887,33 +1111,40 @@
   function think(r) {
     const s = r.s, night = PS.clock.isNight();
     r.mood = null;
+    if (raidHere()) { r.state = 'idle'; r.timer = 0.6; return; } // (the gloom is here: everyone stays together)
     const gl = groundList(area);
     const free = gl.filter(f => !f.claim || f.claim.until < t || f.claim.id === r.id);
     if (free.length) {
       let best = null, bd = 1e9; for (const f of free) { const d = dist(r, f); if (d < bd) { bd = d; best = f; } }
       // close snacks are sniffed out straight away; far ones get found sooner or later while wandering
-      if (bd < TUNE.smellRange || Math.random() < 0.3) {
+      if (bd < TUNE.smellRange || (bd < 240 && Math.random() < 0.3)) {
         best.claim = { id: r.id, until: t + 16 };
         goTo(r, best.x - 5 * (best.x > r.x ? 1 : -1), best.y, { type: 'fruit', f: best }); emote(r, bd < TUNE.smellRange ? '!' : '?', 1); return;
       }
     }
     if (s.happy < 25 && Math.random() < 0.25) { r.state = 'idle'; r.timer = rand(1.5, 3); r.mood = 'sad'; emote(r, '?', 1.5); return; }
-    const pals = here.filter(o => o !== r && !busy(o) && o.state !== 'sleep');
+    const pals = here.filter(o => o !== r && !busy(o) && o.state !== 'sleep' && dist(o, r) < 130);
     const x = Math.random();
     if (pals.length && x < 0.1) { const o = pick(pals); goTo(r, o.x - 8 * (o.x > r.x ? 1 : -1), o.y, { type: 'greet', o }); return; }
-    if (x < 0.6) { const swimmy = Math.random() < (s.stats.swim.lv >= 1 ? 0.2 : 0.1); const q = swimmy ? shallowPoint() : lawnPoint(); goTo(r, q.x, q.y, null); }
+    if (x < 0.6) { const swimmy = shoreAt(r.y) - r.x < 150 && Math.random() < (s.stats.swim.lv >= 1 ? 0.2 : 0.1); const q = swimmy ? shallowPoint(r.y) : wanderPoint(r); goTo(r, q.x, q.y, null); }
     else if (x < 0.76) { r.state = 'idle'; r.timer = rand(1.5, 3); emote(r, pick(['note', 'note', 'heart', 'sparkle']), 1.4); }
     else if (x < 0.86) { r.state = 'idle'; r.timer = 1.4; r.cheerT = 0.9; hop(r); }
     else { r.state = 'idle'; r.timer = rand(1, 2.5); r.facing *= -1; }
   }
   function goSleep(r, dur) { r.state = 'sleep'; r.timer = dur; r.mood = 'sleep'; emote(r, 'zz', dur); }
   function goTo(r, x, y, target) { r.state = 'walk'; r.tx = clamp(x, 6, ww - 6); r.ty = clamp(y, Lw.minY, Lw.maxY); r.target = target; }
-  function startSwim(r) { r.state = 'swim'; r.timer = rand(6, 11); const q = shallowPoint(); r.tx = q.x; r.ty = q.y; emote(r, 'note', 1.5); markSeen('swim'); }
+  function startSwim(r) { r.state = 'swim'; r.timer = rand(6, 11); const q = shallowPoint(r.y); r.tx = q.x; r.ty = q.y; emote(r, 'note', 1.5); markSeen('swim'); }
   function wake(r) { if (r.state === 'sleep') { r.state = 'idle'; r.timer = 1; r.mood = null; r.emote = null; } }
 
   function updateSprout(r, dt, night) {
     const s = r.s;
     if (press && press.kind === 'sprout' && press.r === r && press.mode === 'pending' && t - press.t0 > TUNE.holdDelay) press.mode = pickUp(r) ? 'hold' : 'none';
+    if (r.atkT > 0) r.atkT -= dt; if (r.lungeT > 0) r.lungeT -= dt; if (r.hitT > 0) r.hitT -= dt;
+    // resting after a raid (dizzy stars), then up again with a sparkle
+    if (r.koUntil) {
+      if (Date.now() < r.koUntil) { if (r.state !== 'held' && r.state !== 'fall' && r.state !== 'travel') r.state = 'ko'; }
+      else { r.koUntil = 0; if (r.state === 'ko') { r.state = 'idle'; r.timer = 1; r.cheerT = 1; hop(r); emote(r, 'sparkle', 1.4); } }
+    }
     if (r.state === 'sleep') wake(r); // sleeping is switched off for now
     s.happy = clamp(s.happy - TUNE.happyDecay * dt, 0, 100);
     r.blinkT -= dt; if (r.blinkT < -0.14) r.blinkT = rand(2, 5);
@@ -932,6 +1163,8 @@
     const wet = inWater(r.x, r.y);
     if (wet && (r.state === 'swim' || r.state === 'walk' || r.state === 'wait' || r.state === 'arrive')) addXp(r, 'swim', D.GROWTH.swimXpPerSec * dt);
     const moveTo = (sp) => { const dx = r.tx - r.x, dy = r.ty - r.y, d = Math.hypot(dx, dy); if (Math.abs(dx) > 0.5) r.facing = dx > 0 ? 1 : -1; if (d < 1) return true; const k = Math.min(d, sp * dt) / d; r.x += dx * k; r.y += dy * k; return false; };
+    // a raid on: the fight moves this Sprout (updateFighter), unless you're carrying it
+    if (r.inRaid && raidHere() && raid.phase === 'fight' && r.state !== 'held' && r.state !== 'fall') return;
     switch (r.state) {
       case 'idle': case 'pet':
         r.timer -= dt;
@@ -939,7 +1172,7 @@
         if (wet && r.state === 'idle') startSwim(r);
         break;
       case 'walk': {
-        const sp = speed * (wet ? 0.6 : 1);
+        const sp = speed * (wet ? 0.6 : 1) * (raidHere() ? 1.7 : 1); // (hurrying together when the gloom is coming)
         if (moveTo(sp)) {
           const tg = r.target; r.target = null;
           if (tg && tg.type === 'fruit') {
@@ -956,15 +1189,15 @@
       }
       case 'swim':
         r.timer -= dt;
-        if (moveTo(speed * 0.55)) { const q = shallowPoint(); r.tx = q.x; r.ty = q.y; }
-        if (r.timer <= 0 || !wet) { const q = lawnPoint(); goTo(r, q.x, q.y, null); }
+        if (moveTo(speed * 0.55)) { const q = shallowPoint(r.y); r.tx = q.x; r.ty = q.y; }
+        if (r.timer <= 0 || !wet) { const q = lawnPoint(shoreAt(r.y) - 30, r.y, 40); goTo(r, q.x, q.y, null); }
         break;
       case 'wait': // treading water while the player picks a destination
         r.x += Math.sin(t * 1.3 + r.y) * 0.03;
         break;
       case 'travel': {
         if (!wet && r.x < shoreAt(r.y) + 2) { r.tx = shoreAt(r.y) + 6; r.ty = r.y; moveTo(speed); }
-        else { r.tx = ww + 16; r.ty = clamp(r.y + Math.sin(t * 0.8) * 0.2, Lw.minY, Lw.maxY); moveTo(speed * 0.8 + 4); r.ripT -= dt; if (r.ripT <= 0) { r.ripT = 0.25; parts.push({ x: r.x - 6 * r.facing, y: r.y - 6, vx: 0, vy: 0, life: 0.8, type: 'ripple', color: TH[area].hl }); } }
+        else { r.tx = ww + 16; r.ty = clamp(r.y + Math.sin(t * 0.8) * 0.2, Lw.minY, Lw.maxY); moveTo(speed * 1.3 + 6); r.ripT -= dt; if (r.ripT <= 0) { r.ripT = 0.25; parts.push({ x: r.x - 6 * r.facing, y: r.y - 6, vx: 0, vy: 0, life: 0.8, type: 'ripple', color: TH[area].hl }); } }
         if (r.x > ww + 12) finishMove(s, r.dest);
         break;
       }
@@ -973,7 +1206,7 @@
         if (!Lw.home || moveTo(speed * 1.3)) finishInside(r);
         break;
       case 'arrive':
-        if (moveTo(speed * 0.6)) { const q = lawnPoint(); goTo(r, q.x, q.y, null); emote(r, 'sparkle', 1.4); }
+        if (moveTo(speed * 1.1)) { const q = lawnPoint(shoreAt(r.y) - 40, r.y, 50); goTo(r, q.x, q.y, null); emote(r, 'sparkle', 1.4); }
         break;
       case 'eat':
         r.timer -= dt; if (Math.random() < dt * 5) snd('munch');
@@ -1039,10 +1272,11 @@
     const s = r.s;
     if (inWater(r.x, r.y)) {
       burst(r.x, r.y - 2, 'drop', 14, '#cbdbfc'); snd('splash'); r.flutter = false;
-      if (isDeep(r.x, r.y) && PS.S.sprouts.length) { r.state = 'wait'; emote(r, '?', 3); askTravel(s, true); }
+      if (isDeep(r.x, r.y) && PS.S.sprouts.length && !raidHere()) { r.state = 'wait'; emote(r, '?', 3); askTravel(s, true); }
       else startSwim(r);
       return;
     }
+    if (pondAt(r.x, r.y)) { burst(r.x, r.y - 2, 'drop', 10, '#cbdbfc'); snd('splash'); r.flutter = false; r.state = 'idle'; r.timer = 0.5; emote(r, '!', 1); const q = lawnPoint(r.x, r.y, 30); goTo(r, q.x, q.y, null); return; }
     snd('thud');
     if (r.flutter) {
       if (t - r.flutterAt > TUNE.flutterCooldown) { const xp = clamp(Math.round(r.z0 / 10), 1, TUNE.flutterXpMax); ST.gain(s, { fly: xp }); floaterFor(r, `+${xp} Fly`, D.STAT_META.fly.color); r.flutterAt = t; }
@@ -1054,6 +1288,8 @@
   }
   function feedSprout(r, id) {
     const res = ST.feed(r.s, id); if (!res) return;
+    if (raidHeal(r, id, 1)) return; // (in a raid the snack heals it, and it keeps fighting)
+    if (r.koUntil) { r.koUntil = 0; r.state = 'idle'; } // (a snack wakes a resting Sprout)
     wake(r);
     r.state = 'eat'; r.timer = 1.5; r.eat = id; r.mood = null; r.target = null; emote(r, 'heart', 1.5); snd('munch'); markSeen('feed');
     const f = D.FRUITS[id];
@@ -1196,9 +1432,8 @@
 
   // ---------------- eggs ----------------
   function eggsHere() {
-    const list = PS.S.eggs.filter(e => e.area === area), n = list.length;
-    const midY = Lw.minY + Lw.span * 0.46, mid = Math.round((8 + shoreAt(midY) - 8) / 2) + 6;
-    return list.map((e, i) => ({ e, x: Math.round(clamp(mid + (i - (n - 1) / 2) * 17, 10, shoreAt(midY) - 10)), y: Math.round(midY + (i % 2) * 6) }));
+    const list = PS.S.eggs.filter(e => e.area === area), n = list.length, N = Lw.nest || { x: ww * 0.4, y: Lw.minY + Lw.span * 0.46 };
+    return list.map((e, i) => ({ e, x: Math.round(clamp(N.x + (i - (n - 1) / 2) * 17, 10, shoreAt(N.y) - 10)), y: Math.round(N.y + (i % 2) * 6) }));
   }
   function eggNeed(e) { return (D.EGGS[e.kind] || D.EGGS.meadow).taps || 5; }
   // the last tap: the egg shakes and glows for a moment, then bursts open (a white flash, shell bits) and the Sprout pops out
@@ -1325,9 +1560,9 @@
   function updateCritters(dt) {
     // first session: no visitors until the new Sprout has been petted and fed, then the first one comes quickly
     if (PS.S.sprouts.length && !seen('catch') && (!seen('pet') || !seen('feed')) && here.length) nextCritter = Math.max(nextCritter, t + 4);
-    if (PS.S.sprouts.length && critters.length < TUNE.maxCritters && t > nextCritter) { spawnCritter(); nextCritter = t + rand(...D.GROWTH.critterEverySec); }
+    if (PS.S.sprouts.length && critters.length < TUNE.maxCritters && t > nextCritter && !raidHere()) { spawnCritter(); nextCritter = t + rand(...D.GROWTH.critterEverySec); }
     for (const c of critters) {
-      c.life -= dt * (inView(c.x, c.y - 6, 0) ? 1 : 0.5); c.next -= dt; // off-screen visitors stay a little longer
+      c.life -= raidHere() ? 0 : dt * (inView(c.x, c.y - 6, 0) ? 1 : 0.5); c.next -= dt; // off-screen visitors stay a little longer (and nobody leaves during a raid)
       if (c.where === 'air') {
         c.x += c.vx * dt; c.y = c.by + (c.plant ? Math.sin(t * 1.1 + c.ph) * 6 : Math.sin(t * 2 + c.ph) * 4);
         if (c.plant && Math.random() < dt * 1.2) parts.push({ x: c.x + rand(-4, 4), y: c.y - rand(8, 14), vx: rand(3, 8), vy: rand(-5, -2), life: rand(1.4, 2.4), type: 'seed', color: '#ffffff' });
@@ -1341,7 +1576,7 @@
         let nx, ny;
         if (c.where === 'water') { const q = waterPoint(0.1, 0.85); nx = lerp(c.x, q.x, 0.4); ny = lerp(c.y, q.y, 0.3); if (!inWater(nx, ny)) { nx = c.x; ny = c.y; } }
         else if (c.where === 'coast') { const q = coastPoint(c.y + rand(-4, 4)); nx = q.x; ny = q.y; }
-        else { const a = rand(0, Math.PI * 2), d = rand(4, 9); nx = clamp(c.x + Math.cos(a) * d, 8, ww - 8); ny = clamp(c.y + Math.sin(a) * d * 0.5, Lw.minY + 3, Lw.maxY); if (nx > shoreAt(ny) - 7) { nx = c.x - 4; ny = c.y; } }
+        else { const a = rand(0, Math.PI * 2), d = rand(4, 9); nx = clamp(c.x + Math.cos(a) * d, 8, ww - 8); ny = clamp(c.y + Math.sin(a) * d * 0.5, Lw.minY + 3, Lw.maxY); if (nx > shoreAt(ny) - 7 || pondAt(nx, ny, 3)) { nx = c.x - (c.x > ww * 0.5 ? 4 : -4); ny = c.y; } }
         if (c.plant && c.where === 'land' && !c.rooted) { nx = lerp(c.x, nx, 0.6); ny = lerp(c.y, ny, 0.6); } // little scoots
         c.fx = c.x; c.fy = c.y; c.tx = nx; c.ty = ny; c.hopT = 0; if (Math.abs(nx - c.x) > 0.3) c.facing = nx >= c.x ? 1 : -1;
         c.next = c.rooted ? rand(3.5, 6.5) : c.plant && c.where === 'land' ? rand(0.9, 1.8) : rand(1.6, 3.2);
@@ -1372,7 +1607,9 @@
     let d = ST.rollDrop(), tries = 0;
     while (d.type === 'xp' && !any && tries++ < 6) d = ST.rollDrop();
     if (d.type === 'xp' && !any) d = { type: 'coin', amount: 3 };
-    const q = lawnPoint();
+    // (somewhere on screen when it can be: the garden is big and a drop only lasts TUNE.dropLife seconds)
+    const vx = camX + viewW() / 2, vy = camY + viewH() * 0.45; let q = lawnPoint(vx, vy, Math.min(viewW(), viewH()) * 0.4);
+    if (!inView(q.x, q.y - 6, 4)) q = lawnPoint(vx, vy, 24);
     list.push(Object.assign(d, { x: q.x, y: q.y, z: 16, vz: 0, life: TUNE.dropLife, bounced: false }));
     snd('tick');
   }
@@ -1404,12 +1641,12 @@
   const FUN_OF = {};
   for (const [rec, kinds] of Object.entries({
     bush: 'bush fern', flower: 'flowerbed', fence: 'fence', clank: 'bench driftwood surfboard bucket towel', rock: 'rock', stump: 'stump',
-    shroom: 'mushrooms glowshroom', shine: 'crystal moonstone', shells: 'shells', light: 'lantern', spin: 'umbrella', bounce: 'ball',
+    shroom: 'mushrooms glowshroom', shine: 'crystal moonstone', shells: 'shells', light: 'lantern lamp', spin: 'umbrella', bounce: 'ball', leafy: 'tree bigtree palm glowtree lollitree',
     sand: 'sandcastle', pond: 'rockpool', sweet: 'candycane cupcake gumdrops donut lollipop icecream',
   })) for (const k of kinds.split(' ')) FUN_OF[k] = rec;
   // recipe -> [move, seconds, sound, pitch]; anything not listed wobbles and bumps
   const FUN = {
-    tree: ['shake', 0.6, 'whoosh', 1.3], bush: ['shake', 0.5, 'whoosh', 1.6], flower: ['squash', 0.5, 'pop', 1.3], fence: ['shake', 0.45, 'bump', 1.4],
+    tree: ['shake', 0.6, 'whoosh', 1.3], leafy: ['shake', 0.6, 'whoosh', 1.4], bush: ['shake', 0.5, 'whoosh', 1.6], flower: ['squash', 0.5, 'pop', 1.3], fence: ['shake', 0.45, 'bump', 1.4],
     clank: ['wobble', 0.6, 'bump', 0.9], rock: ['wobble', 0.6, 'thud', 1.1], stump: ['squash', 0.5, 'thud', 1.4], shroom: ['squash', 0.5, 'bloop', 1.2],
     shine: ['squash', 0.5, 'twinkle', 1], shells: ['hop', 0.5, 'twinkle', 1.3], light: ['flicker', 0.9, 'chime', 0.9], spin: ['spin', 0.9, 'whoosh', 1.8],
     bounce: ['hop', 0.6, 'bump', 0.7], sand: ['squash', 0.5, 'thud', 1.5], pond: ['squash', 0.5, 'splash', 1.2], sweet: ['squash', 0.5, 'bloop', 1.5],
@@ -1469,6 +1706,11 @@
         break;
       }
       case 'bush': puff(6, 'leaf', x, top + h * 0.3, w / 2); if (Math.random() < 0.4) flutterOut(x, top + 2); break;
+      case 'leafy': // a tree that bears no fruit: leaves (or sweets) shake down and sometimes a butterfly flutters out
+        if (q.kind === 'lollitree') puff(7, 'bit', x, top + h * 0.3, w * 0.4, SWEETS);
+        else { puff(q.kind === 'glowtree' ? 5 : 7, 'leaf', x, top + h * 0.3, w * 0.4); if (q.kind === 'glowtree') puff(4, 'spark', x, top + h * 0.35, w * 0.4, ['#c8fff8', '#ffffff']); }
+        if (Math.random() < 0.45) flutterOut(x, top + 3);
+        break;
       case 'flower': puff(8, 'petal', x, top + h * 0.35, w / 2, th.dots); if (Math.random() < 0.6) flutterOut(x, top + 1); break;
       case 'rock': puff(3, 'dust', x, q.y - 1, w / 2, '#c8c0b0'); find(3, 'A hidden coin!'); break;
       case 'stump': puff(4, 'leaf', x, top + 1, w / 3); find(3, 'A hidden coin!'); break;
@@ -1495,12 +1737,12 @@
     else puff(5, 'smoke', H.x + Math.round(H.w * 0.22), H.y - H.h - 2, 2, SMOKE, { vx: rand(-3, 3) });
   }
   // the water: a splash and ripples (sometimes a fish jumps; now and then there's a coin, once a day per area)
-  function funWater(x, y) {
+  function funWater(x, y, key) {
     sndP('splash', 1.3); markSeen('propfun');
     parts.push({ x, y, vx: 0, vy: 0, life: 0.8, type: 'ripple', color: '#ffffff' }, { x, y, vx: 0, vy: 0, life: 0.55, type: 'ripple', color: TH[area].hl || '#d6f5fd' });
     burst(x, y - 2, 'drop', 5, '#d6f5fd');
     if (Math.random() < 0.35) jumpFish(x, y);
-    if (Math.random() < 0.15) funPay('water:' + area, 3, x, y - 10);
+    if (Math.random() < 0.15) funPay((key || 'water') + ':' + area, 3, x, y - 10);
   }
   // a tap on the scenery (the finger lifted without dragging): returns true when something reacted
   function sceneryTap(pr) {
@@ -1514,6 +1756,7 @@
       return true;
     }
     if (inWater(x, y)) { funWater(x, y); return true; }
+    const pd = pondAt(x, y, 1); if (pd) { funWater(x, y, 'pond' + (pd.i | 0)); return true; }
     return false;
   }
   // scenery with its tap animation (still props are just blitted: no allocations)
@@ -1539,9 +1782,9 @@
   function toggleFar() {
     if (!ww || pinch) return;
     const cx = camX + viewW() / 2, cy = camY + viewH() / 2;
-    if (Z > ZMIN * 1.03) {
-      zoomBack = { z: Z, x: cx, y: cy };
-      zoomAnim = { from: Z, to: ZMIN, k: 0, c: [cx, cy, ww / 2, cy] }; sndP('whoosh', 0.8);
+    if (Z > ZFAR * 1.03) {
+      zoomBack = { z: Z, x: cx, y: cy }; follow = null;
+      zoomAnim = { from: Z, to: ZFAR, k: 0, c: [cx, cy, ww / 2, (Lw.maxY + 12) / 2] }; sndP('whoosh', 0.8);
     } else {
       let b = zoomBack;
       if (!b) {
@@ -1553,9 +1796,40 @@
     }
     camV.x = camV.y = 0; markSeen('zoom'); buzz(6); syncZoomBtn(true);
   }
+  // ---------------- finding your Sprouts in the big garden ----------------
+  // The face button under the magnifier shows who it will find next: tap it and the view glides to that Sprout (your partner
+  // first, then the others in turn), which hops and waves; the camera then keeps it in view while it wanders.
+  function findList() {
+    const L = here.filter(r => r.state !== 'travel' && r.state !== 'enter');
+    return L.sort((a, b) => (b.s.id === PS.S.activeId) - (a.s.id === PS.S.activeId) || (a.s.id < b.s.id ? -1 : a.s.id > b.s.id ? 1 : 0));
+  }
+  function findNext() {
+    const L = findList(); if (!L.length) return;
+    const i = Math.max(0, L.findIndex(r => r.s.id === findId)), r = L[i];
+    findId = L[(i + 1) % L.length].s.id; // (the next tap finds the next one)
+    closeCard();
+    glideTo(r.x, (r.state === 'fall' ? r.y - r.z : r.y) - 12, Math.max(Z <= ZFAR * 1.03 ? 0 : Z, ZMIN * TUNE.zoomDef));
+    follow = r.id; zoomBack = null;
+    if (!busy(r) && r.state !== 'eat' && r.state !== 'swim') { r.state = 'idle'; r.timer = Math.max(r.timer, 1.4); hop(r); r.cheerT = 0.9; }
+    emote(r, 'heart', 1.4);
+    if (!sproutCry(r)) snd('coo');
+    markSeen('find'); buzz(8); syncFind(true); syncZoomBtn(true);
+  }
+  function syncFind(force) {
+    if (!findEl) return;
+    const L = findList(), show = L.length > 0 && !raidHere();
+    if (findEl.hidden === show) findEl.hidden = !show;
+    if (!show) return;
+    let r = L.find(q => q.s.id === findId); if (!r) { r = L[0]; findId = r.s.id; }
+    const key = r.s.id + ':' + L.length + ':' + r.s.stage + ':' + JSON.stringify(r.s.look || {});
+    if (!force && key === findKey) return; findKey = key;
+    PS.ui.drawSproutTo(findEl.querySelector('canvas'), r.s, { eyes: 'happy' });
+    const n = findEl.querySelector('i'); n.textContent = L.length; n.hidden = L.length < 2;
+    findEl.setAttribute('aria-label', `Find ${r.s.name}`);
+  }
   function syncZoomBtn(force) {
     if (!zoomBtn) return;
-    const far = (zoomAnim ? zoomAnim.to : Z) <= ZMIN * 1.03;
+    const far = (zoomAnim ? zoomAnim.to : Z) <= ZFAR * 1.03;
     if (!force && zoomBtn.classList.contains('g-far') === far) return;
     zoomBtn.classList.toggle('g-far', far); zoomBtn.setAttribute('aria-label', far ? 'Zoom back in' : 'See the whole garden');
   }
@@ -1589,14 +1863,14 @@
   }
   function drawDusk(n) {
     const k = duskK(n); if (k < 0.02) return;
-    const dc = duskSprite(); bx.globalAlpha = k; bx.drawImage(dc, 0, 0, ww, dc.height / SK); bx.globalAlpha = 1;
+    const dc = duskSprite(), dh = dc.height / SK; bx.globalAlpha = k; if (VR.y0 < dh) { const h = Math.min(dh, VR.y1) - VR.y0; bx.drawImage(dc, VR.x0 * SK, VR.y0 * SK, (VR.x1 - VR.x0) * SK, h * SK, VR.x0, VR.y0, VR.x1 - VR.x0, h); } bx.globalAlpha = 1;
     const m = moonPos(); if (!TH[area].bigMoon) glow(m.x, Math.round(m.y + n * Lw.hz * 0.9), 18, '255,170,110', 0.18 * k);
   }
   const shoot = { life: 0, x: 0, y: 0, vx: 0, vy: 0 };
   function drawMagic(n, dt) {
     const th = TH[area], dk = duskK(n);
     // golden-hour light over the whole garden
-    if (dk > 0.02) { bx.globalAlpha = 0.12 * dk; bx.fillStyle = '#ff9a5a'; bx.fillRect(0, 0, ww, wh); bx.globalAlpha = 1; }
+    if (dk > 0.02) { bx.globalAlpha = 0.12 * dk; bx.fillStyle = '#ff9a5a'; bx.fillRect(VR.x0, VR.y0, VR.x1 - VR.x0, VR.y1 - VR.y0); bx.globalAlpha = 1; }
     // a shooting star now and then on a clear night
     const lit = th.bigMoon ? 0.45 + 0.55 * n : n;
     if (lit > 0.7 && !RMO) {
@@ -1673,7 +1947,9 @@
     if (r.state === 'held') { S.arms = 'out'; S.mouth = 'o'; delete S.eyes; }
     if (r.state === 'fall') { S.arms = r.flutter ? 'up' : 'out'; S.flap = r.flutter; S.frame = Math.floor(t * 12) % 2; S.mouth = 'open'; }
     if (r.state === 'eat') { S.arms = 'hold'; S.mouth = Math.floor(t * 8) % 2 ? 'open' : 'smile'; }
-    if (r.state === 'sleep') { S.eyes = 'closed'; S.mouth = 'o'; }
+    if (r.state === 'sleep' || r.state === 'ko') { S.eyes = 'closed'; S.mouth = 'o'; }
+    if (r.atkT > 0) { S.arms = 'out'; S.mouth = 'open'; }
+    if (r.hitT > 0) { S.eyes = 'sad'; S.mouth = 'o'; }
     if (r.state === 'swim' || r.state === 'travel' || r.state === 'arrive' || r.state === 'wait') { S.arms = 'paddle'; S.frame = Math.floor(t * (r.state === 'wait' ? 3 : 5)) % 2; }
     return S;
   }
@@ -1694,15 +1970,18 @@
       bx.save(); bx.globalAlpha = Math.min(1, Math.round(k * 4) / 4 + 0.2); PX.blit(bx, cocoonSprite(), r.x, r.y + 1); bx.restore();
       return;
     }
-    if (inWater(r.x, r.y) || (r.state === 'travel' && r.x > shoreAt(r.y) + 1)) {
-      const wl = Math.round(r.y - 6), sink = Math.floor(t * 2 + r.x * 0.1) % 2;
+    const wade = !inWater(r.x, r.y) && r.state !== 'travel' && pondAt(r.x, r.y);
+    if (inWater(r.x, r.y) || (r.state === 'travel' && r.x > shoreAt(r.y) + 1) || wade) {
+      const wl = Math.round(r.y - (wade ? 4 : 6)), sink = Math.floor(t * 2 + r.x * 0.1) % 2;
       bx.save(); bx.beginPath(); bx.rect(0, 0, ww + 40, wl); bx.clip(); put(r.x, r.y + sink); bx.restore();
       waterline(r.x, wl, 8 + (Math.floor(t * 3) % 2));
       emPush(r, r.x, r.y + sink - head); return;
     }
     const hopY = r.hopT > 0 ? Math.round(Math.sin((1 - r.hopT / 0.35) * Math.PI) * 4) : 0;
-    const breathe = !hopY && (r.state === 'idle' || r.state === 'pet') && Math.floor(t * 1.4 + r.ph) % 2 ? 1 : 0; // a slow 1px breath while standing
-    shadow(r.x, r.y, 13); put(r.x, r.y - hopY - breathe);
+    const breathe = !hopY && (r.state === 'idle' || r.state === 'pet' || r.state === 'ko') && Math.floor(t * 1.4 + r.ph) % 2 ? 1 : 0; // a slow 1px breath while standing
+    // (a raid: a little lunge on a bonk, a shiver when bumped)
+    const ox = (r.lungeT > 0 ? 2 * r.facing : 0) + (r.hitT > 0 ? (Math.floor(t * 30) % 2 ? 1 : -1) : 0);
+    shadow(r.x, r.y, 13); put(r.x + ox, r.y - hopY - breathe);
     if (r.state === 'eat' && r.eat) { const hf = heldFruit(r.eat); bx.drawImage(hf, Math.round(r.x - 5) - 0.5, Math.round(r.y - 11 - hopY) - 0.5, artW(hf) === 13 ? 9 : 10, artW(hf) === 13 ? 9 : 10); }
     emPush(r, r.x, r.y - hopY - head);
   }
@@ -1840,16 +2119,17 @@
   }
   function drawClouds(n) {
     const th = TH[area], a = th.bigMoon ? 0.5 : 1 - n * 0.75;
-    if (a <= 0.05) return;
+    if (a <= 0.05 || VR.y0 > Lw.hz) return;
     bx.globalAlpha = a;
     for (const c of DECO.clouds) {
-      const s = cloudSpr(c.s), span = ww + artW(s) + 10;
-      const x = Math.round(((c.x * span + t * c.v) % span) - artW(s) / 2 - 5), y = Math.round(c.y * Lw.hz);
+      const s = cloudSpr(c.s), w = artW(s), span = ww + w + 10;
+      const x = Math.round(((c.x * span + t * c.v) % span) - w / 2 - 5), y = Math.round(c.y * Lw.hz);
+      if (x + w < VR.x0 || x - w > VR.x1) continue;
       PX.blit(bx, s, x, y);
     }
     bx.globalAlpha = 1;
   }
-  function moonPos() { return { x: Math.round(ww * 0.74), y: Math.round(Lw.hz * 0.36) }; }
+  function moonPos() { return { x: Math.round(ww * 0.8), y: Math.round(Lw.hz * 0.36) }; } // (over the water, so it shines on it)
   function drawSunMoon(n) {
     const th = TH[area], m = moonPos();
     if (!th.bigMoon && n < 0.98) { const s = sunSprite(), sy = Math.round(m.y + 8 + n * Lw.hz * 0.9); if (n < 0.5) glow(m.x, sy - 8, 14, '255,250,210', 0.16 * (1 - n * 2)); PX.blit(bx, s, m.x, sy); }
@@ -1922,17 +2202,17 @@
     // fish shadows gliding under the surface
     for (const f of DECO.fish) {
       const y = Math.round(Lw.minY + 8 + f.b * (Lw.span - 14) + Math.sin(t * f.v * 2.3 + f.ph) * 5), s = shoreAt(y), span = ww - s - 12;
-      if (span < 16 || (Math.abs(y - Lw.dockY) < 4 && s + 10 < Lw.dockX1 + 4)) continue;
+      if (y < VR.y0 - 4 || y > VR.y1 + 4 || span < 16 || (Math.abs(y - Lw.dockY) < 4 && s + 10 < Lw.dockX1 + 4)) continue;
       const ph = t * f.v + f.ph, X = Math.round(s + 8 + clamp(f.a + Math.sin(ph) * f.r, 0.04, 0.96) * span), d = Math.cos(ph) >= 0 ? 1 : -1, L = f.big ? 4 : 3, wag = Math.floor(t * 4 + f.ph) % 2;
       PX.blit(bx, fishShadowSpr(th.fish, f.big, wag), X, y + 3, d < 0, L + 3, 6);
     }
     // shoreline foam (a fine-edged wiggly line along the smooth shore)
     bx.fillStyle = th.foam;
-    for (let y = wt + 1; y < wh; y++) { const s = sn(SB[y]), w = Math.sin(t * 2.2 + y * 0.45); if (w > -0.2) bx.fillRect(s, y, w > 0.6 ? 1.5 : w > 0.2 ? 1 : FP, 1); if (w > 0.85 && (y & 3) === 0) bx.fillRect(s + 2, y + FP, FP, FP); }
+    for (let y = Math.max(wt + 1, VR.y0), y1 = Math.min(wh, VR.y1); y < y1; y++) { const s = sn(SB[y]); if (s < VR.x0 - 3 || s > VR.x1) continue; const w = Math.sin(t * 2.2 + y * 0.45); if (w > -0.2) bx.fillRect(s, y, w > 0.6 ? 1.5 : w > 0.2 ? 1 : FP, 1); if (w > 0.85 && (y & 3) === 0) bx.fillRect(s + 2, y + FP, FP, FP); }
     // little wave marks (a fine line with a lighter fine line on top)
     for (const w of DECO.waves) {
       const y = Math.round(wt + 4 + w.y * (Lw.maxY - wt)), s = shoreAt(y), x = sn(s + 4 + w.x * (ww - s - 6) + Math.sin(t * 0.5 + w.ph) * 2);
-      if (Math.sin(t * 1.3 + w.ph) < -0.3) continue;
+      if (y < VR.y0 || y > VR.y1 || x < VR.x0 - 5 || x > VR.x1 || Math.sin(t * 1.3 + w.ph) < -0.3) continue;
       const deep = depthK(x, y) > 0.45;
       bx.fillStyle = deep ? th.water[1] : th.hl; bx.fillRect(x, y + FP, w.w, FP);
       if (!deep) { bx.fillStyle = '#ffffff'; bx.fillRect(x + FP, y, w.w - 1, FP); }
@@ -1942,7 +2222,7 @@
       bx.fillStyle = th.foam;
       for (let i = 0; i < 2; i++) {
         const p = (t * 0.16 + i * 0.5) % 1; if (p > 0.92) continue;
-        for (let y = wt + 3; y < wh; y++) { if ((y + i) % 2 && p < 0.7) continue; const s = SB[y] - 1, X = sn(ww - p * (ww - s - 2) + Math.sin(y * 0.5 + i * 3) * 1.5); bx.fillRect(X, y, p > 0.6 ? 1.5 : 1, 1); }
+        for (let y = Math.max(wt + 3, VR.y0), y1 = Math.min(wh, VR.y1); y < y1; y++) { if ((y + i) % 2 && p < 0.7) continue; const s = SB[y] - 1, X = sn(ww - p * (ww - s - 2) + Math.sin(y * 0.5 + i * 3) * 1.5); if (X >= VR.x0 - 2 && X <= VR.x1) bx.fillRect(X, y, p > 0.6 ? 1.5 : 1, 1); }
       }
       // a sailboat on the horizon
       const b = floatSprites().boat, sx = shoreAt(wt) + 10, span = ww - sx + 20, bxp = Math.round(sx + ((t * 1.1) % span) - 10);
@@ -1952,7 +2232,7 @@
     if (Math.floor(t * 2) % 2) { bx.fillStyle = '#ffffff'; for (let i = 0; i < 4; i++) { const y = Math.round(wt + 8 + ((i * 37 + Math.floor(t * 0.5) * 13) % Math.max(1, Lw.maxY - wt - 8))), s = shoreAt(y), x = Math.round(s + (ww - s) * (0.25 + i * 0.18)); bx.fillRect(x - FP, y + FP, 2 + FP, FP); bx.fillRect(x + FP, y, FP, 1 + FP); } }
     // moon reflection: fine shimmering lines
     const moonA = th.bigMoon ? 0.55 + 0.35 * n : n * 0.8;
-    if (moonA > 0.1) {
+    if (moonA > 0.1 && VR.y0 < wt + 40) {
       const m = moonPos(); bx.fillStyle = '#fff6c9'; bx.globalAlpha = Math.min(1, moonA);
       for (let y = wt + 1, i = 0; y < wt + 40 && y < wh; y += 1, i++) { if (m.x < shoreAt(y) + 2) continue; const w = 1 + ((i * 7 + Math.floor(t * 3)) % 3) * 0.75 + Math.max(0, 3 - i / 4.5); bx.fillRect(sn(m.x - w / 2 + Math.sin(t * 2 + i * 0.6) * 1), y + (i & 1) * FP, sn(w), FP); }
       bx.globalAlpha = 1;
@@ -1962,14 +2242,14 @@
       const F = floatSprites(), kinds = area === 'moonlit' ? FLOAT_MOON : FLOAT_CANDY;
       for (let i = 0; i < kinds.length; i++) {
         const f = DECO.floats[i], p = floatPos(f), s = F[kinds[i]];
-        if (!p) continue;
+        if (!p || p.x < VR.x0 - 8 || p.x > VR.x1 + 8 || p.y < VR.y0 - 8 || p.y > VR.y1 + 4) continue;
         PX.blit(bx, s, p.x, p.y + (Math.floor(t * f.v * 2 + f.ph) % 2));
         bx.fillStyle = th.hl; bx.fillRect(p.x - Math.floor(artW(s) / 2) - 1, p.y + 1, 2, FP); bx.fillRect(p.x + Math.ceil(artW(s) / 2) - 1, p.y + 1, 2, FP);
       }
     }
     // soda fizz: tiny fine bubbles
     if (th.fizz) {
-      if (Math.random() < dt * 9 && fizz.length < 30) { const q = waterPoint(0.05, 0.95); fizz.push({ x: q.x, y: q.y, life: rand(0.8, 1.6) }); }
+      if (Math.random() < dt * 9 && fizz.length < 30) { const y = rand(Math.max(VR.y0, Lw.minY + 2), Math.min(VR.y1, Lw.maxY - 1)), s = shoreAt(y), x = s + 3 + rand(0.05, 0.95) * (ww - s - 6); if (x > VR.x0 && x < VR.x1) fizz.push({ x, y, life: rand(0.8, 1.6) }); }
       let j = 0;
       for (const f of fizz) {
         f.life -= dt; f.y -= 5 * dt; f.x += Math.sin(t * 6 + f.y) * 0.1;
@@ -1983,7 +2263,7 @@
       fizz.length = j;
     }
   }
-  const FLOAT_MOON = ['lantern', 'lantern', 'lantern'], FLOAT_CANDY = ['donut', 'candy', 'ring', 'donut'];
+  const FLOAT_MOON = ['lantern', 'lantern', 'lantern', 'lantern', 'lantern', 'lantern'], FLOAT_CANDY = ['donut', 'candy', 'ring', 'donut', 'candy', 'ring', 'donut', 'candy'];
   // drifting slowly across the open water, never over the dock
   function floatPos(f) {
     const y = Math.round(Lw.minY + 6 + f.b * (Lw.span - 10)); if (Math.abs(y - Lw.dockY) < 6) return null;
@@ -2004,6 +2284,7 @@
     if (bc && day > 0.5 && area !== 'beach') {
       for (const b of DECO.bugs) {
         const p = t * 0.22 + b.p, x = Math.round(10 + (Math.sin(p * 1.1 + b.a * 6) * 0.5 + 0.5) * (shoreAt(Lw.minY + 30) - 24)), y = Math.round(Lw.minY + 4 + (Math.sin(p * 1.7 + b.b * 6) * 0.5 + 0.5) * Lw.span * 0.75 + Math.sin(t * 5 + b.p) * 2);
+        if (x < VR.x0 - 6 || x > VR.x1 + 6 || y < VR.y0 - 6 || y > VR.y1 + 6) continue;
         fxAt(bflySpr(bc[b.c % bc.length], Math.floor(t * 9 + b.p * 3) % 2), x - 2, y - 2);
       }
     }
@@ -2011,12 +2292,13 @@
     if (dc) {
       for (const d of DECO.drift) {
         const u = (d.p + t * d.v * 0.25) % 1.2 - 0.1, x = sn(u * ww), y = sn(Lw.minY - 20 + d.y * Lw.span * 0.9 + Math.sin(t * 1.3 + d.ph) * 5 + u * 20);
+        if (x < VR.x0 - 4 || x > VR.x1 + 4 || y < VR.y0 - 4 || y > VR.y1 + 4) continue;
         const c = dc[d.c % dc.length], f = Math.floor(t * 3 + d.ph) % 3;
         if (area === 'moonlit') { glow(x, y, 2, '200,230,255', 0.25); bx.fillStyle = c; bx.fillRect(x, y, FP, FP); bx.fillRect(x + FP, y, FP, FP); continue; }
         bx.fillStyle = c; petal(x, y, f);
       }
     }
-    if ((area === 'beach' || area === 'meadow') && day > 0.4) {
+    if ((area === 'beach' || area === 'meadow') && day > 0.4 && VR.y0 < Lw.hz) {
       const c = area === 'beach' ? '#ffffff' : '#4a4a6a';
       for (const b of DECO.birds) {
         const u = (b.p + t * b.v) % 1.3 - 0.15, x = Math.round(u * ww), y = Math.round(b.y * Lw.hz + Math.sin(t * 0.8 + b.ph) * 2), up = Math.floor(t * 4 + b.ph) % 2;
@@ -2030,7 +2312,7 @@
     const m = moonPos();
     // twinkling stars and the moon above the dark overlay (fine dots with a fine cross when they flash)
     bx.fillStyle = '#ffffff'; bx.globalAlpha = Math.min(1, lit);
-    for (const s of DECO.stars) if (s.tw && Math.sin(t * 2 + s.ph) > -0.2) {
+    if (VR.y0 < Lw.hz) for (const s of DECO.stars) if (s.tw && Math.sin(t * 2 + s.ph) > -0.2) {
       const X = Math.round(s.x * ww * SK) * FP, Y = Math.round(s.y * (Lw.hz - 8) * SK) * FP, b = Math.sin(t * 2 + s.ph);
       bx.fillRect(X, Y, FP, FP);
       if (b > 0.5) { bx.fillRect(X - FP, Y, FP * 3, FP); bx.fillRect(X, Y - FP, FP, FP * 3); }
@@ -2041,7 +2323,7 @@
     // lamps, windows, glowing props
     if (Lw.lamp) { glow(Lw.lamp.x, Lw.lamp.y, 7, '255,236,150', 0.35 * lit); lampLit(Lw.lamp); }
     if (Lw.house) { const hc = Lw.house.c, X = Lw.house.x - Math.floor(artW(hc) / 2) + Math.round(artW(hc) * 0.64), Y = Lw.house.y - artH(hc) + Math.round(artH(hc) * 0.62); glow(X, Y, 5, '255,236,150', 0.4 * lit); bx.fillStyle = '#fff27a'; bx.fillRect(X - 1, Y - 1, 1.5, 1.5); bx.fillStyle = '#fffbd0'; bx.fillRect(X - 1, Y - 1, FP, FP); }
-    for (const p of Lw.props) { const g = GLOWS[p.kind]; if (!g) continue; const pulse = 0.8 + Math.sin(t * 2 + p.x) * 0.2; glow(p.x, p.y - artH(p.c) * g[1], g[2], g[3], 0.3 * lit * pulse); }
+    for (const p of Lw.props) { const g = GLOWS[p.kind]; if (!g || p.x < VR.x0 - 12 || p.x > VR.x1 + 12 || p.y < VR.y0 - 4 || p.y - 30 > VR.y1) continue; const pulse = 0.8 + Math.sin(t * 2 + p.x) * 0.2; glow(p.x, p.y - artH(p.c) * g[1], g[2], g[3], 0.3 * lit * pulse); }
     // the rest house's windows light up (brighter when someone is inside)
     if (Lw.home) {
       const H = Lw.home; let full = false; for (const s of PS.S.sprouts) if (s.area === area && s.home) { full = true; break; }
@@ -2052,15 +2334,15 @@
     // spooky Sprouts glow softly at night
     if (lit > 0.3) for (const r of here) { const sp = SPOOKY[r.s.look && r.s.look.skin]; if (sp && r.state !== 'travel') glow(r.x, (r.state === 'held' ? r.feetY : r.y - (r.state === 'fall' ? r.z : 0)) - 12, 10, sp.glow, 0.13 * lit); }
     // glowing reed tips and lotus buds, the lighthouse beam, floating lanterns
-    for (const q of Lw.glowPts || []) { const pulse = 0.7 + Math.sin(t * 1.7 + q.x * 0.3) * 0.3; glow(q.x, q.y, 3, '160,250,255', 0.3 * lit * pulse); bx.fillStyle = '#c8fff8'; bx.fillRect(q.x, q.y, FP, FP); }
+    for (const q of Lw.glowPts || []) { if (q.x < VR.x0 - 4 || q.x > VR.x1 + 4 || q.y < VR.y0 - 4 || q.y > VR.y1 + 4) continue; const pulse = 0.7 + Math.sin(t * 1.7 + q.x * 0.3) * 0.3; glow(q.x, q.y, 3, '160,250,255', 0.3 * lit * pulse); bx.fillStyle = '#c8fff8'; bx.fillRect(q.x, q.y, FP, FP); }
     if (Lw.beacon && Math.floor(t * 1.2) % 3 !== 2) { glow(Lw.beacon.x, Lw.beacon.y, 5, '255,242,170', 0.5 * lit); bx.fillStyle = '#fff27a'; bx.fillRect(Lw.beacon.x - 1, Lw.beacon.y, 3, 1); bx.fillStyle = '#ffffff'; bx.fillRect(Lw.beacon.x - FP, Lw.beacon.y, 1, FP); }
-    if (area === 'moonlit') for (let i = 0; i < 3; i++) { const p = floatPos(DECO.floats[i]); if (!p) continue; glow(p.x, p.y - 4, 6, '255,220,140', 0.28 * lit); const Y = p.y - 4.5 + (Math.floor(t * DECO.floats[i].v * 2 + DECO.floats[i].ph) % 2); bx.fillStyle = '#fff27a'; bx.fillRect(p.x, Y, 1, 1); bx.fillStyle = '#ffffff'; bx.fillRect(p.x, Y, FP, FP); }
+    if (area === 'moonlit') for (let i = 0; i < FLOAT_MOON.length; i++) { const p = floatPos(DECO.floats[i]); if (!p || p.x < VR.x0 - 8 || p.x > VR.x1 + 8 || p.y < VR.y0 - 4 || p.y > VR.y1 + 8) continue; glow(p.x, p.y - 4, 6, '255,220,140', 0.28 * lit); const Y = p.y - 4.5 + (Math.floor(t * DECO.floats[i].v * 2 + DECO.floats[i].ph) % 2); bx.fillStyle = '#fff27a'; bx.fillRect(p.x, Y, 1, 1); bx.fillStyle = '#ffffff'; bx.fillRect(p.x, Y, FP, FP); }
     // fireflies: a glowing dot with a white-hot centre
-    const count = Math.round((th.bigMoon ? 6 : 0) + 10 * n);
+    const count = Math.round(((th.bigMoon ? 6 : 0) + 10 * n) * (Lw.landK || 1)); // (the big garden has more, spread all over it)
     for (let i = 0; i < Math.min(count, DECO.flies.length); i++) {
       const f = DECO.flies[i], p = t * 0.25 + f.p;
       const x = Math.round(8 + (Math.sin(p * 1.3 + f.a * 6) * 0.5 + 0.5) * (shoreAt(Lw.minY + 20) - 12)), y = Math.round(Lw.minY - 6 + (Math.sin(p * 1.9 + f.b * 6) * 0.5 + 0.5) * Lw.span * 0.8);
-      if (Math.sin(t * 3 + f.p * 3) < -0.3) continue;
+      if (x < VR.x0 - 3 || x > VR.x1 + 3 || y < VR.y0 - 3 || y > VR.y1 + 3 || Math.sin(t * 3 + f.p * 3) < -0.3) continue;
       glow(x, y, 2, '255,242,122', 0.35); bx.fillStyle = '#fff27a'; bx.fillRect(x, y, 1, 1); bx.fillStyle = '#fffbd0'; bx.fillRect(x, y, FP, FP);
     }
   }
@@ -2095,6 +2377,501 @@
     parts.length = j;
   }
 
+  // ---------------- night raids ----------------
+  // Now and then, on a night, the gloom comes to the garden you're looking at (if it has Sprouts playing outside). A banner warns
+  // ("The gloom is coming!") with a 10 second countdown while your Sprouts hurry together; a shadow portal swirls open on the lawn
+  // and the Gloomlings come out of it in waves (Gloom Bats swoop, Shadow Wisps throw shadow balls, Gloom Brutes plod; a big raid
+  // may end with the Gloom King). The fight runs by itself: each Sprout fights its own way (its element's shot, a bonk for a
+  // strong Sprout with horns, claws or spikes, a little heal now and then from a Sweet or Light one; wings help dodge, a shell
+  // or a mushroom cap makes it sturdier); tap a Sprout, then a Gloomling, to choose its target; a snack heals a Sprout and even
+  // wakes a resting one. Win: coins, XP and a cheer. Lose: the Moon Owl swoops in and chases the gloom away. Nothing is ever
+  // taken: a Sprout that runs out of puff just rests for 30 seconds with dizzy stars. Raids come only at night, at most one a
+  // night (PS.S.raids.night = the clock's phase of the last one), never while a new player is still learning, while something
+  // is being dragged, carried or hatched, while a pop-up is up, or when a grown-up switched them off (PS.S.raidsOff).
+  // (gHp / gAtk: the Gloomlings' hit points and bumps; range: how far a Sprout's shot reaches. Tuned with __garden.raidSim so a
+  // family of fresh Sprouts usually wins, but with a few bumps and now and then a Sprout that needs a rest.)
+  const RAID = { after: [35, 130], warn: 10, minLeft: 100, koMs: 30000, dmgK: 0.55, cd: 1.7, maxZ: 12, waveGap: 7, giveUp: 180, gap: 66, gHp: 1.35, gAtk: 1.2, range: 58 };
+  // the Gloomlings: hit points and attack (x a Sprout-like level), speed (world px/s), how close they come to bump (reach)
+  const GK = {
+    blob: { hp: 1, atk: 1, sp: 7, reach: 11 }, bat: { hp: 0.6, atk: 0.85, sp: 15, reach: 10 }, wisp: { hp: 0.7, atk: 0.9, sp: 8, reach: 46, ranged: true },
+    brute: { hp: 2.4, atk: 1.35, sp: 5, reach: 14 }, king: { hp: 7, atk: 1.6, sp: 4, reach: 19 },
+  };
+  // (their sizes if the raid art isn't loaded: the same as art-raid.js's PX.raid.UNITS)
+  const GU = { blob: { w: 18, h: 16, hover: 0, cy: 7, top: 15, name: 'Gloomling' }, bat: { w: 20, h: 16, hover: 4, cy: 9, top: 15, name: 'Gloom Bat', fly: true },
+    wisp: { w: 14, h: 18, hover: 1, cy: 10, top: 17, name: 'Shadow Wisp', fly: true }, brute: { w: 26, h: 26, hover: 0, cy: 11, top: 23, name: 'Gloom Brute' },
+    king: { w: 44, h: 44, hover: 0, cy: 17, top: 40, name: 'Gloom King' } };
+  const GMOVE = { bump: { name: 'Gloom Bump', el: 'shadow', pow: 32, acc: 1, fx: {} }, ball: { name: 'Shadow Ball', el: 'shadow', pow: 26, acc: 1, fx: {} }, stomp: { name: 'Gloom Stomp', el: 'shadow', pow: 40, acc: 1, fx: {} } };
+  const BRAWNY = ['horns', 'claws', 'spikes', 'thorns', 'tail'], WINGED = ['wings', 'batwings', 'fairywings', 'flamewings', 'dragonwings'];
+  const engine = () => { try { return window.__battle && window.__battle.engine; } catch (e) { return null; } };
+  const raidSave = () => { let R = PS.S.raids; if (!R || typeof R !== 'object' || Array.isArray(R)) R = PS.S.raids = {}; return R; };
+  let raidClock = 0, nextRaid = 0, raidEl = null, raidSong = null, musicBackAt = 0, zid = 0;
+  // (in a balance test, raid.sim: no sounds, floaters, sparkles or rewards)
+  const rsnd = (n, p) => { if (raid && !raid.sim) sndP(n, p); };
+  const rfloat = (text, col, x, y) => { if (raid && !raid.sim) floater(text, col, x, y); };
+  const rburst = (x, y, type, n, col) => { if (raid && !raid.sim) burst(x, y, type, n, col); };
+  const outHere = () => here.filter(r => !r.s.home && r.state !== 'travel' && r.state !== 'enter' && r.state !== 'arrive' && !(r.koUntil > Date.now()));
+  const aliveP = () => raid.ps.filter(u => !u.dead && !u.r.s.home && here.includes(u.r));
+  const UZ = [], UP = []; // (reused lists of the fighters on each side)
+  const cdOf = F => RAID.cd * clamp(36 / (18 + (F.spd || 10) * 0.6), 0.55, 1.45);
+  const unitOf = z => (PX.raid && PX.raid.UNITS && PX.raid.UNITS[z.kind]) || GU[z.kind] || GU.blob;
+  const elColor = el => (D.ELEMENTS[el] || D.ELEMENTS.normal || { color: '#ffffff' }).color;
+  function raidTick(dt) {
+    raidClock += dt;
+    if (raid) {
+      if (raidHere()) { raid.away = 0; updateRaid(dt); }
+      // (you went to another area: the gloom waits there for you, and gives up after a few minutes)
+      else if ((raid.away = (raid.away || 0) + dt) > RAID.giveUp) endRaid(true);
+      return;
+    }
+    let night = false, ph = -1; try { night = PS.clock.isNight(); ph = PS.clock.phase(); } catch (e) { night = false; }
+    if (!night) { nextRaid = 0; return; }
+    if (PS.S.raids && PS.S.raids.night === ph) return; // (one a night)
+    if (!nextRaid) { nextRaid = raidClock + rand(...RAID.after); return; }
+    if (raidClock < nextRaid) return;
+    if (PS.S.raidsOff || !canRaid()) { nextRaid = raidClock + 15; return; }
+    let left = 0; try { left = PS.clock.msToSwitch() / 1000; } catch (e) { left = 0; }
+    if (left < RAID.minLeft) return; // (too near morning: the next night)
+    startRaid(false);
+  }
+  function canRaid() {
+    return visible && !learning() && outHere().length > 0 && !drag && !pinch && !hatchFx.size && !hatchWait && !PS.ui.modalOpen && !PS.ui.menuOpen
+      && !here.some(r => r.state === 'held' || r.state === 'fall' || r.state === 'cocoon');
+  }
+  const comingText = () => `The gloom is coming to ${toArea(raid.area)}!`;
+  const fightText = () => (raid.king && raid.zs.some(z => z.boss && !z.dead) ? 'The Gloom King is here!' : 'Gloomlings!');
+  function raidUI(title, sub, big) {
+    if (raid && title) raid.ui = [title, sub, big];
+    if (!raidEl) {
+      raidEl = document.createElement('div'); raidEl.className = 'g-raid'; raidEl.setAttribute('role', 'status');
+      raidEl.innerHTML = '<canvas class="px" width="32" height="32" aria-hidden="true"></canvas><span><b></b><small></small></span><i></i>'; root.appendChild(raidEl);
+      try { const ic = PX.raid && PX.raid.icon ? PX.raid.icon('raid') : null; if (ic) PS.ui.paint(raidEl.querySelector('canvas'), ic); else raidEl.querySelector('canvas').remove(); } catch (e) { /* art optional */ }
+    }
+    raidEl.hidden = !title;
+    raidEl.querySelector('b').textContent = title || ''; raidEl.querySelector('small').textContent = sub || ''; raidEl.querySelector('i').textContent = big == null ? '' : big;
+    raidEl.classList.toggle('g-raid-big', big != null);
+  }
+  function raidSub(text) { if (raidEl && !raidEl.hidden) raidEl.querySelector('small').textContent = text; if (raid && raid.ui) raid.ui[1] = text; }
+  function raidHold(on) { if (!raid || raid.sim) return; if (on && !raid.held) { raid.held = true; PS.ui.hold(true); } else if (!on && raid.held) { raid.held = false; PS.ui.hold(false); } }
+  // where the Sprouts gather (between your partner and the middle of the group) and where the portal opens (to the side with more
+  // lawn, a little way off, on open grass)
+  function startRaid(sim) {
+    const mine = outHere(); if (!mine.length) return false;
+    const act = ST.active(), lead = mine.find(r => r.s === act) || mine[0];
+    let cx = 0, cy = 0; for (const r of mine) { cx += r.x; cy += r.y; } cx /= mine.length; cy /= mine.length;
+    const ry0 = clamp(lerp(cy, lead.y, 0.5), Lw.minY + 34, Lw.maxY - 18), rally = lawnPoint(clamp(lerp(cx, lead.x, 0.5), 40, lawnRight(ry0) - 40), ry0, 22);
+    const side = lawnRight(rally.y) - rally.x > rally.x ? 1 : -1; let portal = null;
+    for (const d of [RAID.gap, RAID.gap * 0.8, RAID.gap * 1.25]) for (const sg of [side, -side]) {
+      if (portal) break;
+      const p = { x: Math.round(rally.x + sg * d), y: Math.round(clamp(rally.y + rand(-12, 12), Lw.minY + 16, Lw.maxY - 6)) };
+      if (p.x > 22 && p.x < lawnRight(p.y) - 18 && !pondAt(p.x, p.y, 20) && !(Lw.home && Math.abs(p.x - Lw.home.x) < Lw.home.w / 2 + 16 && Math.abs(p.y - Lw.home.y) < 20)) portal = p;
+    }
+    if (!portal) portal = { x: Math.round(clamp(rally.x + side * RAID.gap, 22, lawnRight(rally.y) - 18)), y: rally.y };
+    raid = { area, sim: !!sim, phase: 'warn', t: RAID.warn, lastN: -1, rally, portal, side: portal.x > rally.x ? 1 : -1, openK: 0, zs: [], ps: [], shots: [], poofs: [], queue: planRaid(mine), sel: null, killed: 0, clock: 0, flash: 0, wave: 0, king: false, held: false, away: 0 };
+    if (sim) return true;
+    // the pictures this raid needs are drawn a couple a frame during the warning (the King's take a moment on an older iPad)
+    const kinds = [...new Set(raid.queue.map(q => q.kind))], els = [...new Set(mine.map(r => { try { return ST.elementsOf(r.s)[0]; } catch (e) { return 'normal'; } }))];
+    raid.warm = [];
+    for (const k of kinds) for (let pi = 0; pi < POSE_ID.length; pi++) raid.warm.push(() => gloomSpr(k, pi));
+    for (const id of ['portal0', 'portal1', 'poof', 'poof1', 'poof2', 'ko', 'ko1', 'shadowball'].concat(els.map(el => SHOT_ID[el] || 'shot:normal'))) raid.warm.push(() => raidFx(id));
+    raid.warm.push(() => owlSpr(0), () => owlSpr(1));
+    raidSave().night = PS.clock.phase(); PS.save();
+    closeCard(); raidHold(true); follow = null; zoomBack = null; hintEl.style.opacity = 0;
+    // everyone hurries over to the rally point (the ones further off arrive during the fight)
+    mine.forEach((r, i) => { // (a little formation facing the portal, rows of three)
+      if (['eat', 'pet', 'sleep', 'swim', 'wait'].includes(r.state)) { r.state = 'idle'; r.eat = null; }
+      const row = Math.floor(i / 3), col = i % 3, y = clamp(rally.y + (col - 1) * 16 + (row % 2) * 6, Lw.minY + 4, Lw.maxY), x = clamp(rally.x - raid.side * (4 + row * 22 + Math.abs(col - 1) * 5), 8, lawnRight(y) - 4);
+      goTo(r, x, y, { type: 'rally' }); emote(r, '!', 2);
+    });
+    // the camera shows the gathering place and where the portal will open
+    const gap = Math.abs(portal.x - rally.x) + 150;
+    glideTo((rally.x + portal.x) / 2, (rally.y + portal.y) / 2 - 14, clamp(Math.min(Z <= ZFAR * 1.03 ? ZMIN * TUNE.zoomDef : Z, W / gap), Math.max(ZFAR * 1.05, ZMIN * 1.05), ZMAX));
+    raidUI(comingText(), 'Get ready...', RAID.warn);
+    sndP('whoosh', 0.7); buzz(60);
+    return true;
+  }
+  // what comes: 1-3 waves, more Gloomlings for more Sprouts, stronger ones for stronger Sprouts (a little weaker than them), wisps
+  // and brutes in the later waves, and sometimes the Gloom King at the end of a big raid
+  function planRaid(mine) {
+    const lvs = mine.map(r => ST.totalLevels(r.s)), lv = lvs.reduce((a, b) => a + b, 0) / Math.max(1, lvs.length), best = Math.max(0, ...lvs);
+    const T = mine.length, n = clamp(Math.round(1 + T * 0.85 + lv / 30 + Math.random()), 2, RAID.maxZ);
+    const waves = n >= 7 ? 3 : n >= 3 ? 2 : 1, L = Math.max(1, Math.round(lv * rand(0.55, 0.8)));
+    // (a small team meets them one at a time: they come further apart, and no bats in the first wave)
+    const gapK = T <= 1 ? 4 : T === 2 ? 2.6 : T === 3 ? 1.7 : 1, hpK = clamp(0.55 + 0.075 * T, 0.6, 1); // (and they're a little softer)
+    const q = []; let at = 1;
+    for (let w = 0, i = 0; w < waves; w++) {
+      const m = Math.round(n * (w + 1) / waves) - i;
+      for (let j = 0; j < m; j++, i++) {
+        const r = Math.random(), kind = w === 0 ? (r < 0.75 || T <= 2 ? 'blob' : 'bat') : r < 0.42 ? 'blob' : r < 0.68 ? 'bat' : r < 0.88 || lv < 14 ? 'wisp' : 'brute';
+        q.push({ kind, L: Math.max(1, Math.round(L * (1 + w * 0.08))), hpK, delay: at, wave: w, waves }); at += rand(1.1, 2) * gapK;
+      }
+      at += RAID.waveGap;
+    }
+    if (waves >= 3 && mine.length >= 3 && (mine.length >= 4 || best >= 20) && Math.random() < 0.3) q.push({ kind: 'king', L: Math.max(2, Math.round(L * 1.1)), delay: at - RAID.waveGap + 3, wave: waves - 1, waves, boss: true });
+    return q;
+  }
+  // a Sprout's fighter (the battle engine's, so stats, elements and moves count just as in battles) and its way of fighting
+  function fighterOf(s, E) {
+    if (E && E.makeFighter) { try { return E.makeFighter(s, 'p', 1, null, true); } catch (e) { /* the simple one below */ } }
+    const b = ST.battleStats(s);
+    return { side: 'p', st: { atk: 0, def: 0, spd: 0, eva: 0, acc: 0 }, status: null, s, name: s.name, moves: ST.movesOf(s).filter(id => D.MOVES[id]), els: b.els.slice(), lv: b.level, max: b.hp, hp: b.hp, atk: b.atk, def: b.def, spd: b.spd, eva: b.eva };
+  }
+  function bestMove(F) {
+    let best = null, bs = -1;
+    for (const id of F.moves || []) { const m = D.MOVES[id]; if (!m || !(m.pow > 0)) continue; const sc = m.pow * ((m.fx && m.fx.hits) || 1) * ((F.els || []).includes(m.el) ? 1.25 : 1) * (m.acc || 1); if (sc > bs) { bs = sc; best = m; } }
+    return best || D.MOVES.tackle || { name: 'Tackle', el: 'normal', pow: 35, acc: 1, fx: {} };
+  }
+  function hitFor(a, d, mv) {
+    const E = engine(); let n = 0;
+    try { if (E && E.baseDamage) n = E.baseDamage(a, d, mv) * ((mv.fx && mv.fx.hits) || 1); } catch (e) { n = 0; }
+    if (!(n > 0)) n = mv.pow * Math.pow(Math.max(1, a.atk) / Math.max(1, d.def), 0.65) * 0.104 * (1.5 + (a.lv || 0) / 45) * ((a.els || []).includes(mv.el) && mv.el !== 'normal' ? 1.25 : 1);
+    return Math.max(1, Math.round(n * RAID.dmgK * rand(0.85, 1.15)));
+  }
+  function beginFight() {
+    raid.phase = 'fight'; raid.clock = 0;
+    const E = engine();
+    raid.ps = outHere().map(r => {
+      if (r.state === 'cocoon') return null; // (one being carried joins in when it's set down)
+      if (['eat', 'pet', 'sleep', 'swim', 'wait'].includes(r.state)) { r.state = 'idle'; r.eat = null; }
+      r.target = null;
+      if (inWater(r.x, r.y)) { const q = coastPoint(r.y); r.x = q.x - 4; r.y = q.y; }
+      const s = r.s, F = fighterOf(s, E), P = s.parts || {}, top = ST.domStat ? ST.domStat(s) : 'power', el = (F.els && F.els[0]) || 'normal', mv = bestMove(F);
+      const bonk = (BRAWNY.some(k => (P[k] || 0) > 0) && (top === 'power' || top === 'stamina')) || (el === 'stone' && top === 'power');
+      if ((P.shell || 0) + (P.mushcap || 0) > 0) F.max = Math.round(F.max * 1.2);
+      return { r, F, mv, hp: F.max, max: F.max, cd: rand(0.3, 1.2), style: bonk ? 'bonk' : 'shot', el: mv.el !== 'normal' ? mv.el : el, range: bonk ? 13 : RAID.range,
+        heals: el === 'sweet' || el === 'light', eva: (F.eva || 0) + (WINGED.some(k => (P[k] || 0) > 0) ? 0.12 : 0), pick: null, tgt: null, dead: 0, n: 0, bitten: 0 };
+    }).filter(Boolean);
+    for (const u of raid.ps) u.r.inRaid = true;
+    if (raid.sim) return;
+    if (raid.warm) { for (const f of raid.warm) f(); raid.warm = null; }
+    raidUI(fightText(), raid.ps.length > 1 ? 'Tap a Sprout, then a Gloomling!' : 'Tap your Sprout, then a Gloomling!');
+    sndP('whoosh', 1.1);
+  }
+  function makeGloom(q) {
+    const G = GK[q.kind] || GK.blob, L = q.L, F = { side: 'o', st: { atk: 0, def: 0, spd: 0, eva: 0, acc: 0 }, status: null, name: (GU[q.kind] || GU.blob).name, els: ['shadow'], lv: L,
+      atk: Math.round((11 + 0.42 * L) * G.atk * RAID.gAtk), def: Math.round(10 + 0.4 * L), spd: Math.round(10 + 0.35 * L), eva: 0 };
+    F.max = F.hp = Math.round((30 + 2.2 * L) * G.hp * RAID.gHp * (q.hpK || 1));
+    const p = raid.portal, a = rand(0, 6.283), z = { id: zid++, kind: GK[q.kind] ? q.kind : 'blob', G, F, hp: F.max, max: F.max, x: p.x + Math.cos(a) * 4, y: p.y + Math.sin(a) * 1.5, rise: 1, cd: rand(0.8, 1.8),
+      facing: -raid.side, hitT: 0, atkT: 0, dead: 0, kb: 0, ph: Math.random() * 6.28, boss: !!q.boss, tgt: null };
+    z.U = unitOf(z); return z;
+  }
+  function nearestGloom(x, y) { let b = null, bd = 1e9; for (const z of raid.zs) { if (z.dead || z.rise > 0) continue; const d = Math.hypot(z.x - x, (z.y - y) * 1.4); if (d < bd) { bd = d; b = z; } } return b; }
+  function updateRaid(dt) {
+    raid.flash = Math.max(0, raid.flash - dt);
+    const wantOpen = raid.phase === 'fight' || (raid.phase === 'warn' && raid.t < 2.5) ? 1 : 0;
+    raid.openK = clamp(raid.openK + clamp(wantOpen - raid.openK, -dt * 1.2, dt * 1.6), 0, 1);
+    if (raid.poofs.length) { for (const p of raid.poofs) p.t += dt; if (raid.poofs[0].t > 0.9) raid.poofs = raid.poofs.filter(p => p.t <= 0.9); }
+    if (raid.phase === 'warn') {
+      for (let i = 0; i < 2 && raid.warm && raid.warm.length; i++) raid.warm.shift()();
+      raid.t -= dt; const n = Math.max(0, Math.ceil(raid.t));
+      if (n !== raid.lastN) { raid.lastN = n; raidUI(comingText(), n > 3 ? 'Your Sprouts are getting ready...' : 'Here it comes!', n); if (n > 0) sndP(n <= 3 ? 'tick' : 'pop', 1); }
+      if (raid.t < 2.5 && !raid.portalSnd) { raid.portalSnd = true; rsnd('portal'); }
+      if (raid.t <= 0) beginFight();
+      return;
+    }
+    if (raid.phase === 'fight') {
+      raid.clock += dt;
+      while (raid.queue.length && raid.queue[0].delay <= raid.clock) {
+        const q = raid.queue.shift(), z = makeGloom(q); raid.zs.push(z);
+        if (!raid.sim && q.waves > 1 && q.wave > raid.wave) { raid.wave = q.wave; raidUI(fightText(), q.wave === q.waves - 1 ? `Last wave! (${q.wave + 1} of ${q.waves})` : `Wave ${q.wave + 1} of ${q.waves}!`); }
+        rburst(z.x, z.y - 4, 'spark', z.boss ? 16 : 6, '#c9a2f0'); rsnd('gloom', z.boss ? 0.7 : 1);
+        if (z.boss) { raid.king = true; if (!raid.sim) { raidUI('The Gloom King is here!', 'Everyone, together!'); raid.flash = 0.25; buzz(60); } }
+      }
+      for (const z of raid.zs) updateGloom(z, dt);
+      for (const u of raid.ps) updateFighter(u, dt);
+      // fighters on the same side don't stand inside each other (a gentle push apart; carried Sprouts stay put)
+      UZ.length = 0; for (const z of raid.zs) if (!z.dead && z.rise <= 0) UZ.push(z);
+      UP.length = 0; for (const u of raid.ps) if (!u.dead && !u.r.s.home && u.r.state !== 'held' && u.r.state !== 'fall' && here.includes(u.r)) UP.push(u.r);
+      unstack(UZ, z => (z.boss ? 14 : z.kind === 'brute' ? 9 : 6), dt);
+      unstack(UP, () => 8.5, dt);
+      updateShots(dt);
+      let left = raid.queue.length; for (const z of raid.zs) if (!z.dead) left++;
+      if (!left) winRaid();
+      else if (!UP.length && !raid.ps.some(u => !u.dead && !u.r.s.home && here.includes(u.r))) loseRaid();
+      else if (!raid.sim && raid.shownN !== left && raid.clock > 3 && !raid.sel) { raid.shownN = left; const W2 = raid.queue.concat(raid.zs).reduce((m, z) => Math.max(m, z.waves || 1), 1); raidSub(`${left} Gloomling${left === 1 ? '' : 's'} left` + (W2 > 1 ? ` · wave ${raid.wave + 1} of ${W2}` : '')); }
+      return;
+    }
+    // the end: the cheer, or the Moon Owl, then the portal swirls shut
+    raid.t -= dt;
+    for (const z of raid.zs) if (z.dead) z.dead += dt;
+    if (raid.phase === 'rescue') updateOwl(dt);
+    if (raid.phase === 'win' && raid.t <= 0) { raid.phase = 'done'; raid.t = 0.8; }
+    if (raid.phase === 'done' && raid.t <= 0 && raid.openK <= 0) endRaid(false);
+  }
+  function unstack(list, rad, dt) {
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const a = list[i], b = list[j], need = rad(a) + rad(b); let dx = b.x - a.x, dy = (b.y - a.y) * 1.6; const d = Math.hypot(dx, dy);
+      if (d >= need) continue;
+      if (d < 0.01) { dx = 0.5; dy = 1; }
+      const k = Math.min(1, dt * 6) * (need - d) / 2 / Math.max(0.01, Math.hypot(dx, dy));
+      a.x -= dx * k; b.x += dx * k; a.y -= dy * k / 1.6; b.y += dy * k / 1.6;
+      for (const o of [a, b]) { o.y = clamp(o.y, Lw.minY, Lw.maxY); o.x = clamp(o.x, 6, lawnRight(o.y)); }
+    }
+  }
+  function updateFighter(u, dt) {
+    const r = u.r;
+    if (u.dead || r.state === 'held' || r.state === 'fall' || r.s.home || !here.includes(r)) return; // (resting, carried or gone inside: not fighting)
+    u.cd -= dt; if (u.bitten > 0) u.bitten -= dt;
+    // a Sweet or Light Sprout now and then heals the most hurt friend instead
+    if (u.heals && u.cd <= 0 && u.n % 3 === 2) {
+      let hurt = null; for (const o of aliveP()) if (o.hp < o.max * 0.6 && (!hurt || o.hp / o.max < hurt.hp / hurt.max)) hurt = o;
+      if (hurt) {
+        const k = Math.max(2, Math.round(hurt.max * 0.15)); hurt.hp = Math.min(hurt.max, hurt.hp + k); u.cd = cdOf(u.F) * 1.2; u.n++; r.cheerT = 0.4;
+        rfloat('+' + k, '#3f9a3a', hurt.r.x, headY(hurt.r) - 2); rburst(hurt.r.x, hurt.r.y - 12, 'spark', 6, '#c8ff9a'); if (!raid.sim) heartUp(hurt.r.x, hurt.r.y - 18);
+        return;
+      }
+    }
+    const dz = z => Math.hypot(z.x - r.x, (z.y - r.y) * 1.4);
+    if (u.pick && u.pick.dead) u.pick = null;
+    let tg = u.pick || nearestGloom(r.x, r.y);
+    // (being bumped, or its pick is out of reach: it fights whatever is closest)
+    if (tg && dz(tg) > u.range && u.bitten > 0) { const nz = nearestGloom(r.x, r.y); if (nz && dz(nz) <= u.range) tg = nz; }
+    u.tgt = tg;
+    if (!tg) { r.state = 'idle'; return; }
+    r.facing = tg.x > r.x ? 1 : -1;
+    const d = dz(tg);
+    if (d > u.range) { // walk up (a shooter only until it's in range)
+      const sp = (TUNE.walkSpeed + r.s.stats.run.lv * TUNE.walkPerRunLv) * 1.3, gx = tg.x - r.facing * (u.style === 'bonk' ? (tg.boss ? 18 : tg.kind === 'brute' ? 13 : 10) : u.range * 0.8), gy = tg.y;
+      const dx = gx - r.x, dy = gy - r.y, dd = Math.hypot(dx, dy);
+      if (dd > 0.8) { const k = Math.min(dd, sp * dt) / dd; r.x += dx * k; r.y += dy * k; r.state = 'walk'; } else r.state = 'idle';
+      r.y = clamp(r.y, Lw.minY, Lw.maxY); r.x = clamp(r.x, 6, lawnRight(r.y));
+      return;
+    }
+    r.state = 'idle';
+    if (u.cd > 0) return;
+    u.cd = cdOf(u.F); u.n++;
+    const dmg = Math.round(hitFor(u.F, tg.F, u.mv) * (u.style === 'bonk' ? 1.25 : 1));
+    if (u.style === 'bonk') { r.lungeT = 0.25; r.atkT = 0.25; hurtGloom(tg, dmg); rburst(tg.x - r.facing * 4, tg.y - 10, 'spark', 5, '#ffffff'); rsnd('bump', 1.3); return; }
+    raid.shots.push({ kind: 'shot', el: u.el, to: tg, x0: r.x + r.facing * 7, y0: r.y - 13, x: r.x, y: r.y - 13, t: 0, dur: Math.max(0.16, d / 150), dmg, flip: tg.x < r.x });
+    r.atkT = 0.22; rsnd('pop', 1.25);
+  }
+  function updateGloom(z, dt) {
+    if (z.dead) { z.dead += dt; return; }
+    if (z.rise > 0) { z.rise = Math.max(0, z.rise - dt / 0.7); return; } // climbing out of the portal
+    z.cd -= dt; z.hitT = Math.max(0, z.hitT - dt); z.atkT = Math.max(0, z.atkT - dt); z.kb = Math.max(0, z.kb - dt);
+    let tg = null, bd = 1e9;
+    for (const u of raid.ps) { if (u.dead || u.r.s.home || !here.includes(u.r) || u.r.state === 'held') continue; const d = Math.hypot(u.r.x - z.x, (u.r.y - z.y) * 1.4); if (d < bd) { bd = d; tg = u; } }
+    z.tgt = tg; if (!tg) return;
+    const G = z.G, gx = tg.r.x + (z.x >= tg.r.x ? G.reach * 0.85 : -G.reach * 0.85), gy = tg.r.y, dx = gx - z.x, dy = gy - z.y, d = Math.hypot(dx, dy);
+    if (Math.abs(tg.r.x - z.x) > 0.5) z.facing = tg.r.x > z.x ? 1 : -1;
+    if (bd <= G.reach + 2) { if (z.cd <= 0) gloomAttack(z, tg); return; }
+    if (d > 0.5) { const back = z.kb > 0, k = Math.min(d, G.sp * (back ? 0.8 : 1) * dt) / d * (back ? -1 : 1); z.x += dx * k; z.y += dy * k; }
+    z.y = clamp(z.y, Lw.minY + 4, Lw.maxY); z.x = clamp(z.x, 6, lawnRight(z.y));
+  }
+  function gloomAttack(z, u) {
+    z.cd = cdOf(z.F) * (z.boss ? 1.4 : 1.15); z.atkT = 0.35;
+    if (z.G.ranged) { raid.shots.push({ kind: 'ball', to: u, x0: z.x + z.facing * 5, y0: z.y - z.U.cy, x: z.x, y: z.y - z.U.cy, t: 0, dur: Math.max(0.25, Math.hypot(u.r.x - z.x, u.r.y - z.y) / 90), dmg: hitFor(z.F, u.F, GMOVE.ball), flip: u.r.x < z.x }); rsnd('whoosh', 1.6); return; }
+    const mv = z.boss ? GMOVE.stomp : GMOVE.bump;
+    hurtSprout(u, hitFor(z.F, u.F, mv));
+    if (z.boss) { for (const o of aliveP()) if (o !== u && Math.hypot(o.r.x - z.x, o.r.y - z.y) < 26) hurtSprout(o, Math.round(hitFor(z.F, o.F, mv) * 0.5)); if (!raid.sim) { raid.flash = 0.12; buzz(40); } rburst(z.x, z.y, 'dust', 10, '#9a8aa8'); rsnd('thud', 0.8); }
+    else rsnd('bump', 0.9);
+  }
+  function hurtSprout(u, n) {
+    if (u.dead) return;
+    if (Math.random() < Math.min(0.35, u.eva || 0)) { rfloat('Missed!', '#5b4630', u.r.x, headY(u.r) - 4); if (!raid.sim) hop(u.r); return; } // (wings help it dodge)
+    u.hp -= n; u.bitten = 1.5; u.r.hitT = 0.2; rfloat(String(n), '#e5535f', u.r.x + rand(-3, 3), headY(u.r) - 4);
+    if (!raid.sim && Math.random() < 0.25) emote(u.r, 'swirl', 0.8);
+    if (u.hp <= 0) { u.hp = 0; u.dead = 0.001; knockOut(u); }
+  }
+  // out of puff: it sits down for a rest with dizzy stars (a snack wakes it up)
+  function knockOut(u) {
+    const r = u.r; r.koUntil = Date.now() + RAID.koMs; r.state = 'ko'; r.target = null; r.mood = null; r.emote = null; r.inRaid = false;
+    rburst(r.x, r.y - 10, 'spark', 10, '#fff27a'); rfloat('Needs a rest!', '#a2477a', r.x, headY(r) - 12); rsnd('thud', 1.2);
+    if (raid.sel === u) raid.sel = null;
+  }
+  function hurtGloom(z, n) {
+    if (z.dead) return;
+    z.hp -= n; z.hitT = 0.15; z.kb = z.boss ? 0.05 : 0.18; rfloat(String(n), '#ffffff', z.x + rand(-3, 3), z.y - z.U.top - 4);
+    if (z.hp > 0) return;
+    z.hp = 0; z.dead = 0.001; raid.killed++;
+    if (!raid.sim) { raid.poofs.push({ x: z.x, y: z.y, t: 0, big: z.boss || z.kind === 'brute' }); burst(z.x, z.y - z.U.cy, 'spark', z.boss ? 24 : 9, '#fff6a8'); buzz(z.boss ? 40 : 12); }
+    rsnd('poof', z.boss ? 0.7 : 1);
+    for (const o of raid.ps) if (o.pick === z) o.pick = null;
+    if (z.boss && !raid.sim) raidUI('You beat the Gloom King!', 'Hooray!');
+  }
+  function updateShots(dt) {
+    let j = 0;
+    for (const sh of raid.shots) {
+      sh.t += dt; const k = Math.min(1, sh.t / sh.dur);
+      if (sh.kind === 'ball') { const u = sh.to, tx = u.r.x, ty = u.r.y - 10; sh.x = lerp(sh.x0, tx, k); sh.y = lerp(sh.y0, ty, k) - Math.sin(k * Math.PI) * 6; if (k >= 1) { if (!u.dead && here.includes(u.r) && u.r.state !== 'held') hurtSprout(u, sh.dmg); rburst(tx, ty, 'spark', 4, '#9a6ad0'); continue; } }
+      else { const z = sh.to, tx = z.x, ty = z.y - z.U.cy; sh.x = lerp(sh.x0, tx, k); sh.y = lerp(sh.y0, ty, k) - Math.sin(k * Math.PI) * 3; if (k >= 1) { if (!z.dead) hurtGloom(z, sh.dmg); rburst(tx, ty, 'spark', 5, elColor(sh.el)); continue; } }
+      raid.shots[j++] = sh;
+    }
+    raid.shots.length = j;
+  }
+  // a snack in a fight heals: Golden Fruit fully, a Heart Apple or Hearty Root half, other fruit a third (each extra piece fed at
+  // once adds the same again). A resting Sprout wakes up and jumps back in. Returns true when it was a fighting Sprout.
+  function raidHeal(r, id, n) {
+    const u = raid && raid.phase === 'fight' && raid.area === area && raid.ps.find(o => o.r === r);
+    if (!u) return false;
+    const k = id === 'goldfruit' ? 1 : id === 'apple' || id === 'heartyroot' ? 0.5 : 0.34, before = u.dead ? 0 : u.hp;
+    if (u.dead) { u.dead = 0; u.hp = 0; r.koUntil = 0; r.state = 'idle'; r.cheerT = 1; r.inRaid = true; floater('Back in!', '#3f9a3a', r.x, headY(r) - 12); }
+    u.hp = Math.min(u.max, Math.max(u.hp, 1) + Math.round(u.max * k * (n || 1)));
+    const got = u.hp - before;
+    floater(got > 0 ? `+${got}` : 'Full!', '#3f9a3a', r.x, headY(r) - 4);
+    heartUp(r.x, r.y - 22); burst(r.x, r.y - 12, 'spark', 8, '#c8ff9a'); emote(r, 'heart', 1); snd('munch'); markSeen('feed');
+    return true;
+  }
+  function winRaid() {
+    raid.phase = 'win'; raid.t = 3.2; raid.result = 'win';
+    if (raid.sim) return;
+    const ps = raid.ps, lv = ps.reduce((a, u) => a + ST.totalLevels(u.r.s), 0) / Math.max(1, ps.length);
+    const coins = Math.round((8 + raid.killed * (3 + lv / 10)) * (raid.king ? 1.6 : 1)), got = ST.addCoins(coins, 'raid');
+    for (const u of ps) {
+      const s = u.r.s; if (!PS.S.sprouts.includes(s)) continue;
+      ST.gain(s, { power: 1 + raid.killed, stamina: 1 + Math.ceil(raid.killed / 2) });
+      if (!u.dead && here.includes(u.r) && !busy(u.r)) { u.r.cheerT = 2.6; emote(u.r, pick(['heart', 'sparkle']), 2); hop(u.r); }
+    }
+    raidUI('The gloom is gone!', `Hooray! +${got} coins`);
+    jingle('raid-win', 'cheer'); sndP('cheer', 1); buzz(40);
+    const R = raid.rally; flyCoins(R.x, R.y - 20, Math.min(8, Math.max(3, Math.round(got / 8))));
+    const S = raidSave(); S.wins = (S.wins | 0) + 1; if (raid.king) S.kings = (S.kings | 0) + 1;
+    // (the first win, and the first time the Gloom King is beaten, get the big moment afterwards)
+    if (S.wins === 1 || (raid.king && S.kings === 1)) raid.party = { coins: got, king: raid.king, killed: raid.killed };
+    PS.save();
+  }
+  function loseRaid() {
+    raid.phase = 'rescue'; raid.t = 99; raid.sel = null; raid.result = 'lose';
+    if (raid.sim) return;
+    // the Moon Owl swoops down from the sky, sweeps along the gloom (each one it reaches puffs away) and flies off with the last
+    const list = raid.zs.filter(z => !z.dead).sort((a, b) => (a.x - b.x) * raid.side);
+    raid.owl = { x: camX + (raid.side > 0 ? -20 : viewW() + 20), y: camY + 24, face: raid.side, list, t: 0 };
+    raidUI('Everyone needs a rest!', 'Here comes the Moon Owl!');
+    sndP('whoosh', 0.8);
+    const S = raidSave(); S.losses = (S.losses | 0) + 1; PS.save();
+  }
+  function updateOwl(dt) {
+    const O = raid.owl; if (!O) { raid.phase = 'done'; raid.t = 0.5; return; }
+    O.t += dt;
+    const tg = O.list.find(z => !z.dead), gx = tg ? tg.x : O.x + O.face * 160, gy = tg ? tg.y - tg.U.cy - 4 : camY - 40, dx = gx - O.x, dy = gy - O.y, d = Math.hypot(dx, dy);
+    if (d > 3) { const k = Math.min(d, (tg ? 120 : 150) * dt) / d; O.x += dx * k; O.y += dy * k; if (Math.abs(dx) > 1) O.face = dx > 0 ? 1 : -1; }
+    else if (tg) { tg.dead = 0.001; raid.poofs.push({ x: tg.x, y: tg.y, t: 0, big: tg.boss }); burst(tg.x, tg.y - tg.U.cy, 'spark', 10, '#fff6a8'); sndP('poof', 1.1); buzz(10); }
+    if (!tg && (O.y < camY - 30 || O.x < camX - 40 || O.x > camX + viewW() + 40)) {
+      raid.owl = null; raid.phase = 'done'; raid.t = 2.2;
+      raidUI('Phew!', `The Moon Owl chased the gloom away from ${toArea(raid.area)}`); jingle('raid-lose', 'chime');
+    }
+  }
+  function endRaid(quiet) {
+    const was = raid; if (!was) return;
+    for (const u of was.ps) { const r = u.r; r.inRaid = false; if (!u.dead && r.state !== 'held' && r.state !== 'fall' && r.state !== 'ko') { r.state = 'idle'; r.timer = rand(0.5, 1.5); } }
+    raidHold(false); raid = null; raidUI(null); hintReset = true; PS.save();
+    // (the win and lose jingles hand the music back to the garden by themselves; a quiet end, or no jingle, gets it back here)
+    if (raidSong) { raidSong = null; musicBackAt = quiet ? 0.01 : t + 5; }
+    if (was.party && !quiet) setTimeout(() => raidParty(was.party), 400);
+  }
+  // the big moment for the first win (and the first Gloom King beaten)
+  function raidParty(p) {
+    if (!PS.ui.celebrate) return;
+    let ic = null, king = null; try { ic = PX.raid && PX.raid.icon ? PX.raid.icon(p.king ? 'king' : 'raid') : null; king = p.king && PX.raid && PX.raid.unit ? PX.raid.unit('king', 'hurt') : null; } catch (e) { ic = null; }
+    let coin = null; try { coin = PS.ui.icon ? PS.ui.icon('coin') : null; } catch (e) { coin = null; }
+    const partner = ST.active();
+    PS.ui.celebrate({ kind: 'trophy', eyebrow: 'Night raid', title: p.king ? 'You beat the Gloom King!' : 'You chased the gloom away!', sub: 'Your Sprouts were so brave. The gloom only comes at night.',
+      icon: king, sprite: king ? null : partner || null, jingle: false, tiles: [{ icon: coin, value: '+' + p.coins, label: 'Coins' }, { icon: ic, value: String(p.killed), label: 'Gloomlings' }], button: 'Hooray!' });
+  }
+  // ---- tapping in a raid: a Sprout to choose it (again, or the grass, to let it go), then a Gloomling to send it after that one ----
+  function gloomAt(p) { let b = null, bd = 1e9; for (const z of raid.zs) { if (z.dead || z.rise > 0.5) continue; const d = Math.hypot(p.x - z.x, p.y - (z.y - z.U.cy)); if (d < hitR(z.boss ? 20 : z.U.w * 0.6) && d < bd) { bd = d; b = z; } } return b; }
+  function raidTarget(z) { const u = raid.sel; u.pick = z; emote(u.r, '!', 1); floater('Get it!', '#5b4630', u.r.x, headY(u.r) - 6); snd('pop'); buzz(8); }
+  function raidSelect(r) {
+    const u = raid.phase === 'fight' && raid.ps.find(o => o.r === r && !o.dead);
+    if (!u) { if (!busy(r)) { hop(r); emote(r, '!', 0.8); } snd('coo'); return; }
+    raid.sel = raid.sel === u ? null : u; hop(r); emote(r, raid.sel ? 'sparkle' : 'note', 0.8); if (!(raid.sel && sproutCry(r))) snd(raid.sel ? 'coo' : 'tick');
+    raidSub(raid.sel ? `Now tap a Gloomling for ${r.s.name}!` : 'Tap a Sprout, then a Gloomling!');
+  }
+  // ---- raid pictures: from art-raid.js (PX.raid), cached here per kind and pose; simple stand-ins if a picture is missing ----
+  const RSPR = {}, POSE_ID = ['idle', 'walk0', 'walk1', 'attack', 'hurt'];
+  function gloomSpr(kind, pi) {
+    const m = RSPR[kind] || (RSPR[kind] = []); let c = m[pi];
+    if (c === undefined) { try { c = PX.raid && PX.raid.unit ? PX.raid.unit(kind, POSE_ID[pi]) : null; } catch (e) { c = null; } if (!c) c = gloomStandIn(kind); m[pi] = c; }
+    return c;
+  }
+  function raidFx(id) {
+    let c = RSPR['fx:' + id];
+    if (c === undefined) { try { c = PX.raid && PX.raid.fx ? PX.raid.fx(id) : null; } catch (e) { c = null; } RSPR['fx:' + id] = c || null; }
+    return c;
+  }
+  function owlSpr(f) {
+    const m = RSPR.owl || (RSPR.owl = []); let c = m[f];
+    if (c === undefined) { try { c = PX.raid && PX.raid.owl ? PX.raid.owl(f ? 'fly1' : 'fly0') : null; } catch (e) { c = null; } if (!c) c = owlStandIn(f); m[f] = c; }
+    return c;
+  }
+  const SHOT_ID = {}; for (const el of Object.keys(D.ELEMENTS)) SHOT_ID[el] = 'shot:' + el;
+  // a round shadow body with big glowing eyes (only if the raid art isn't there)
+  function gloomStandIn(kind) {
+    const U = GU[kind] || GU.blob, g = new PX.Grid(U.w, U.h), cx = U.w / 2, by = U.h - 0.5 - (U.hover || 0), rx = U.w * 0.42, ry = (U.h - (U.hover || 0)) * 0.44;
+    g.ell(cx, by - ry, rx, ry, ['#8c7cd8', '#4a3a8e', '#2c2458']);
+    for (const s of [-1, 1]) { g.ell(cx + s * rx * 0.36, by - ry * 1.12, Math.max(1.3, rx * 0.17), Math.max(1.5, ry * 0.24), '#fff6c8'); g.dot(cx + s * rx * 0.36 - 0.4, by - ry * 1.25, '#ffffff'); }
+    return hd(g, { outline: true }).canvas();
+  }
+  function owlStandIn(f) {
+    const g = new PX.Grid(30, 22);
+    g.ell(15, 13, 7, 7.5, ['#fffbe6', '#e4dab0', '#b8a878']); for (const s of [-1, 1]) g.poly([[15 + s * 5, 9], [15 + s * 14, f ? 14 : 5], [15 + s * 6, 15]], '#d9cfa0');
+    for (const s of [-1, 1]) { g.ell(15 + s * 3, 11, 2, 2, '#ffffff'); g.dot(15 + s * 3, 11, '#222034'); }
+    g.poly([[14, 13], [16, 13], [15, 15]], '#f6c83a');
+    return hd(g, { outline: true }).canvas();
+  }
+  // the raid's creatures go on top of the night's tint (so their glowing eyes stay bright), back to front
+  function drawGlooms() {
+    const zs = raid.zs; for (let a = 1; a < zs.length; a++) { const e = zs[a]; let b = a - 1; while (b >= 0 && zs[b].y > e.y) { zs[b + 1] = zs[b]; b--; } zs[b + 1] = e; }
+    for (const z of zs) if (!z.dead && vis(z.x, z.y, 26, 50)) drawGloom(z);
+  }
+  function drawGloom(z) {
+    if (z.dead) return; // (its poof is drawn on top)
+    const pi = z.hitT > 0 ? 4 : z.atkT > 0 ? 3 : (z.rise <= 0 && (z.tgt && Math.hypot(z.tgt.r.x - z.x, z.tgt.r.y - z.y) > z.G.reach + 3)) ? 1 + (Math.floor(t * 5 + z.ph) % 2) : 0;
+    const c = gloomSpr(z.kind, pi), w = artW(c), h = artH(c), flip = z.facing < 0, fly = !!z.U.fly;
+    const bob = fly ? Math.round(Math.sin(t * 5 + z.ph) * 1.5) : 0, lean = z.kb > 0 ? -z.facing : 0;
+    shadow(z.x, z.y, z.boss ? 30 : Math.max(8, Math.round(w * 0.6)));
+    if (z.rise > 0) { bx.save(); bx.beginPath(); bx.rect(z.x - w, z.y - h - 8, w * 2, h + 8); bx.clip(); PX.blit(bx, c, z.x, z.y + Math.round(z.rise * h), flip); bx.restore(); return; } // (climbing out of the portal)
+    PX.blit(bx, c, z.x + lean, z.y + bob, flip);
+  }
+  // the shadow portal on the ground: its two swirl frames, fading in as it opens and out as it closes
+  function drawPortal() {
+    const R = raid; if (!R || R.openK <= 0.01 || !vis(R.portal.x, R.portal.y, 24, 16)) return;
+    const c = raidFx(Math.floor(t * 4) % 2 ? 'portal1' : 'portal0');
+    bx.globalAlpha = Math.min(1, R.openK * 1.2);
+    if (c) PX.blit(bx, c, R.portal.x, R.portal.y + 2);
+    else { const X = R.portal.x + 0.5, Y = R.portal.y - 4; ellF(X, Y, 15, 5.5, '#2c2458'); ellF(X, Y, 11, 4, '#4a3a8e'); ellF(X, Y + 0.3, 6, 2.2, '#1c1638'); }
+    bx.globalAlpha = 1;
+  }
+  function bar(x, y, w, k, col) {
+    const X = sn(x - w / 2), Y = sn(y);
+    bx.fillStyle = INK; bx.fillRect(X - FP, Y - FP, w + 2 * FP, 1 + 2 * FP);
+    bx.fillStyle = '#fbf6e8'; bx.fillRect(X, Y, w, 1);
+    bx.fillStyle = k > 0.5 ? col : k > 0.25 ? '#f6c83a' : '#e5535f'; bx.fillRect(X, Y, Math.max(FP, sn(w * clamp(k, 0, 1))), 1);
+  }
+  function ring(x, y, rx, ry, col) { bx.fillStyle = col; for (let a = 0; a < 6.283; a += 0.09) bx.fillRect(sn(x + Math.cos(a) * rx), sn(y + Math.sin(a) * ry), FP, FP); }
+  // above the night's tint: glowing eyes in the dark, the portal's glow, shots, poofs, health bars, the chosen Sprout and its
+  // target, and the Moon Owl
+  function drawRaidTop() {
+    const R = raid;
+    if (R.openK > 0.02) glow(R.portal.x, R.portal.y - 5, 16, '170,120,255', 0.28 * R.openK);
+    for (const z of R.zs) if (!z.dead && z.rise < 0.8 && vis(z.x, z.y, 20, 40)) glow(z.x, z.y - z.U.cy - 1, z.boss ? 14 : 7, '210,190,255', 0.14);
+    for (const sh of R.shots) {
+      if (sh.kind === 'ball') { const c = raidFx('shadowball'); if (c) PX.blit(bx, c, sh.x, sh.y + artH(c) / 2, sh.flip); else { glow(sh.x, sh.y, 3, '160,110,230', 0.6); bx.fillStyle = '#5e3a8e'; bx.fillRect(sn(sh.x - 1), sn(sh.y - 1), 2, 2); } continue; }
+      const c = raidFx(SHOT_ID[sh.el] || 'shot:normal');
+      if (c) PX.blit(bx, c, sh.x, sh.y + artH(c) / 2, sh.flip);
+      else { bx.fillStyle = elColor(sh.el); bx.fillRect(sn(sh.x - 1), sn(sh.y - 1), 2, 2); bx.fillStyle = '#ffffff'; bx.fillRect(sn(sh.x - 1), sn(sh.y - 1), FP, FP); }
+    }
+    for (const p of R.poofs) { const c = raidFx(p.t < 0.3 ? 'poof' : p.t < 0.6 ? 'poof1' : 'poof2') || raidFx('poof'); if (c) { PX.blit(bx, c, p.x, p.y + 1); if (p.big) { PX.blit(bx, c, p.x - 9, p.y - 2); PX.blit(bx, c, p.x + 9, p.y - 2); } } }
+    if (R.phase === 'fight') {
+      if (R.sel && !R.sel.dead && here.includes(R.sel.r)) {
+        const r = R.sel.r; ring(r.x, r.y + 0.5, 10 + Math.sin(t * 6) * 0.5, 4, '#fff27a');
+        const pk = R.sel.pick; if (pk && !pk.dead) PX.blit(bx, arrowSprite(), pk.x, pk.y - pk.U.top - 5 - (Math.floor(t * 4) % 2));
+      }
+      for (const u of R.ps) if (!u.dead && u.hp < u.max && here.includes(u.r) && u.r.state !== 'held') bar(u.r.x, headY(u.r) - 5, 14, u.hp / u.max, '#7ad070');
+      for (const z of R.zs) if (!z.dead && z.rise <= 0 && (z.hp < z.max || z.boss)) bar(z.x, z.y - z.U.top - 4, z.boss ? 28 : 14, z.hp / z.max, '#c88af0');
+    }
+    if (R.owl) {
+      const O = R.owl, c = owlSpr(Math.floor(t * 8) % 2);
+      glow(O.x, O.y - 10, 14, '255,246,201', 0.3); shadow(O.x, Math.min(Lw.maxY, O.y + 22), 12);
+      PX.blit(bx, c, O.x, O.y, O.face < 0);
+    }
+    if (R.flash > 0) { bx.globalAlpha = Math.min(1, R.flash * 2); bx.fillStyle = '#ffffff'; bx.fillRect(VR.x0, VR.y0, VR.x1 - VR.x0, VR.y1 - VR.y0); bx.globalAlpha = 1; }
+  }
+  // dizzy stars over a resting Sprout (after a raid too, until it gets its breath back)
+  function drawDizzy() {
+    const now = Date.now();
+    for (const r of here) if (r.koUntil > now && vis(r.x, r.y, 12, 40)) { const c = raidFx(Math.floor(t * 3) % 2 ? 'ko1' : 'ko'); if (c) PX.blit(bx, c, r.x, headY(r) + 3); else { bx.fillStyle = '#fff27a'; for (let i = 0; i < 3; i++) { const a = t * 6 + i * 2.1; bx.fillRect(sn(r.x + Math.cos(a) * 6), sn(headY(r) + Math.sin(a) * 2), 1, 1); } } }
+  }
+
   // ---------------- update + render ----------------
   function update(dt) {
     const night = PS.clock.isNight();
@@ -2110,11 +2887,12 @@
         if (!(t < r.watchT)) { emote(r, drag.src === 'pouch' ? '!' : 'heart', 1.2); r.watchT = t + 3; }
       }
     }
+    raidTick(dt);
     updateCritters(dt);
-    // drops
-    if (t > nextDrop) { spawnDrop(); nextDrop = t + rand(...D.GROWTH.dropEverySec); }
+    // drops (none while the gloom is here; the ones already out wait)
+    if (t > nextDrop && !raidHere()) { spawnDrop(); nextDrop = t + rand(...D.GROWTH.dropEverySec); }
     const dl = drops[area] || [];
-    for (const d of dl) { d.life -= dt; if (d.z > 0 || d.vz) { d.vz += TUNE.gravity * 0.6 * dt; d.z -= d.vz * dt; if (d.z <= 0) { d.z = 0; if (!d.bounced && d.vz > 30) { d.vz = -d.vz * 0.35; d.bounced = true; d.z = 0.01; } else d.vz = 0; } } }
+    for (const d of dl) { if (!raidHere()) d.life -= dt; if (d.z > 0 || d.vz) { d.vz += TUNE.gravity * 0.6 * dt; d.z -= d.vz * dt; if (d.z <= 0) { d.z = 0; if (!d.bounced && d.vz > 30) { d.vz = -d.vz * 0.35; d.bounced = true; d.z = 0.01; } else d.vz = 0; } } }
     if (dl.some(d => d.life <= 0)) drops[area] = dl.filter(d => d.life > 0);
     // ground fruit falls to the grass
     for (const f of groundList(area)) if (f.z > 0) { f.vz += TUNE.gravity * dt; f.z = Math.max(0, f.z - f.vz * dt); }
@@ -2137,25 +2915,33 @@
       e.o = null;
     }
   }
+  // the world px on screen this frame (whole px, a little margin), clamped to the garden: only this part is drawn
+  function viewRect() {
+    VR.x0 = clamp(Math.floor(camX) - 2, 0, ww); VR.y0 = clamp(Math.floor(camY) - 2, 0, wh);
+    VR.x1 = clamp(Math.ceil(camX + W / Z) + 2, VR.x0 + 1, ww); VR.y1 = clamp(Math.ceil(camY + H / Z) + 2, VR.y0 + 1, wh);
+  }
+  // is something standing at (x, y), hw px either side and up px tall, on screen?
+  const vis = (x, y, hw, up) => x + hw >= VR.x0 && x - hw <= VR.x1 && y + 8 >= VR.y0 && y - up <= VR.y1;
   function render(dt) {
     const n = PS.clock.night(), th = TH[area];
     ensureBg(n);
+    viewRect();
+    const vx = VR.x0, vy = VR.y0, vw = VR.x1 - VR.x0, vh = VR.y1 - VR.y0;
     bx.setTransform(SK, 0, 0, SK, 0, 0); // world coordinates, SK buffer pixels each
     bx.imageSmoothingEnabled = false;
-    bx.drawImage(skyC, 0, 0, ww, skyC.height / SK);
-    drawDusk(n);
-    drawSunMoon(n);
-    drawClouds(n);
-    bx.drawImage(bgC, 0, 0, ww, wh);
+    const skyH = skyC.height / SK;
+    if (vy < skyH) { const h = Math.min(skyH, VR.y1) - vy; bx.drawImage(skyC, vx * SK, vy * SK, vw * SK, h * SK, vx, vy, vw, h); }
+    if (vy < Lw.hz + 14) { drawDusk(n); drawSunMoon(n); drawClouds(n); }
+    bx.drawImage(bgC, vx * SK, vy * SK, vw * SK, vh * SK, vx, vy, vw, vh);
     drawWater(dt, n);
     const hintT = hintTree(); dlN = 0; emN = 0; topN = 0;
-    for (let i = 0; i < Lw.trees.length; i++) dl(Lw.trees[i].y, 0, null, i);
-    for (const p of Lw.props) dl(p.y, 1, p, 0);
-    if (Lw.home) dl(Lw.home.y, 2, null, 0);
-    for (const o of eggsHere()) dl(o.y, 3, o, 0);
-    for (const r of here) { if (r.state === 'held' || r.state === 'fall') topQ[topN++] = r; else dl(r.y, 4, r, 0); }
-    for (const c of critters) if (c.where !== 'air') dl(c.y, 5, c, 0);
-    for (const f of groundList(area)) dl(f.y, 6, f, 0);
+    for (let i = 0; i < Lw.trees.length; i++) { const T = Lw.trees[i]; if (vis(T.x, T.y, artW(T.c) / 2 + 4, artH(T.c) + 6)) dl(T.y, 0, null, i); }
+    for (const p of Lw.props) if (vis(p.x, p.y, artW(p.c) / 2 + 2, artH(p.c) + 8)) dl(p.y, 1, p, 0);
+    if (Lw.home && vis(Lw.home.x, Lw.home.y, Lw.home.w / 2 + 18, artH(Lw.home.c) + 4)) dl(Lw.home.y, 2, null, 0);
+    for (const o of eggsHere()) if (vis(o.x, o.y, 14, 30)) dl(o.y, 3, o, 0);
+    for (const r of here) { if (r.state === 'held' || r.state === 'fall') topQ[topN++] = r; else if (vis(r.x, r.y, 20, 44)) dl(r.y, 4, r, 0); }
+    for (const c of critters) if (c.where !== 'air' && vis(c.x, c.y, 16, 30)) dl(c.y, 5, c, 0);
+    for (const f of groundList(area)) if (vis(f.x, f.y, 8, 14 + f.z)) dl(f.y, 6, f, 0);
     drawList(hintT);
     drawAmbient(n);
     for (const c of critters) if (c.where === 'air') drawCritter(c);
@@ -2167,11 +2953,14 @@
       // (in fine rows, so the fade is soft; one solid colour per area, faded with the alpha)
       const bh = th.mount ? 5 : 3, y0 = Lw.hz - (th.mount ? 10 + th.mountAmp : 14), nh = 4 * bh * SK;
       bx.fillStyle = th.nightC || (th.nightC = `rgb(${th.night[0]},${th.night[1]},${th.night[2]})`);
-      for (let j = 0; j < nh; j++) { bx.globalAlpha = Math.min(1, na * (j + 1) / (nh + 1)); bx.fillRect(0, y0 + j * FP, ww, FP); }
-      bx.globalAlpha = Math.min(1, na); bx.fillRect(0, y0 + 4 * bh, ww, wh); bx.globalAlpha = 1;
+      if (vy < y0 + 4 * bh) for (let j = 0; j < nh; j++) { bx.globalAlpha = Math.min(1, na * (j + 1) / (nh + 1)); bx.fillRect(vx, y0 + j * FP, vw, FP); }
+      const top = Math.max(y0 + 4 * bh, vy); if (VR.y1 > top) { bx.globalAlpha = Math.min(1, na); bx.fillRect(vx, top, vw, VR.y1 - top); }
+      bx.globalAlpha = 1;
     }
     drawMagic(n, dt);
     drawLights(n);
+    if (raidHere()) { drawPortal(); drawGlooms(); drawRaidTop(); }
+    drawDizzy();
     if (eggBits.length) drawEggBits();
     // drops sit above the night tint so they always sparkle
     for (const d of drops[area] || []) { if (n > 0.3 || th.dim) glow(d.x, d.y - 6 - d.z, 6, '255,242,170', 0.25); drawDrop(d); }
@@ -2180,18 +2969,27 @@
     const mark = drag && drag.hover ? drag.hover : sel ? RT.get(sel) : null;
     if (mark && here.includes(mark) && !busy(mark)) PX.blit(bx, arrowSprite(), mark.x, headY(mark) - 2 - (Math.floor(t * 3) % 2) - (mark.emote ? 13 : 0));
     drawParticles(dt);
-    if (flashT > 0) { bx.globalAlpha = Math.min(1, flashT / 0.3) * 0.7; bx.fillStyle = '#ffffff'; bx.fillRect(0, 0, ww, wh); bx.globalAlpha = 1; }
+    if (flashT > 0) { bx.globalAlpha = Math.min(1, flashT / 0.3) * 0.7; bx.fillStyle = '#ffffff'; bx.fillRect(vx, vy, vw, vh); bx.globalAlpha = 1; }
 
-    // present, then crisp text at display resolution
+    // present the part on screen, then crisp text at display resolution
     const sc = Z * DPR;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = TH[area].water[3]; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = th.water[3]; ctx.fillRect(0, 0, cv.width, cv.height);
     // far out a buffer pixel is smaller than a device pixel: smooth it then (nearest would drop the thin fine lines)
     if (sc < SK - 0.01) { ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'low'; }
-    const X0 = Math.round(-camX * sc), Y0 = Math.round(-camY * sc);
-    ctx.drawImage(buf, X0, Y0, Math.round((ww - camX) * sc) - X0, Math.round((wh - camY) * sc) - Y0);
+    const X0 = Math.round((vx - camX) * sc), Y0 = Math.round((vy - camY) * sc), X1 = Math.round((VR.x1 - camX) * sc), Y1 = Math.round((VR.y1 - camY) * sc);
+    ctx.drawImage(buf, vx * SK, vy * SK, vw * SK, vh * SK, X0, Y0, X1 - X0, Y1 - Y0);
     ctx.imageSmoothingEnabled = false;
+    // the whole garden on screen: plain lawn past its left and front edges (the water's colour is already behind on the right)
+    if (X0 > 0 || Y1 < cv.height) {
+      ctx.fillStyle = th.grass[2];
+      if (X0 > 0) ctx.fillRect(0, 0, X0, cv.height);
+      const xs = Math.max(0, X0), xw = Math.round((shoreAt(wh) - camX) * sc);
+      if (Y1 < cv.height) ctx.fillRect(xs, Y1, Math.max(0, xw - xs), cv.height - Y1);
+      // (the night's tint over them, like over the garden)
+      if (na > 0.01) { ctx.globalAlpha = Math.min(1, na); ctx.fillStyle = th.nightC; if (X0 > 0) ctx.fillRect(0, 0, X0, cv.height); if (Y1 < cv.height) ctx.fillRect(xs, Y1, cv.width - xs, cv.height - Y1); ctx.globalAlpha = 1; }
+    }
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.textAlign = 'center'; ctx.lineJoin = 'round';
     if (here.some(r => r.state === 'held')) drawZoneLabels();
@@ -2255,6 +3053,21 @@
     PX.Sound.unlock();
     const p = local(e); ptr.x = ptr.px = p.x; ptr.y = ptr.py = p.y; ptr.vx = 0;
     const base = { pid: e.pointerId, sx: e.clientX, sy: e.clientY, ms: performance.now() };
+    if (raidHere()) { // the gloom is here: tap a Sprout, then a Gloomling (or drag to look around); nothing pops up
+      // (coins, fruit and visitors already in the garden can still be picked up; nothing new comes until it's over)
+      for (const d of (drops[area] || []).slice().reverse()) if (Math.hypot(p.x - d.x, p.y - (d.y - 5 - d.z)) < hitR(9)) { collectDrop(d); return; }
+      const sl0 = treeSlots();
+      for (let i = 0; i < sl0.length; i++) { const q = Lw.slots[i]; if (q && growK(sl0[i]) >= 1 && Math.hypot(p.x - q.x, p.y - q.y) < hitR(7.5)) { press = Object.assign({ kind: 'tree', i, x0: p.x, y0: p.y }, base); return; } }
+      const gl0 = groundList(area);
+      for (let i = gl0.length - 1; i >= 0; i--) { const f = gl0[i]; if (Math.hypot(p.x - f.x, p.y - (f.y - 5)) < hitR(7.5)) { press = Object.assign({ kind: 'gfruit', f, x0: p.x, y0: p.y }, base); return; } }
+      for (const c of critters) if (critterHit(c, p)) { catchCritter(c); return; }
+      const zt = raid.phase === 'fight' ? gloomAt(p) : null;
+      if (zt && raid.sel && !raid.sel.dead) { raidTarget(zt); return; }
+      const rr = sproutAt(p);
+      if (rr) { press = Object.assign({ kind: 'sprout', r: rr, t0: t, x0: p.x, y0: p.y, mode: 'pending', rub: 0, raid: true }, base); return; }
+      if (zt) { raidSub('Tap one of your Sprouts first, then a Gloomling!'); snd('pop'); return; }
+      press = Object.assign({ kind: 'bg', prop: null, wx: p.x, wy: p.y, lx: e.clientX, ly: e.clientY, cam0: camX, cam0y: camY, vx: 0, vy: 0, lt: performance.now() }, base); return;
+    }
     for (const o of eggsHere()) { const c = itemSpr('egg', o.e.kind); if (Math.hypot(p.x - o.x, p.y - (o.y - artH(c) / 2)) < Math.max(12, artH(c) / 2 + 2)) { closeCard(); tapEgg(o); return; } }
     for (const d of (drops[area] || []).slice().reverse()) if (Math.hypot(p.x - d.x, p.y - (d.y - 5 - d.z)) < 9) { collectDrop(d); return; }
     const sl = treeSlots();
@@ -2272,12 +3085,12 @@
     const [a, b] = [...touches.values()], r = cv.getBoundingClientRect();
     const mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top;
     pinch = { d0: Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)), z0: Z, wx: mx / Z + camX, wy: my / Z + camY };
-    zoomAnim = null; closeCard(); markSeen('zoom');
+    zoomAnim = null; follow = null; closeCard(); markSeen('zoom');
   }
   function movePinch() {
     const [a, b] = [...touches.values()], r = cv.getBoundingClientRect();
     const mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top, d = Math.hypot(a.x - b.x, a.y - b.y);
-    Z = clamp(pinch.z0 * d / pinch.d0, ZMIN * 0.85, ZMAX * 1.15);
+    Z = clamp(pinch.z0 * d / pinch.d0, ZFAR * 0.85, ZMAX * 1.15);
     camX = pinch.wx - mx / Z; camY = pinch.wy - my / Z; clampCam();
     pinch.mx = mx; pinch.my = my;
   }
@@ -2305,9 +3118,9 @@
       camX -= dx / Z; camY -= dy / Z; clampCam();
       press.vx = lerp(press.vx, -dx / Z / dtm * 1000, 0.4); press.vy = lerp(press.vy, -dy / Z / dtm * 1000, 0.4);
       press.lx = e.clientX; press.ly = e.clientY; press.lt = now;
-      if (Math.hypot(e.clientX - press.sx, e.clientY - press.sy) > 10) press.panned = true;
+      if (!press.panned && Math.hypot(e.clientX - press.sx, e.clientY - press.sy) > 10) { press.panned = true; follow = null; }
     } else if (press.kind === 'sprout') {
-      if (press.mode === 'pending' && Math.hypot(p.x - press.x0, p.y - press.y0) > 2.5) press.mode = 'rub';
+      if (press.mode === 'pending' && !press.raid && Math.hypot(p.x - press.x0, p.y - press.y0) > 2.5) press.mode = 'rub';
       if (press.mode === 'rub') {
         press.rub += Math.hypot(p.x - ptr.px, p.y - ptr.py);
         while (press.rub > TUNE.rubStep) { press.rub -= TUNE.rubStep; petSprout(press.r, false); }
@@ -2339,7 +3152,7 @@
     if (pr.kind === 'tree') { const kind = takeTreeFruit(pr.i); ST.addFruit(kind, 1); floater(`+1 ${D.FRUITS[kind].name}`, '#5b4630', Lw.slots[pr.i].x, Lw.slots[pr.i].y - 6); markSeen('pick'); return; }
     if (pr.kind === 'gfruit') { if (takeGround(pr.f)) { ST.addFruit(pr.f.kind, 1); floater(`+1 ${D.FRUITS[pr.f.kind].name}`, '#5b4630', pr.f.x, pr.f.y - 12); snd('pop'); } return; }
     if (pr.kind === 'sprout') {
-      if (pr.mode === 'pending') tapSprout(pr.r);
+      if (pr.mode === 'pending') { if (pr.raid && raidHere()) raidSelect(pr.r); else tapSprout(pr.r); }
       else if (pr.mode === 'hold' && pr.r.state === 'held') release(pr.r);
       return;
     }
@@ -2350,20 +3163,25 @@
       // a quick sideways swipe changes area, but only when the view can't scroll that way any more
       if (Math.abs(dx) > 60 && Math.abs(dy) < 50 && ms < 700 && Math.abs(camX - pr.cam0) < 1) { switchArea(dx < 0 ? 1 : -1); return; }
       if (pr.panned) { if (performance.now() - pr.lt < 90) { camV.x = clamp(pr.vx, -600, 600); camV.y = clamp(pr.vy, -600, 600); } return; }
+      if (raidHere()) { if (raid.sel) { raid.sel = null; raidSub('Tap a Sprout, then a Gloomling!'); snd('tick'); } if (Z > ZFAR * 1.03) return; } // (the grass lets the chosen Sprout go)
       closeCard();
+      // the whole garden on screen: a tap on it zooms back in right there (it's a map you can tap into)
+      if (Z <= ZFAR * 1.03 && pr.wx != null) { glideTo(pr.wx, pr.wy - 6, Math.max(zoomBack ? zoomBack.z : 0, ZMIN * TUNE.zoomDef)); zoomBack = null; sndP('whoosh', 1.3); lastTapBg = null; syncZoomBtn(true); return; }
       // tapping the scenery: a prop or tree reacts (a few hide a coin once a day), the sign wobbles, the lamp glows, the water splashes
       if (pr.wx != null && sceneryTap(pr)) { lastTapBg = null; return; }
       // double-tap: zoom all the way out, or back in
       const now = performance.now();
       if (lastTapBg && now - lastTapBg.t < 330 && Math.hypot(e.clientX - lastTapBg.x, e.clientY - lastTapBg.y) < 30) {
         const r = cv.getBoundingClientRect();
-        animateZoom(Z > ZMIN * 1.05 ? ZMIN : ZMIN * TUNE.zoomDef, e.clientX - r.left, e.clientY - r.top); lastTapBg = null; markSeen('zoom');
+        if (Z > ZFAR * 1.05) follow = null;
+        animateZoom(Z > ZFAR * 1.05 ? ZFAR : ZMIN * TUNE.zoomDef, e.clientX - r.left, e.clientY - r.top); lastTapBg = null; markSeen('zoom');
       } else lastTapBg = { t: now, x: e.clientX, y: e.clientY };
     }
   }
   function tapSprout(r) {
     if (r.state === 'sleep') { snd('tick'); }
     else if (!busy(r) && r.state !== 'eat' && r.state !== 'swim') { r.state = 'idle'; r.timer = 1.4; emote(r, pick(['!', 'heart', 'note']), 1); hop(r); if (!sproutCry(r)) snd('coo'); }
+    follow = r.id; // (the camera keeps it in view while its card is open and it wanders)
     openCard(r);
   }
 
@@ -2403,7 +3221,7 @@
       const fromTray = d.src === 'fruitinv';
       if (!fromTray && overTray && !cancelled) { ST.addFruit(d.id, 1); snd('pop'); PS.ui.toast(`+1 ${D.FRUITS[d.id].name} in your fruit tray`, 1800); }
       else if (fromTray && (overTray || groundList(area).length >= TUNE.maxGroundFruit)) { if (!overTray) PS.ui.toast('That\'s a lot of snacks already! Let your Sprouts eat some first.', 2600); }
-      else if (inWater(wx, gy)) {
+      else if (inWater(wx, gy) || pondAt(wx, gy)) {
         if (fromTray) PS.ui.toast('Drop fruit on the grass, not in the water!', 2400);
         else { burst(wx, gy - 1, 'drop', 8, '#cbdbfc'); snd('splash'); floater('Plop. It sank.', '#5b4630', wx, gy - 8); }
       } else if (!fromTray || ST.useFruit(d.id)) dropFruit(d.id, wx, gy, Math.max(0, gy - wy));
@@ -2473,6 +3291,8 @@
     let fed = 0;
     for (let i = 0; i < n; i++) { if (!ST.useFruit(k)) break; ST.feed(r.s, k); fed++; }
     if (!fed) return 0;
+    if (raidHeal(r, k, fed)) return fed;
+    if (r.koUntil) { r.koUntil = 0; r.state = 'idle'; }
     const f = D.FRUITS[k]; // a big meal: one long munch, with the totals
     wake(r); r.state = 'eat'; r.timer = Math.min(3, 1.2 + fed * 0.25); r.eat = k; r.mood = null; r.target = null; emote(r, 'heart', 1.5); snd('munch'); markSeen('feed');
     for (const [st, v] of Object.entries(f.gives || {})) floaterFor(r, `+${v * fed} ${D.STAT_META[st].label}`, D.STAT_META[st].color);
@@ -2662,6 +3482,12 @@
     }
   }
   function switchArea(dir) { const i = AREA_IDS.indexOf(area); setArea(AREA_IDS[(i + dir + AREA_IDS.length) % AREA_IDS.length], dir); }
+  // the drop-down of every area under the garden's name (app.js pickMap); without it, the name steps to the next area
+  function openAreas(anchor) {
+    if (raidHere()) { snd('tick'); raidSub('Not now: the gloom is here!'); return; }
+    if (!PS.ui.pickMap) { switchArea(1); return; }
+    PS.ui.pickMap(null, area, { anchor, onPick: a => { if (D.AREAS[a] && a !== area) setArea(a, AREA_IDS.indexOf(a) < AREA_IDS.indexOf(area) ? -1 : 1); } });
+  }
   function settleAll() {
     press = null;
     for (const r of here) {
@@ -2681,7 +3507,9 @@
     critters = []; fizz = []; parts = []; floaters = [];
     nextCritter = t + rand(...D.GROWTH.critterEverySec) * 0.35;
     here = PS.S.sprouts.filter(isOut).map(getRT);
-    closeCard(); buildProps(); skyKey = ''; bgKey = ''; focusCamera(); hintReset = true;
+    closeCard(); buildProps(); skyKey = ''; bgKey = ''; findId = ''; focusCamera(); hintReset = true;
+    // a raid stays in its own area: leaving hides its banner and lets pop-ups through, coming back brings it back
+    if (raid) { if (raidHere()) { raidHold(true); if (raid.ui) raidUI(...raid.ui); glideTo((raid.rally.x + raid.portal.x) / 2, raid.rally.y - 14, Z); } else { raidHold(false); if (raidEl) raidEl.hidden = true; raid.sel = null; } }
     cv.classList.remove('g-in-l', 'g-in-r'); void cv.offsetWidth; cv.classList.add(dir < 0 ? 'g-in-l' : 'g-in-r');
     updatePill(); snd('whoosh'); markSeen('area');
   }
@@ -2698,9 +3526,11 @@
 .g-arrow{flex:0 0 auto;width:44px;height:44px;border-radius:14px;background:var(--panel);border:2px solid var(--edge);border-bottom-width:4px;display:grid;place-items:center;padding:0;color:var(--ink)}
 .g-arrow:active{transform:translateY(2px);border-bottom-width:2px;margin-top:2px}
 .g-arrow svg{width:18px;height:18px}
-.g-pill{background:var(--panel);border:2px solid var(--line);border-bottom:4px solid var(--edge);border-radius:16px;padding:4px 14px 5px;text-align:center;min-width:0;max-width:230px;flex:0 1 auto}
-.g-pill b{display:block;font-family:var(--f-px);font-weight:700;font-size:18px;line-height:1.1;white-space:nowrap}
-.g-pill span{display:block;font-size:13px;color:var(--ink-soft);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g-pill{background:var(--panel);border:2px solid var(--line);border-bottom:4px solid var(--edge);border-radius:16px;padding:4px 14px 5px;text-align:center;min-width:0;max-width:240px;flex:0 1 auto;color:var(--ink);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.g-pill:active{transform:translateY(2px);border-bottom-width:2px;margin-top:2px}
+.g-pill b{display:flex;align-items:center;justify-content:center;gap:5px;font-family:var(--f-px);font-weight:700;font-size:18px;line-height:1.1;white-space:nowrap}
+.g-pill .g-dd{width:11px;height:7px;flex:0 0 auto;color:var(--ink-soft);margin-top:1px}
+.g-pill .g-ps{display:block;font-size:13px;color:var(--ink-soft);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .g-dots{display:flex;gap:5px;justify-content:center;margin-top:3px}
 .g-dots i{width:7px;height:7px;border-radius:2px;background:var(--line)}
 .g-dots i.on{background:var(--sun-edge)}.g-dots i.egg{background:var(--berry)}
@@ -2719,6 +3549,16 @@
 .g-empty{font-size:13px;color:var(--ink-soft);font-weight:600;padding-left:2px;white-space:nowrap}
 .g-ghost{position:absolute;left:0;top:0;pointer-events:none;z-index:30;transform:translate(-999px,-999px);image-rendering:pixelated;image-rendering:crisp-edges;filter:drop-shadow(0 4px 0 rgba(34,32,52,.25))}
 .g-hint{z-index:3;width:max-content;max-width:calc(100% - 40px)}
+.g-raid{position:absolute;left:50%;top:74px;transform:translateX(-50%);z-index:8;pointer-events:none;display:flex;align-items:center;gap:8px;text-align:left;background:#2e2650;color:#fff8e6;border:3px solid #1c1638;border-bottom-width:5px;border-radius:18px;padding:5px 14px 6px 8px;min-width:210px;max-width:calc(100% - 132px);box-shadow:0 6px 0 rgba(28,22,56,.22),inset 0 0 0 2px #5e3a8e;animation:gRaid .35s ease-out}
+.g-raid canvas{width:32px;height:32px;flex:0 0 auto}
+.g-raid span{min-width:0;flex:1}
+.g-raid b{display:block;font-family:var(--f-px);font-size:18px;line-height:1.15;color:#fff27a}
+.g-raid small{display:block;font:600 13.5px/1.25 var(--f-ui);color:#e8e0ff;margin-top:1px}
+.g-raid i{display:none;font-style:normal;font-family:var(--f-px);font-size:40px;line-height:1;color:#fff27a;margin-left:2px;font-variant-numeric:tabular-nums}
+.g-raid.g-raid-big i{display:block;animation:gTick 1s ease-in-out infinite}
+@keyframes gRaid{from{transform:translate(-50%,-14px);opacity:0}to{transform:translateX(-50%);opacity:1}}
+@keyframes gTick{0%{transform:scale(1.25)}30%{transform:scale(1)}100%{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.g-raid,.g-raid.g-raid-big i{animation:none}}
 .g-fr-who{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}
 .g-fr-pick{display:flex;align-items:center;gap:4px;border:2px solid var(--line);border-bottom-width:4px;border-radius:14px;background:var(--field);padding:2px 10px 2px 2px;font:600 15px var(--f-ui);color:var(--ink)}
 .g-fr-pick.on{background:#fff4c2;border-color:var(--sun-edge)}
@@ -2762,6 +3602,10 @@
 .g-zoom svg{width:30px;height:30px;display:block}
 .g-zoom .g-zi-in{display:none}.g-zoom.g-far .g-zi-in{display:inline}
 .g-zoom.g-far{background:#fff4c2;border-color:var(--sun-edge)}
+.g-find{position:absolute;top:122px;right:8px;z-index:3;width:52px;height:52px;border-radius:50%;background:var(--panel);border:2px solid var(--edge);border-bottom-width:5px;display:grid;place-items:center;padding:0;box-shadow:0 3px 0 rgba(60,44,24,.14);-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.g-find:active{transform:translateY(2px);border-bottom-width:3px}
+.g-find canvas{width:32px;height:32px;margin-top:-2px;pointer-events:none}
+.g-find i{position:absolute;right:-5px;bottom:-5px;min-width:20px;height:20px;border-radius:10px;background:var(--sun);border:2px solid var(--sun-edge);color:#4a3210;font:700 12px/16px var(--f-ui);font-style:normal;text-align:center;padding:0 3px}
 .g-a-meadow{background:#e6f6d6}.g-a-beach{background:#fdf1cf}.g-a-moonlit{background:#e6def7}.g-a-candy{background:#fde4f0}
 `;
   function injectCSS() { if (document.getElementById('g-style')) return; const st = document.createElement('style'); st.id = 'g-style'; st.textContent = CSS; document.head.appendChild(st); }
@@ -2774,13 +3618,14 @@
       <canvas class="g-cv" aria-label="The garden. Tap and drag to care for your Sprouts."></canvas>
       <div class="g-top">
         <button class="g-arrow" data-d="-1" type="button">${chev(-1)}</button>
-        <div class="g-pill"><b></b><span></span><div class="g-dots">${AREA_IDS.map(() => '<i></i>').join('')}</div></div>
+        <button class="g-pill" type="button" aria-haspopup="dialog"><b><span class="g-pn"></span><svg class="g-dd" viewBox="0 0 7 4" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path d="M0 0h7v1H6v1H5v1H4v1H3V3H2V2H1V1H0z"/></svg></b><span class="g-ps"></span><span class="g-dots">${AREA_IDS.map(() => '<i></i>').join('')}</span></button>
         <button class="g-arrow" data-d="1" type="button">${chev(1)}</button>
       </div>
       <button class="g-zoom" type="button" aria-label="See the whole garden"><svg viewBox="0 0 16 16" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true">
         <path fill="#cfeefa" d="M4 3h5v1h1v5h-1v1H4V9H3V4h1z"/><path fill="#ffffff" d="M4 4h2v1H4z"/>
         <path d="M4 1h5v2H4zM4 10h5v2H4zM1 4h2v5H1zM10 4h2v5h-2zM2 2h2v2H2zM9 2h2v2H9zM2 9h2v2H2zM9 9h2v2H9zM11 11h2v2h-2zM12 12h2v2h-2zM13 13h2v2h-2z"/>
         <path d="M4 6h5v1H4z"/><path class="g-zi-in" d="M6 4h1v5H6z"/></svg></button>
+      <button class="g-find" type="button" aria-label="Find your Sprout" hidden><canvas class="px" width="32" height="32"></canvas><i hidden></i></button>
       <div class="hint g-hint" style="opacity:0"></div>
       <footer class="panel g-tray">
         <div class="g-row"><div class="g-rl">Pouch<span class="g-pc">0/8</span></div><div class="g-strip g-pouch"></div></div>
@@ -2802,7 +3647,9 @@
     buf = document.createElement('canvas'); bx = buf.getContext('2d');
     skyC = document.createElement('canvas'); skx = skyC.getContext('2d');
     bgC = document.createElement('canvas'); bgx = bgC.getContext('2d');
-    pillName = q('.g-pill b'); pillSub = q('.g-pill span'); dotsEl = q('.g-dots');
+    pillName = q('.g-pn'); pillSub = q('.g-ps'); dotsEl = q('.g-dots');
+    // the garden's name drops down a map of every area (app.js pickMap); tap one to go there
+    q('.g-pill').addEventListener('click', () => { PX.Sound.unlock(); closeCard(); openAreas(q('.g-pill')); });
     trayEl = q('.g-tray'); pouchStrip = q('.g-pouch'); fruitStrip = q('.g-fruit'); pouchCnt = q('.g-pc');
     hintEl = q('.g-hint'); cardEl = q('.g-card'); ghostEl = q('.g-ghost'); gctx = ghostEl.getContext('2d');
     handEl = q('.g-hand'); { const hs = handSprite(), hx = handEl.getContext('2d'); handEl.width = hs.width; handEl.height = hs.height; hx.imageSmoothingEnabled = false; hx.drawImage(hs, 0, 0, hs.width, hs.height); }
@@ -2813,6 +3660,8 @@
     root.querySelectorAll('.g-arrow').forEach(b => b.addEventListener('click', () => { PX.Sound.unlock(); closeCard(); switchArea(+b.dataset.d); }));
     zoomBtn = q('.g-zoom');
     zoomBtn.addEventListener('click', e => { e.stopPropagation(); PX.Sound.unlock(); closeCard(); toggleFar(); });
+    findEl = q('.g-find');
+    findEl.addEventListener('click', e => { e.stopPropagation(); PX.Sound.unlock(); findNext(); });
     cv.addEventListener('pointerdown', onDown);
     cv.addEventListener('wheel', e => {
       if (!visible) return; e.preventDefault();
@@ -2841,7 +3690,7 @@
     });
     PS.on('night', () => { skyKey = ''; for (const c of critters) { const a = D.ANIMALS[c.id]; if (a.time !== 'any' && (a.time === 'night') !== PS.clock.isNight()) c.life = Math.min(c.life, 3); } });
     PS.on('egg:new', () => updatePill());
-    PS.on('reset', () => { RT.clear(); hatchFx.clear(); eggBits = []; critters = []; for (const k in drops) delete drops[k]; for (const k in ground) delete ground[k]; closeCard(); renderTray(); shownOnce = false; });
+    PS.on('reset', () => { if (raid) { raidHold(false); raid = null; raidUI(null); } RT.clear(); hatchFx.clear(); eggBits = []; critters = []; for (const k in drops) delete drops[k]; for (const k in ground) delete ground[k]; closeCard(); renderTray(); shownOnce = false; });
     mounted = true;
     renderTray();
   }
@@ -2851,6 +3700,7 @@
     area = D.AREAS[want] ? want : 'meadow';
     if (PS.S.area !== area) { PS.S.area = area; PS.emit('area', { area }); }
     resize(); lastTrayH = trayEl.offsetHeight;
+    if (raidHere()) { raidHold(true); closeCard(); if (raid.ui) raidUI(...raid.ui); } else if (raidEl) raidEl.hidden = true;
     renderTray(); updatePill();
     if (nextCritter < t) nextCritter = t + 6;
     if (nextDrop < t) nextDrop = t + rand(...D.GROWTH.dropEverySec) * 0.4;
@@ -2862,6 +3712,9 @@
   let shownOnce = false;
   function hide() {
     visible = false;
+    // (a raid waits while you're away; its "no pop-ups" hold is only for the garden, so other screens aren't held up)
+    if (raid) raidHold(false);
+    raidSong = null;
     if (drag) { ghostEl.style.transform = 'translate(-999px,-999px)'; if (drag.el) drag.el.classList.remove('g-lift'); drag = null; }
     if (trayPress) { clearTimeout(trayPress.timer); trayPress = null; }
     touches.clear(); pinch = null; lastClient.on = false; camV.x = camV.y = 0;
@@ -2875,7 +3728,7 @@
     checkSize(); if (!ww) return;
     updateCamera(dt);
     update(dt);
-    guideNow = guide();
+    guideNow = raidHere() ? null : guide(); // (no pointing hand while the gloom is here)
     render(dt);
     syncZoomBtn(false);
     placeTrayHand(guideNow);
@@ -2886,20 +3739,71 @@
       if (hintReset) { hintReset = false; hintUntil = t + 4; }
       const holding = here.some(r => r.state === 'held'), firstEgg = !PS.S.sprouts.length && PS.S.eggs.some(e => e.area === area);
       const lesson = here.length && learning() && !PS.ui.modalOpen;
-      const h = !cardEl.hidden ? '' : holding ? 'Drop in the shallows to swim, in deep water to travel, or on the house to rest' : (firstEgg || lesson || t < hintUntil) ? hintText() : '';
+      const h = raidHere() || !cardEl.hidden ? '' : holding ? 'Drop in the shallows to swim, in deep water to travel, or on the house to rest' : (firstEgg || lesson || t < hintUntil) ? hintText() : '';
       if (hintEl.textContent !== h) hintEl.textContent = h;
       hintEl.style.opacity = h ? 1 : 0;
       if (sel) renderCard();
-      updatePill();
+      updatePill(); syncFind(false);
+      // the raid's own music while the gloom is here (re-asserted: a screen change may have put the garden's back), the Gloom
+      // King's while he's out; afterwards the jingle hands back to the garden track (or it comes back here a little later)
+      if (raidHere() && (raid.phase === 'warn' || raid.phase === 'fight')) {
+        const want = raid.zs.some(z => z.boss && !z.dead) ? 'raid-boss' : 'raid';
+        try { if (raidSong !== want || (PX.Music && PX.Music.current !== want)) { raidSong = want; if (PX.Music) PX.Music.play(want); } } catch (e) { /* audio optional */ }
+      } else if (!raid && musicBackAt && t >= musicBackAt) {
+        musicBackAt = 0; try { const cur = PX.Music && PX.Music.current; if (cur === 'raid' || cur === 'raid-boss') PS.ui.music(); } catch (e) { /* audio optional */ }
+      }
     }
   }
 
+  // fast-forward raids for balancing (__garden.raidSim): the Sprouts out here fight n raids in a loop; nothing is drawn, saved or paid
+  function simRaids(n) {
+    {
+      const mine = outHere(); if (!mine.length) return 'no Sprouts out here';
+      const keep = mine.map(r => [r, r.x, r.y, r.state, r.koUntil, r.emote]), out = { raids: 0, wins: 0, kings: 0, kingWins: 0, secs: 0, kos: 0, gloom: 0 };
+      for (let i = 0; i < (n || 20); i++) {
+        for (const r of mine) { r.koUntil = 0; if (r.state === 'ko') r.state = 'idle'; }
+        if (!startRaid(true)) break;
+        beginFight();
+        for (const u of raid.ps) { const q = lawnPoint(raid.rally.x, raid.rally.y, 18); u.r.x = q.x; u.r.y = q.y; u.r.koUntil = 0; }
+        let T = 0; while (raid.phase === 'fight' && T < 300) { updateRaid(1 / 30); T += 1 / 30; }
+        out.raids++; out.secs += T; out.gloom += raid.zs.length + raid.queue.length; out.kos += raid.ps.filter(u => u.dead).length;
+        if (raid.result === 'win') out.wins++; if (raid.king) { out.kings++; if (raid.result === 'win') out.kingWins++; }
+        for (const u of raid.ps) u.r.inRaid = false;
+        raid = null;
+      }
+      for (const [r, x, y, st, ko, em] of keep) { r.x = x; r.y = y; r.state = st === 'ko' ? 'idle' : st; r.koUntil = ko; r.emote = em; r.inRaid = false; }
+      out.avgSec = +(out.secs / out.raids).toFixed(1); out.avgKO = +(out.kos / out.raids).toFixed(2); out.avgGloom = +(out.gloom / out.raids).toFixed(1); delete out.secs; delete out.kos; delete out.gloom;
+      return out;
+    }
+  }
   PS.scenes = PS.scenes || {};
   PS.scenes.garden = { mount, show, hide, frame };
   // debug hook for testing
   window.__garden = {
     RT, get here() { return here; }, get critters() { return critters; }, drops, ground, Lw, get area() { return area; }, get pxs() { return Z; },
-    get cam() { return { x: camX, y: camY, z: Z, zmin: ZMIN, zmax: ZMAX, ww, wh }; }, zoomAt, animateZoom, focusCamera, dropFruit, groundList, setCam(x, y) { camX = x; camY = y; clampCam(); },
+    get cam() { return { x: camX, y: camY, z: Z, zmin: ZMIN, zmax: ZMAX, zfar: ZFAR, ww, wh }; }, zoomAt, animateZoom, focusCamera, dropFruit, groundList, setCam(x, y) { follow = null; camX = x; camY = y; clampCam(); },
+    findNext, glideTo, get follow() { return follow; },
+    // night raids: raidNow() starts one here (or in an area with Sprouts out), any time of day; raidWin() / raidLose() end it;
+    // raidSim(n) fights n raids in fast-forward with the Sprouts out here (no rewards, nothing saved) and returns the tally
+    get raid() { return raid; },
+    raidNow() {
+      if (raid) return 'a raid is already on';
+      if (!outHere().length) { const a = AREA_IDS.find(x => PS.S.sprouts.some(s => s.area === x && !s.home)); if (!a) return 'no Sprouts outside anywhere'; setArea(a, 1); here = PS.S.sprouts.filter(isOut).map(getRT); }
+      nextRaid = 0; return startRaid(false) ? 'started in ' + area : 'could not start';
+    },
+    raidSoon() { nextRaid = raidClock + 1; return 'the next raid check is in a second (the usual rules still apply)'; },
+    raidWin() { if (!raid) return 'no raid'; if (raid.phase === 'warn') beginFight(); raid.queue.length = 0; for (const z of raid.zs) if (!z.dead) { z.rise = 0; hurtGloom(z, 99999); } return 'win'; },
+    raidLose() {
+      if (!raid) return 'no raid'; if (raid.phase === 'warn') beginFight();
+      while (raid.queue.length) { const z = makeGloom(raid.queue.shift()); z.rise = 0; raid.zs.push(z); }
+      for (const u of raid.ps) if (!u.dead) { u.hp = 0; u.dead = 0.001; knockOut(u); } return 'lose';
+    },
+    raidSim(n, opts) {
+      if (raid) return 'a raid is on';
+      const was = {}; for (const k in opts || {}) if (k in RAID) { was[k] = RAID[k]; RAID[k] = opts[k]; }
+      try { return simRaids(n); } finally { Object.assign(RAID, was); }
+    },
+    pondAt, get layoutInfo() { return { props: Lw.props.length, trees: Lw.trees.length, slots: Lw.slots.length, ponds: Lw.ponds.length, paths: Lw.pathPts.length, landK: Lw.landK }; },
     paintBg() { const t0 = performance.now(); paintLand(); const t1 = performance.now(); paintSky(PS.clock.night()); return [Math.round(t1 - t0), Math.round(performance.now() - t1)]; },
     propHit, funProp, sceneryTap, toggleFar, get fun() { return PS.S.gardenFun; }, get parts() { return parts.length; }, get hatching() { return hatchFx.size; }, shootStar() { shoot.life = 0; nextShoot = t + 0.01; },
     spawnCritter, spawnDrop, setArea, switchArea, eggsHere, tapEgg, treeSlots, feedSprout, giveAnimal, startTravel, askTravel, openCard, closeCard,

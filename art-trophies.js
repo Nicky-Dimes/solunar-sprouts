@@ -5,7 +5,7 @@
 //   pixels per art pixel and carries c.k: draw it with PX.artW / PX.artH or PX.blit). dim: a flat silhouette, for a trophy
 //   not won yet. Unknown ids give null.
 //   Ids: 'l-<league id>' (a gold cup with the league's emblem on a coloured base), 'g-<legend id>' (a gold medal on a ribbon,
-//   one per Legend Challenge), 't-<floor>' (a little Battle Tower statue: bronze, silver, gold or crystal). PX.TROPHY_IDS lists them.
+//   one per Legend Challenge: all 12, the newer six with emblems of their own), 't-<floor>' (a little Battle Tower statue: bronze, silver, gold or crystal). PX.TROPHY_IDS lists them.
 // Nothing is drawn when this file loads (tools/check_game.js runs art files in Node): a trophy is drawn the first time it is
 // asked for, and only those 1x pictures are kept (at most two per id: plain and dim).
 (function () {
@@ -20,6 +20,7 @@
     night: ['#cbdbfc', '#5b6ee1', '#3f3f74'], candy: ['#ffd4f2', '#d77bba', '#a2477a'], sun: ['#ffe2b4', '#df7126', '#8a4a1c'],
     dusk: ['#e6ccff', '#9a6ad0', '#76428a'], sky: ['#ccfcff', '#5fcde4', '#306082'], ember: ['#ffc4ac', '#d95763', '#ac3232'],
     royal: ['#ffd8e4', '#c0406a', '#7a2048'], snow: ['#ffffff', '#cbdbfc', '#8a9cc8'], fern: ['#e2ff96', '#99e550', '#4b692f'],
+    storm: ['#e4ecfc', '#6e7aa0', '#3a4466'], cave: ['#e6ccff', '#7a5ac0', '#4a3478'], lion: ['#fff1bf', '#f6a83a', '#c45c0c'], cosmos: ['#c8c8f8', '#3a3a8a', '#1c1c48'],
   };
   const WOOD = ['#eec39a', '#b47c4a', '#663931'], CREAM = ['#fffdf2', '#f6e8c6', '#ccb28a'], DOOR = '#45283c';
   const METAL = { bronze: ['#ffd2a0', '#d88a4a', '#8f563b'], silver: ['#ffffff', '#c8d0e0', '#8a94ae'], gold: GOLD, crystal: ['#ffffff', '#b8f0ff', '#5fa8e0'] };
@@ -32,6 +33,7 @@
   };
   const LEGEND = {
     yeti: ['snow', 'snow'], griffin: ['wing', 'sky'], dinosaur: ['bone', 'fern'], kraken: ['tentacle', 'dusk'], phoenix: ['feather', 'sun'], dragon: ['flame', 'ember'],
+    golem: ['mossrock', 'leaf'], stormwhale: ['fluke', 'storm'], moonwolf: ['paw', 'night'], crystaltortoise: ['crystals', 'cave'], sunlion: ['sunmane', 'lion'], starserpent: ['firststar', 'cosmos'],
   };
   const TOWER = { 5: 'bronze', 15: 'silver', 30: 'gold', 50: 'crystal' };
 
@@ -64,6 +66,37 @@
     bone(t, P) { stroke(t, [P(-2.2, 2.2), P(2.2, -2.2)], 0.8, 0.8, CREAM[1]); for (const [a, b] of [[-2.9, 1.6], [-1.6, 2.9], [2.9, -1.6], [1.6, -2.9]]) { const [x, y] = P(a, b); t.ell(x, y, 1.05, 1.05, CREAM[1]); } stroke(t, [P(-1.2, 0.6), P(0.6, -1.2)], 0.22, 0.22, '#ffffff'); },
     tentacle(t, P) { stroke(t, [P(-2.6, 3.6), P(-2.4, 0.6), P(-0.8, -1.8), P(1.6, -2.6), P(3, -1.2), P(2.2, 0.4), P(0.8, -0.2)], 1.3, 0.45, R.candy[1]); for (const [a, b] of [[-1.7, 1.2], [-0.4, -0.8], [1.4, -1.6]]) { const [x, y] = P(a, b); t.ell(x, y, 0.5, 0.5, R.candy[0]); } },
     feather(t, P) { const [x, y] = P(0, 0); t.ell(x, y, 4.2, 1.9, '#ff9a3a', -0.9); t.ell(x - 0.3, y + 0.3, 2.6, 1, '#fff27a', -0.9); stroke(t, [P(-3.4, 3.6), P(2.4, -2.6)], 0.22, 0.22, '#d95763'); },
+    mossrock(t, P) { // a round stone with a mossy cap and a little sprout
+      let [x, y] = P(0, 1.4); t.ell(x, y, 4.2, 3.1, R.stone); [x, y] = P(0, -0.8); t.ell(x, y, 3.8, 1.6, R.fern[1]);
+      for (const a of [-2.7, -0.9, 0.9, 2.7]) { [x, y] = P(a, 0.25); t.ell(x, y, 0.85, 0.75, R.fern[1]); }
+      for (const a of [-1.3, 1.3]) { [x, y] = P(a, 2); t.ell(x, y, 0.42, 0.55, INK); }
+      stroke(t, [P(0, -1.6), P(0.2, -3.6)], 0.3, 0.3, R.leaf[2]); [x, y] = P(-1, -3.8); t.ell(x, y, 1.2, 0.6, R.leaf[1], -0.5); [x, y] = P(1.4, -4); t.ell(x, y, 1.3, 0.65, R.leaf[1], 0.5);
+      [x, y] = P(-1.8, -0.8); t.ell(x, y, 0.55, 0.55, '#f7b6c8'); [x, y] = P(1.6, -0.6); t.ell(x, y, 0.5, 0.5, '#f7b6c8');
+    },
+    fluke(t, P) { // a whale's tail rising out of the sea, with a splash
+      let [x, y] = P(0, 3.3); t.ell(x, y, 4.2, 1.1, '#9fd8ff');
+      stroke(t, [P(0, 3), P(0, 0.4), P(0, -0.9)], 0.9, 0.55, R.sea[1]);
+      [x, y] = P(-1.9, -2); t.ell(x, y, 2.5, 1, R.sea[1], 0.64); [x, y] = P(1.9, -2); t.ell(x, y, 2.5, 1, R.sea[1], -0.64);
+      [x, y] = P(-2.2, -2.5); t.ell(x, y, 1.1, 0.4, R.sea[0], 0.64); [x, y] = P(-3.6, 1.8); t.ell(x, y, 0.5, 0.6, '#ffffff'); [x, y] = P(3.5, 1.6); t.ell(x, y, 0.5, 0.6, '#ffffff');
+    },
+    paw(t, P) { // a big wolf paw print under a tiny crescent
+      let [x, y] = P(0, 1.5); t.ell(x, y, 2.4, 2, '#ffffff');
+      for (const [a, b] of [[-2.7, -0.9], [-1, -2.6], [1, -2.6], [2.7, -0.9]]) { [x, y] = P(a, b); t.ell(x, y, 0.95, 1.15, '#ffffff'); }
+      [x, y] = P(0, 1.3); t.ell(x, y, 1.1, 0.8, '#fff27a');
+    },
+    crystals(t, P) { // three crystals: a lit left face on each
+      for (const [a, h, w, c, lt] of [[-2.3, 4.8, 1.25, '#c8aaf0', '#f0e2ff'], [2.3, 4.4, 1.2, '#f7b6c8', '#ffd4f2'], [0, 7, 1.55, '#5ee2f2', '#ccfcff']]) {
+        const pt = (u, v) => P(a + u, 3.2 - v);
+        t.poly([pt(-w, 0), pt(-w, h * 0.62), pt(0, h), pt(w, h * 0.62), pt(w, 0)], c); t.poly([pt(-w, 0), pt(-w, h * 0.62), pt(0, h), pt(-w * 0.2, h * 0.6), pt(-w * 0.25, 0)], lt);
+      }
+    },
+    sunmane(t, P) { // a sun with a lion's mane of rays
+      const [x, y] = P(0, 0); t.poly(PX.starPts(x, y, 4.5, 2.7, 10), '#ff9a3a'); t.ell(x, y, 2.7, 2.7, '#fff27a'); t.ell(x - 0.6, y - 0.7, 1, 0.9, '#fffbd0');
+    },
+    firststar(t, P) { // the First Star: a big four-pointed sparkle with two little ones twinkling beside it
+      let [x, y] = P(0, 0.2); t.poly(PX.starPts(x, y, 4.4, 1.25, 4), '#fff27a'); t.ell(x, y, 1.25, 1.25, '#ffffff');
+      for (const [a, b, r] of [[-3, -2.8, 1.5], [3, 2.9, 1.3]]) { [x, y] = P(a, b); t.poly(PX.starPts(x, y, r, r * 0.38, 4), '#9fd8ff'); }
+    },
     flame(t, P) { const [x, y] = P(0, 1.2); t.ell(x, y, 3, 2.6, '#df7126'); t.poly([P(-2.8, 0.6), P(-0.7, -2.6), P(0.2, -1.3), P(1.1, -4.3), P(2.8, 0.6)], '#df7126'); t.ell(x, y + 0.4, 1.5, 1.5, '#fbf236'); t.poly([P(-1.3, 1), P(0.2, -1.5), P(1.3, 1)], '#fbf236'); },
   };
   const AT = (x, y, s) => (a, b) => [x + a * s, y + b * s];

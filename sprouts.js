@@ -295,6 +295,7 @@
 @keyframes spTurnN{from{transform:perspective(900px) translateX(30px) rotateY(-14deg);opacity:.3}}
 @keyframes spTurnP{from{transform:perspective(900px) translateX(-30px) rotateY(14deg);opacity:.3}}
 .sp-stagebox.rare{background:linear-gradient(#e9dcff 0 58%, #f7c6e0 58% 100%)}
+.sp-stagebox.legend{background:linear-gradient(#fff1bf 0 58%, #f6d27a 58% 100%)}
 .sp-stagebox.look{background:linear-gradient(#fff1c9 0 58%, #e8dcb8 58% 100%)}
 .sp-stagebox .sp-item{margin:0 14px 22px 0}
 .sp-stagebox canvas.sp-hop{animation:spHop .45s ease-out}
@@ -344,6 +345,7 @@
       if (k === 'critter') src = PX.critter(id);
       else if (k === 'egg') src = PX.item('egg', id);
       else if (k === 'flower') src = PX.item('flower', id);
+      else if (k === 'legend') src = legendPic(id, 32);
       else if (k === 'icon') src = PS.ui.icon(id);
       else if (k === 'book') src = bookIcon();
       else if (STYLE_KINDS.includes(k)) src = styleArt(k, id);
@@ -371,6 +373,11 @@
   const NATURE = { sun: 'Sun', moon: 'Moon', wild: 'Wild' };
   const creature = id => D.ANIMALS[id] || D.RARES[id];
   const areaName = a => (D.AREAS[a] || D.AREAS.meadow).name;
+  // the Legend Challenges (battle.js PS.battle.legends(): easiest first, with wins and whether each is open yet)
+  const LEG = () => { try { return (PS.battle && typeof PS.battle.legends === 'function' && PS.battle.legends()) || []; } catch (e) { return []; } };
+  const legendOf = id => LEG().find(L => L.id === id) || null;
+  // a Legend's picture: the newer ones are drawn by art-legends.js at the size asked for, the older ones are rare creatures
+  function legendPic(id, box) { const L = legendOf(id); if (L && L.art === 'legend' && typeof PX.legend === 'function') { const c = PX.legend(id, 'idle', box || 32); if (c) return c; } return PX.critter(id); }
 
   // animated sprites: registered per render, redrawn only when their pose changes
   let anims = [];
@@ -437,23 +444,27 @@
     a.push(...Object.keys(D.ANIMALS).filter(id => !a.includes(id)), ...Object.keys(D.RARES));
     const p = Object.keys(D.COLORS), s = Object.keys(D.PATTERNS).filter(k => k !== 'plain');
     const h = Object.keys(D.HATS).sort((x, y) => (D.HATS[x].slot === 'extra') - (D.HATS[y].slot === 'extra'));
-    return (IDS = { e, a, p, s, h, eggs: e.map(i => 'e:' + i), animals: a.map(i => 'a:' + i), looks: p.map(i => 'p:' + i).concat(s.map(i => 's:' + i), h.map(i => 'h:' + i)) });
+    const g = LEG().map(L => L.id); // Legends (kind 'g'): pages on the Animals tab, after the rare creatures
+    const out = { e, a, p, s, h, g, eggs: e.map(i => 'e:' + i), animals: a.map(i => 'a:' + i).concat(g.map(i => 'g:' + i)), looks: p.map(i => 'p:' + i).concat(s.map(i => 's:' + i), h.map(i => 'h:' + i)) };
+    if (g.length) IDS = out; // (kept once the Battle screen has listed its Legends)
+    return out;
   }
   const validEntry = (k, id) => !!(ids()[k] && ids()[k].includes(id));
-  const tabOf = k => (k === 'e' ? 'eggs' : k === 'a' ? 'animals' : 'looks');
+  const tabOf = k => (k === 'e' ? 'eggs' : k === 'a' || k === 'g' ? 'animals' : 'looks');
   function entryName(k, id) {
     if (k === 'e') return (D.EGGS[id] || {}).name || id;
     if (k === 'a') return (creature(id) || {}).name || id;
+    if (k === 'g') return (legendOf(id) || {}).name || id;
     if (k === 'p') return D.COLORS[id] || id;
     if (k === 's') return D.PATTERNS[id] || id;
     return (D.HATS[id] || {}).name || id;
   }
-  const artKey = (k, id) => (k === 'e' ? 'egg:' : k === 'a' ? 'critter:' : k === 'p' ? 'paint:' : k === 's' ? 'pattern:' : 'hat:') + id;
-  const artScale = (k, id) => (k === 'e' ? 3 : k === 'a' ? (D.RARES[id] ? 2 : 3) : 4);
+  const artKey = (k, id) => (k === 'e' ? 'egg:' : k === 'a' ? 'critter:' : k === 'g' ? 'legend:' : k === 'p' ? 'paint:' : k === 's' ? 'pattern:' : 'hat:') + id;
+  const artScale = (k, id) => (k === 'e' ? 3 : k === 'a' ? (D.RARES[id] ? 2 : 3) : k === 'g' ? 2 : 4);
   // everything this player has found: remembered keys plus what they have right now
   function scan() {
     const S = PS.S || {}, seen = S.seen && typeof S.seen === 'object' ? S.seen : {}, it = S.items && typeof S.items === 'object' ? S.items : {};
-    const f = { e: new Set(), a: new Set(), p: new Set(), s: new Set(), h: new Set() }, now = [];
+    const f = { e: new Set(), a: new Set(), p: new Set(), s: new Set(), h: new Set(), g: new Set() }, now = [];
     for (const k in seen) {
       if (!seen[k]) continue;
       if (k.startsWith('bk:')) { const kind = k.charAt(3); if (f[kind]) f[kind].add(k.slice(5)); }
@@ -472,6 +483,7 @@
       for (const sl of ['hat', 'extra']) if (D.HATS[L[sl]]) add('h', L[sl]);
     }
     for (const id of Array.isArray(S.pouch) ? S.pouch : []) if (creature(id)) add('a', id);
+    for (const L of LEG()) if (L.wins > 0) add('g', L.id); // a Legend's page is found by beating it
     for (const id in (it.paints || {})) if (D.COLORS[id]) add('p', id);
     for (const id in (it.patterns || {})) if (id !== 'plain' && D.PATTERNS[id]) add('s', id);
     for (const id in (it.hats || {})) if (it.hats[id] && D.HATS[id]) add('h', id);
@@ -493,11 +505,12 @@
   function seenOf(k, id, vis) {
     if (k === 'a') { const A = D.ANIMALS[id]; return !A || vis.has(A.area); } // (rares sit in the Shop)
     if (k === 'e') return !D.AREAS[id] || vis.has(id) || (PS.S.eggs || []).some(e => e && e.kind === id);
+    if (k === 'g') { const L = legendOf(id); return !!(L && L.unlocked); } // (a Legend you can already challenge shows its name)
     return true; // paint and stickers are in the Shop, hats in the Gumball machine
   }
   function counts(sc) {
     const I = ids(), f = (sc || scan()).f, n = k => I[k].filter(id => f[k].has(id)).length;
-    const c = { eggs: n('e'), eggsAll: I.e.length, animals: n('a'), animalsAll: I.a.length, paints: n('p'), paintsAll: I.p.length, stickers: n('s'), stickersAll: I.s.length, hats: n('h'), hatsAll: I.h.length };
+    const c = { eggs: n('e'), eggsAll: I.e.length, animals: n('a') + n('g'), animalsAll: I.a.length + I.g.length, paints: n('p'), paintsAll: I.p.length, stickers: n('s'), stickersAll: I.s.length, hats: n('h'), hatsAll: I.h.length };
     c.looks = c.paints + c.stickers + c.hats; c.looksAll = c.paintsAll + c.stickersAll + c.hatsAll;
     c.entries = c.eggs + c.animals + c.looks; c.total = Math.max(1, c.eggsAll + c.animalsAll + c.looksAll);
     c.pct = Math.floor(c.entries / c.total * 100);
@@ -543,6 +556,11 @@
       fairy: 'Fairies leave a trail of sparkles wherever they fly.', unicorn: "A unicorn's horn shines every color of the rainbow.", kitsune: 'A kitsune grows a new tail every hundred years.',
       yeti: 'Yetis are big and fluffy, and they give the best hugs.', griffin: 'A griffin is half eagle and half lion.', dinosaur: 'Some real dinosaurs were as small as a chicken!',
       kraken: 'The Kraken is shy. It hides way down in the deep sea.', phoenix: 'A phoenix is born again from warm, glowing embers.', dragon: 'Dragons keep their treasure warm by sleeping on it.' },
+    g: { golem: 'Birds love to nap in the Golem\'s mossy hands.', yeti: 'The Yeti\'s biggest snowball was as tall as a house!', griffin: 'The Griffin can fly higher than the highest cloud.',
+      dinosaur: 'One swing of its tail can shake the whole jungle!', kraken: 'The Kraken has eight arms, so it can give eight hugs.', phoenix: 'When the Phoenix faints, it rises again from warm embers.',
+      dragon: 'The Dragon breathes fire every third turn. Be ready!', stormwhale: 'The Storm Whale sings so loudly that the thunder sings along.',
+      moonwolf: 'When the Moon Wolf howls, the stars come out to listen.', crystaltortoise: 'Its crystals grew during a thousand years of naps.',
+      sunlion: 'Every morning, the Sun Lion roars the whole world awake.', starserpent: 'The First Star was shining long before the Sun and the Moon!' },
     p: { mint: 'Fresh as a mint leaf.', leaf: 'The green of a happy garden.', sky: 'The blue of a sunny sky.', peach: 'Soft and fuzzy, like a peach.', rose: 'Pink like a rose petal.',
       sun: 'Bright yellow, like sunshine.', berry: 'Juicy red, like a ripe berry.', plum: 'Deep purple, like a plum.', cloud: 'Fluffy white, like a cloud.', slate: 'Cool gray, like a river stone.',
       night: 'Dark blue, like the night sky.', clay: 'Warm orange-brown, like a flower pot.', moss: 'Soft green, like moss on a log.', cocoa: 'Brown, like a mug of cocoa.',
@@ -575,6 +593,7 @@
       if (D.AREAS[id]) return `Win it in races, or get one from gumballs. It hatches in the ${areaName(id)}.`;
       return `${E.price ? `Buy it in the Shop for ${fmt(E.price)} coins.` : 'Win it in a League.'}${gum ? ' Gumballs can have one too!' : ''}`;
     }
+    if (k === 'g') { const L = legendOf(id); return !L ? '' : L.unlocked ? `Beat it in a Legend Challenge: go to Battle, then Legends. Best for Lv ${L.rec}+.` : `${L.lock}.`; }
     if (k === 'p') return 'Buy paint in the Shop, or win it from gumballs.';
     if (k === 's') return 'Buy stickers in the Shop, or win them from gumballs.';
     return id === 'witch' ? 'Win it from the Gumball machine, or hatch a Witch Egg.' : 'Win it from the Gumball machine.';
@@ -584,6 +603,7 @@
   function tileCount(k, id, S) {
     if (k === 'e') return S.sprouts.filter(s => s.kind === id).length;
     if (k === 'a') return S.sprouts.reduce((n, s) => n + (+((s.absorbed || {})[id]) || 0), 0);
+    if (k === 'g') return (legendOf(id) || {}).wins || 0;
     if (k === 'p') return +((S.items.paints || {})[id]) || 0;
     if (k === 's') return +((S.items.patterns || {})[id]) || 0;
     return 0;
@@ -607,7 +627,8 @@
   function animalsHTML(f, vis) {
     const all = ids().animals;
     return D.AREA_ORDER.map(ar => shelf(areaName(ar), 'egg:' + ar, all.filter(k => (D.ANIMALS[k.slice(2)] || {}).area === ar), all, f, vis)).join('')
-      + shelf('Rare creatures', 'critter:fairy', all.filter(k => D.RARES[k.slice(2)]), all, f, vis);
+      + shelf('Rare creatures', 'critter:fairy', all.filter(k => k[0] === 'a' && D.RARES[k.slice(2)]), all, f, vis)
+      + (ids().g.length ? shelf('Legends', 'icon:trophy', all.filter(k => k[0] === 'g'), all, f, vis) : '');
   }
   function looksHTML(f, vis) {
     const all = ids().looks;
@@ -682,6 +703,7 @@
   }
   function mineFor(k, id) {
     const L = s => s.look || {};
+    if (k === 'g') return [];
     const pick = k === 'e' ? s => s.kind === id : k === 'a' ? s => (s.absorbed || {})[id] > 0 : k === 'p' ? s => L(s).body === id && !L(s).skin : k === 's' ? s => L(s).pattern === id : s => L(s).hat === id || L(s).extra === id;
     return PS.S.sprouts.filter(pick);
   }
@@ -692,6 +714,10 @@
       const time = A ? (A.time === 'night' ? ch('<canvas data-sp="icon:moon"></canvas>Night') : A.time === 'day' ? ch('<canvas data-sp="icon:sun"></canvas>Day') : ch('<canvas data-sp="icon:sun"></canvas><canvas data-sp="icon:moon"></canvas>Day and night')) : '';
       const parts = A ? [A.part] : Object.keys(R.parts || {});
       return `<div class="sp-ichips">${elChip(C.el)}${A ? ch(`<canvas data-sp="egg:${A.area}"></canvas>${esc(areaName(A.area))}`) : ch('Rare', 'gold')}${time}${parts.filter(Boolean).map(p => ch('Grows ' + esc(partName(p)))).join('')}</div>`;
+    }
+    if (k === 'g') {
+      const L = legendOf(id); if (!L) return '';
+      return `<div class="sp-ichips">${L.els.map(elChip).join('')}${ch(`Legend \u00b7 Lv ${L.lv}`, 'gold')}${ok ? ch(`Beaten ${L.wins} time${L.wins === 1 ? '' : 's'}`) : ''}${L.egg && D.EGGS[L.egg] ? ch(`<canvas data-sp="egg:${L.egg}"></canvas>First win: ${esc(D.EGGS[L.egg].name)}`) : ''}</div>`;
     }
     if (k === 'e') {
       const E = D.EGGS[id] || {};
@@ -710,16 +736,17 @@
     const b = [];
     if (k === 'a') { const A = D.ANIMALS[id]; if (A) b.push(`<button class="btn go" data-areago="${A.area}"><canvas data-sp="egg:${A.area}"></canvas>Go to the ${esc(areaName(A.area))}</button>`); else b.push('<button class="btn primary" data-shopgo="rare"><canvas data-sp="icon:shop"></canvas>Creatures in the Shop</button>'); }
     else if (k === 'e') { const E = D.EGGS[id] || {}; if (E.price) b.push('<button class="btn primary" data-shopgo="egg"><canvas data-sp="icon:shop"></canvas>Eggs in the Shop</button>'); else if (!ok) b.push('<button class="btn go" data-go-garden><canvas data-sp="icon:garden"></canvas>Go to the Garden</button>'); }
+    else if (k === 'g') { const L = legendOf(id); b.push(`<button class="btn go" data-legendgo="${id}"><canvas data-sp="icon:battle"></canvas>${L && L.unlocked ? 'Challenge it!' : 'See the Legends'}</button>`); }
     else if (k === 'h') b.push('<button class="btn primary" data-gumball-go><canvas data-sp="gumball:6"></canvas>Gumball machine</button>');
     else b.push('<button class="btn primary" data-closet-go><canvas data-sp="icon:shop"></canvas>Buy paint &amp; stickers</button>');
     return `<div class="sp-pbtns">${b.join('')}</div>`;
   }
   function entryHTML(k, id, ok, sn, no) {
     const nm = sn ? entryName(k, id) : '???', A = D.ANIMALS[id];
-    const bg = k === 'a' ? (A ? A.area : 'rare') : k === 'e' ? (D.AREAS[id] ? id : 'rare') : 'look';
-    const showSprout = ok && k !== 'a';
+    const bg = k === 'a' ? (A ? A.area : 'rare') : k === 'e' ? (D.AREAS[id] ? id : 'rare') : k === 'g' ? 'legend' : 'look';
+    const showSprout = ok && k !== 'a' && k !== 'g';
     const hero = `<div class="sp-stagebox ${bg}"><span class="sp-where">#${no}</span>${showSprout ? `<canvas class="sp-item" data-sp="${artKey(k, id)}" data-scale="${k === 'e' ? 3 : 4}"></canvas>` : ''}<canvas data-pghero class="${ok ? '' : sn ? ghost(k, sn) : 'sp-sil deep'}" title="${ok ? 'Tap me!' : ''}"></canvas></div>`;
-    const fact = (FACTS[k] || {})[id] || (k === 'a' ? (creature(id) || {}).blurb : k === 'e' ? (D.EGGS[id] || {}).desc : '') || `${entryName(k, id)} is part of your Sprout Book!`;
+    const fact = (FACTS[k] || {})[id] || (k === 'a' ? (creature(id) || {}).blurb : k === 'e' ? (D.EGGS[id] || {}).desc : k === 'g' ? (legendOf(id) || {}).blurb : '') || `${entryName(k, id)} is part of your Sprout Book!`;
     const mine = ok ? mineFor(k, id) : [];
     const mineT = k === 'a' ? 'Bonded with' : k === 'e' ? 'Hatched from it' : k === 'h' ? 'Wearing it' : 'Your Sprouts with it';
     return `<section class="panel sp-paper ${turn > 0 ? 'turn-n' : turn < 0 ? 'turn-p' : ''}">${hero}
@@ -730,7 +757,8 @@
         ${sn ? pageBtnsHTML(k, id, ok) : ''}
       </section>
       ${mine.length ? `<section class="panel sp-sec"><h2>${mineT} <span class="sp-aside">${mine.length}</span></h2><div class="sp-minelist">${mine.slice(0, 12).map(s => `<button class="sp-mine" data-open="${s.id}"><canvas data-mini="${s.id}"></canvas><b>${esc(s.name)}</b></button>`).join('')}</div></section>` : ''}
-      ${ok && k !== 'a' ? `<p class="sp-muted" style="text-align:center">${k === 'e' ? 'Tap the Sprout to say hi!' : `Tap ${state.active() ? esc(state.active().name) : 'the Sprout'} to see it wiggle!`}</p>` : ''}`;
+      ${ok && k === 'g' ? '<p class="sp-muted" style="text-align:center">Tap the Legend to hear it roar!</p>' : ''}
+      ${ok && k !== 'a' && k !== 'g' ? `<p class="sp-muted" style="text-align:center">${k === 'e' ? 'Tap the Sprout to say hi!' : `Tap ${state.active() ? esc(state.active().name) : 'the Sprout'} to see it wiggle!`}</p>` : ''}`;
   }
   function pageHTML() {
     const list = ids()[tabOf(pg.kind)], key = pg.kind + ':' + pg.id, i = list.indexOf(key), sc = scan();
@@ -756,7 +784,8 @@
     const hero = root.querySelector('[data-pghero]'); if (!hero) return;
     const k = pg.kind, id = pg.id, ok = scan().f[k].has(id);
     try {
-      if (ok && k !== 'a') { pgHero = animSprite(hero, previewLook(k, id), 4, { phase: 0 }); return; }
+      if (ok && k !== 'a' && k !== 'g') { pgHero = animSprite(hero, previewLook(k, id), 4, { phase: 0 }); return; }
+      if (k === 'g') { const src = legendPic(id, 40); put(hero, src, PX.artW(src) > 30 ? 4 : 5); return; }
       if (k === 'a') {
         const n = ok && PX.critterFrames ? PX.critterFrames(id) || 1 : 1, src = PX.critter(id, 0), sc = PX.artW(src) > 20 ? 4 : 5;
         put(hero, src, sc); critHero = { cv: hero, id, n, f: 0, sc };
@@ -776,6 +805,13 @@
       PX.Sound.play('coo'); return;
     }
     hero.classList.remove('sp-hop'); void hero.offsetWidth; hero.classList.add('sp-hop');
+    if (pg.kind === 'g') { // a found Legend roars: its charging picture for a moment
+      const id = pg.id, L = legendOf(id);
+      if (L && L.art === 'legend' && typeof PX.legend === 'function') {
+        try { const c = PX.legend(id, 'charge', 40); if (c) { put(hero, c, 4); clearTimeout(heroTap.t); heroTap.t = setTimeout(() => { if (hero.isConnected && pg.id === id) try { put(hero, legendPic(id, 40), 4); } catch (e) { /* stays */ } }, 1100); } } catch (e) { /* the hop is enough */ }
+      }
+      PX.Sound.play('thud'); return;
+    }
     PX.Sound.play(pg.kind === 'a' ? 'coo' : 'pop');
   }
   // the book's own little icon (a green book with a leaf and a sun), made once
@@ -1136,6 +1172,7 @@
     if ((b = q('[data-pg]'))) { flip(+b.dataset.pg); return; }
     if (q('[data-pghero]')) { heroTap(); return; }
     if ((b = q('[data-shopgo]'))) { PX.Sound.play('pop'); PS.ui.go('shop', { tab: b.dataset.shopgo }); return; }
+    if ((b = q('[data-legendgo]'))) { PX.Sound.play('pop'); if (PS.battle && typeof PS.battle.openLegend === 'function') PS.battle.openLegend(b.dataset.legendgo); else PS.ui.go('battle'); return; }
     if ((b = q('[data-areago]'))) {
       const a = b.dataset.areago; PX.Sound.play('pop');
       if (D.AREAS[a] && PS.S.area !== a) { PS.S.area = a; PS.emit('area', { area: a }); PS.save(); }

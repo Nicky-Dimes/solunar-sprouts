@@ -19,7 +19,14 @@
   // Legend Challenges. Stats are those of a balanced Sprout of total level `lv`, scaled by hpK / atkK / defK / spdK.
   // Every boss follows the same readable rhythm: `calm` normal turns, then it CHARGES (big warning), then it unleashes
   // its giant attack. Using a Guard / Heal / Boost move (or a snack) on the giant-attack turn blocks most of it.
+  // Listed easiest first (the Legends tab, the trophy case and nextChallenge() go in this order). art: 'legend' = the picture
+  // comes from art-legends.js (PX.legend, built at the size it is shown); the others are rare creatures (PX.critter).
+  // unlock: { league } and / or { boss } (all must be done). A first win pays B.egg if set, else the creature joins you (rares).
   const BOSSES = [
+    { id: 'golem', name: 'Golem', title: 'the Mossy Guardian', area: 'grove', art: 'legend', unlock: { league: 'pebble' }, lv: 14, hpK: 1.4, atkK: 1.2, defK: 1, spdK: 0.7, smart: 0.55,
+      els: ['leaf', 'stone'], moves: ['mosspunch', 'pebbletoss', 'mosscoat'], calm: 2, sup: { move: 'boulderbloom', mult: 1.35, name: 'Mossy Boulder' },
+      charge: 'The Golem lifts a GIANT mossy boulder!', warn: 'Mossy boulder coming!', coins: 90, xp: 16, rec: 18, egg: 'blossom',
+      blurb: 'A gentle giant made of stone and moss. Flowers grow on its back, and birds nap in its hands.' },
     { id: 'yeti', name: 'Yeti', title: 'the Snow Giant', area: 'snow', unlock: { league: 'thorn' }, lv: 27, hpK: 1.65, atkK: 1.28, defK: 1, spdK: 0.75, smart: 0.7,
       els: ['water', 'stone'], moves: ['frostbite', 'snowball', 'curl'], calm: 2, sup: { move: 'avalanche', mult: 1.35, name: 'Giant Snowball' },
       charge: 'The Yeti is rolling a GIANT snowball!', warn: 'Giant snowball coming!', coins: 140, xp: 20, rec: 35,
@@ -44,6 +51,26 @@
       els: ['fire', 'sky'], moves: ['ember', 'dragonscale', 'flamewing'], calm: 1, sup: { move: 'dragonbreath', mult: 1.25, name: 'Dragon Fire' },
       charge: 'The Dragon takes a DEEP breath!', warn: 'Dragon Fire coming!', coins: 1200, xp: 80, rec: 120, egg: 'dragon',
       blurb: 'The rarest of them all. It breathes fire every third turn, so be ready!' },
+    { id: 'stormwhale', name: 'Storm Whale', title: 'the Cloud Singer', area: 'stormsky', art: 'legend', unlock: { league: 'mythic' }, lv: 138, hpK: 1.3, atkK: 1.55, defK: 1, spdK: 0.85, smart: 0.85,
+      els: ['water', 'sky'], moves: ['cloudsplash', 'thunderclap', 'whalesong'], calm: 2, sup: { move: 'stormsplash', mult: 1.3, name: 'Storm Splash' },
+      charge: 'The Storm Whale dives deep into the thunder clouds...', warn: 'Storm Splash coming!', coins: 1500, xp: 85, rec: 150, egg: 'rainbow',
+      blurb: 'A whale so big it swims through the clouds. When it sings, the thunder sings along!' },
+    { id: 'moonwolf', name: 'Moon Wolf', title: 'the Silver Howl', area: 'moonhill', art: 'legend', unlock: { league: 'starfall' }, lv: 172, hpK: 1.25, atkK: 1.35, defK: 1, spdK: 1.05, smart: 0.88,
+      els: ['shadow', 'light'], moves: ['moonclaw', 'lunarbeam', 'silverhowl'], calm: 2, sup: { move: 'moonpounce', mult: 1.3, name: 'Moon Pounce' },
+      charge: 'The Moon Wolf howls at the full moon! Its fur glows silver!', warn: 'Moon Pounce coming!', coins: 1800, xp: 90, rec: 185, egg: 'eclipse',
+      blurb: 'A silver wolf as big as a hill. When it howls at the full moon, the stars come out to listen.' },
+    { id: 'crystaltortoise', name: 'Crystal Tortoise', title: 'the Ancient Shell', area: 'crystalcave', art: 'legend', unlock: { league: 'titan' }, lv: 210, hpK: 1.6, atkK: 1.55, defK: 1.05, spdK: 0.7, smart: 0.9,
+      els: ['stone', 'water'], moves: ['crystalshard', 'shellspin', 'crystalguard'], calm: 2, sup: { move: 'crystalquake', mult: 1.3, name: 'Crystal Quake' },
+      charge: 'The Crystal Tortoise stomps! Crystals glow under the ground!', warn: 'Crystal Quake coming!', coins: 2100, xp: 95, rec: 222, egg: 'crystal',
+      blurb: 'Older than the oldest tree. Its shell grew sparkly crystals over a thousand years of naps.' },
+    { id: 'sunlion', name: 'Sun Lion', title: 'King of the Sun', area: 'savanna', art: 'legend', unlock: { league: 'champion' }, lv: 236, hpK: 1.3, atkK: 1.35, defK: 1, spdK: 1.05, smart: 0.92,
+      els: ['light', 'fire'], moves: ['sunpounce', 'goldenmane', 'sunbathe'], calm: 2, sup: { move: 'solarroar', mult: 1.25, name: 'Solar Roar' },
+      charge: "The Sun Lion's mane glows like a second sun!", warn: 'Solar Roar coming!', coins: 2500, xp: 100, rec: 248, egg: 'golden',
+      blurb: 'Its golden mane shines like the sun at noon. Every morning, its roar wakes the whole world up!' },
+    { id: 'starserpent', name: 'Star Serpent', title: 'the First Star', area: 'starsky', art: 'legend', unlock: { boss: 'sunlion' }, lv: 255, hpK: 1.3, atkK: 1.4, defK: 1.05, spdK: 1, smart: 0.95,
+      els: ['sky', 'light'], moves: ['starshower', 'cometdive', 'starglow'], calm: 1, sup: { move: 'firstlight', mult: 1.2, name: 'First Light' },
+      charge: 'The Star Serpent curls up and glows brighter... and BRIGHTER!', warn: 'First Light coming!', coins: 3000, xp: 110, rec: 250, egg: 'starry',
+      blurb: 'The very first star in the sky, curled up as a great serpent. It shone long before the Sun and the Moon. Its light comes every third turn!' },
   ];
   const BOSS = Object.fromEntries(BOSSES.map(b => [b.id, b]));
   // Battle Tower: floor f has an opponent of total level lv(f). HP carries over, +heal between floors.
@@ -575,15 +602,13 @@
   const bossRec = id => Object.assign({ wins: 0, tries: 0, best: null }, extra().bosses[id]);
   function bossUnlocked(B) {
     const u = B.unlock || {};
-    if (u.league) return ST.leagueProgress(u.league).cleared;
-    if (u.boss) return bossRec(u.boss).wins > 0;
-    return true;
+    return (!u.league || !!ST.leagueProgress(u.league).cleared) && (!u.boss || bossRec(u.boss).wins > 0);
   }
   function unlockText(B) {
-    const u = B.unlock || {};
-    if (u.league) return `Clear the ${(D.LEAGUES.find(l => l.id === u.league) || {}).name || 'league'} to unlock`;
-    if (u.boss) return `Beat the ${BOSS[u.boss].name} to unlock`;
-    return '';
+    const u = B.unlock || {}, bits = [];
+    if (u.league) bits.push(`Clear the ${(D.LEAGUES.find(l => l.id === u.league) || {}).name || 'league'}`);
+    if (u.boss && BOSS[u.boss]) bits.push(`${bits.length ? 'beat' : 'Beat'} the ${BOSS[u.boss].name}`);
+    return bits.length ? bits.join(' and ') + ' to unlock' : '';
   }
   const towerUnlocked = () => ST.leagueProgress(TOWER.unlock).cleared;
   const today = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
@@ -829,6 +854,12 @@
 .b-leg.locked{filter:grayscale(.85) brightness(.8)}
 .b-leg.locked canvas.big{filter:brightness(0) opacity(.55)}
 .b-leg .lk{font-family:var(--f-ui);font-weight:700;font-size:14px;line-height:1.2;margin-top:5px;background:rgba(34,32,52,.55);border-radius:8px;padding:3px 6px}
+.b-leg.next{box-shadow:0 0 0 3px #fbf236,0 0 0 5px rgba(34,32,52,.35)}
+.b-leg .nx{position:absolute;top:6px;left:6px;font-family:var(--f-ui);font-weight:700;font-size:13px;line-height:17px;border-radius:7px;padding:0 6px;background:#fbf236;color:#4a3210;border:1px solid var(--px-ink);z-index:1}
+@media (min-width:600px){.b-legs{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:1000px){.b-legs{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (prefers-reduced-motion:no-preference){.b-leg.next canvas.big{animation:bNext 1.6s ease-in-out infinite}}
+@keyframes bNext{50%{transform:translateY(-3px)}}
 .b-tw{display:grid;grid-template-columns:84px 1fr;gap:12px;align-items:start}
 .b-tw canvas.art{width:84px;height:132px}
 .b-tw h2{font-family:var(--f-px);font-weight:700;font-size:22px;margin:0;color:var(--ink)}
@@ -1285,7 +1316,10 @@
   }
   // a rare critter centred on its feet in a square canvas (so it scales by whole pixels)
   const boxCache = {};
+  // a Legend drawn by art-legends.js (BOSSES art: 'legend'): PX.legend draws it at the size it is shown, never enlarged
+  const legendArt = id => !!(BOSS[id] && BOSS[id].art === 'legend' && typeof PX.legend === 'function');
   function critterBox(id, box) {
+    if (legendArt(id)) { const c = safe(() => PX.legend(id, 'idle', box), null); if (c) return c; }
     const key = id + box; if (boxCache[key]) return boxCache[key];
     const c = safe(() => PX.critter(id), null); if (!c) return null;
     const k = c.k || 1, w = PX.artW(c), h = PX.artH(c), o = document.createElement('canvas'); o.width = box * k; o.height = box * k; // (box in art pixels)
@@ -1344,7 +1378,8 @@
     if (hubTab === 'wild') bindWild(); else if (hubTab === 'legends') bindLegends(); else if (hubTab === 'tower') bindTower(); else if (hubTab === 'friends') bindFriends(); else bindLeagues();
     hubEl.querySelectorAll('.b-tslot,.b-caseall').forEach(b => b.onclick = () => { sfx('pop'); trophyCase(b.dataset.tid); });
     const nx = hubEl.querySelector('.b-next');
-    if (nx) {
+    if (nx && nx.dataset.boss) { const B = BOSS[nx.dataset.boss]; nx.querySelector('.b-nextgo').onclick = () => { sfx('pop'); if (B) previewBoss(B); }; }
+    else if (nx) {
       const L = D.LEAGUES[+nx.dataset.li], i = +nx.dataset.i;
       safe(() => PS.ui.drawSproutTo(nx.querySelector('.b-nfoe'), ST.lookOf(leagueNPC(L.id, i)), { eyes: 'brave', mouth: 'grin' }));
       nx.querySelector('.b-nextgo').onclick = () => { sfx('pop'); preview(L, i); };
@@ -1393,10 +1428,20 @@
         <div class="b-next-t"><b>${esc(npc.name)}</b><small>${esc(nx.L.name)} · ${nx.i + 1} of 3</small>${o ? `<span class="b-ow ${o.c}">${o.word}</span>` : ''}</div>
         <button class="btn go b-nextgo" type="button">Battle!</button></div></section>`;
   }
+  function nextLegendHtml(B) {
+    const s = partner(), o = s ? safe(() => oddsOf(matchup(s, { kind: 'boss', id: B.id }).win), null) : null;
+    return `<section class="panel b-next" data-boss="${B.id}"><div class="b-next-h">Next challenge</div>
+      <div class="b-next-b"><canvas class="px b-nfoe" data-critter="${B.id}"></canvas>
+        <div class="b-next-t"><b>The ${esc(B.name)}</b><small>Legend · Lv ${B.lv}</small>${o ? `<span class="b-ow ${o.c}">${o.word}</span>` : ''}</div>
+        <button class="btn go b-nextgo" type="button">Battle!</button></div></section>`;
+  }
   function leaguesHtml() {
     const done = D.LEAGUES.filter(L => ST.leagueProgress(L.id).cleared).length, last = D.LEAGUES[D.LEAGUES.length - 1];
     let h = trophyCaseHtml();
-    if (ST.leagueProgress(last.id).cleared) h += `<div class="b-champ"><canvas class="px" data-icon="crown"></canvas><div><b>Grand Champion!</b><small>You cleared all ${D.LEAGUES.length} leagues. Rematch anyone to keep training!</small></div></div>`;
+    if (ST.leagueProgress(last.id).cleared) {
+      h += `<div class="b-champ"><canvas class="px" data-icon="crown"></canvas><div><b>Grand Champion!</b><small>You cleared all ${D.LEAGUES.length} leagues. Rematch anyone to keep training!</small></div></div>`;
+      const B = BOSSES.find(x => bossUnlocked(x) && !bossRec(x.id).wins); if (B) h += nextLegendHtml(B); // (the late game: a Legend to chase)
+    }
     else { const nx = nextOf(D.LEAGUES); if (nx) h += nextCardHtml(nx); }
 
     D.LEAGUES.forEach((L, li) => {
@@ -1554,16 +1599,18 @@
   }
 
   // ---------------- Legends hub ----------------
-  const THEME_CARD = { snow: ['#9fc4e8', '#5a78b0'], peak: ['#639bff', '#3f55b8'], jungle: ['#f5a86a', '#4f7a2a'], abyss: ['#34406e', '#141a30'], sunfire: ['#f6b04a', '#c8401e'], volcano: ['#a8321e', '#2a0f1e'] };
+  const THEME_CARD = { snow: ['#9fc4e8', '#5a78b0'], peak: ['#639bff', '#3f55b8'], jungle: ['#f5a86a', '#4f7a2a'], abyss: ['#34406e', '#141a30'], sunfire: ['#f6b04a', '#c8401e'], volcano: ['#a8321e', '#2a0f1e'],
+    grove: ['#8fcf5a', '#2f6a3a'], stormsky: ['#7a8cb0', '#2c3450'], moonhill: ['#5e66c4', '#12123a'], crystalcave: ['#8c6cc4', '#1e1a3a'], savanna: ['#f6c83a', '#c45c0c'], starsky: ['#4a4aa0', '#0a0a22'] };
   function legendsHtml() {
+    const nx = BOSSES.find(B => bossUnlocked(B) && !bossRec(B.id).wins); // the one to chase next (they are listed easiest first)
     const cards = BOSSES.map(B => {
       const open = bossUnlocked(B), r = bossRec(B.id), [c1, c2] = THEME_CARD[B.area] || ['#8c93a8', '#595a70'];
       const prize = B.egg ? `<canvas class="px" data-egg="${B.egg}" style="width:12px;height:14px"></canvas>` : '<canvas class="px" data-icon="crown"></canvas>';
       const status = !open ? `<div class="lk">${unlockText(B)}</div>`
         : r.wins ? `<span class="st win"><canvas class="px" data-icon="tick"></canvas>Beaten${r.wins > 1 ? ' ×' + r.wins : ''}</span>`
           : `<span class="st new">Win: ${prize}${B.egg ? 'Egg!' : 'Joins you!'}</span>`;
-      return `<button class="b-leg ${open ? '' : 'locked'}" type="button" data-boss="${B.id}" style="--c1:${c1};--c2:${c2}" ${open ? '' : 'aria-disabled="true"'}>
-        <canvas class="px big" data-critter="${B.id}"></canvas><b>${B.name}</b><span class="t">${B.title}</span>
+      return `<button class="b-leg ${open ? '' : 'locked'}${B === nx ? ' next' : ''}" type="button" data-boss="${B.id}" style="--c1:${c1};--c2:${c2}" ${open ? '' : 'aria-disabled="true"'}>
+        ${B === nx ? '<span class="nx">Next!</span>' : ''}<canvas class="px big" data-critter="${B.id}"></canvas><b>${B.name}</b><span class="t">${B.title}</span>
         ${open ? `<span class="t">Best for Lv ${B.rec}+</span>` : ''}${status}</button>`;
     }).join('');
     return `<p class="b-intro"><b>Legend Challenges:</b> giant creatures with huge HP. When a Legend <b>charges up</b>, use a Guard, Heal or Boost move to block its giant attack!</p><div class="b-legs">${cards}</div>`;
@@ -1815,6 +1862,7 @@
     for (let i = 0; i < 4; i++) V.clouds.push({ x: Math.random() * 140 - 20, y: 2 + Math.random() * 16, k: i % 3, v: 1.5 + Math.random() * 2 });
     fightEl.classList.toggle('boss', !!V.boss);
     resize(); bgKey = -1;
+    if (V.boss && legendArt(V.boss.id)) safe(() => { for (const fr of PX.LEGEND_FRAMES || ['idle']) PX.legend(V.boss.id, fr, legendBox()); });
     makeCrowd();
     renderPlates(true); renderMoves(); setInfo(null); renderSnack();
     runBtn.textContent = V.mode === 'friend' ? 'End battle' : 'Give up'; runBtn.classList.remove('armed'); runBtn.hidden = false;
@@ -1896,6 +1944,7 @@
     return side === 'o' ? { x: Math.round(WW * 0.71), y: Math.round(clamp(WH * 0.53, HY() + 16, WH - 50)) } : { x: Math.round(WW * 0.29), y: Math.round(WH - Math.max(10, WH * 0.1)) };
   }
   const critScale = () => (V && V.boss ? bossScale() : V && V.wild ? WILD.steps[V.wild.step].scale : 1);
+  const legendBox = () => 26 * bossScale(); // (the same size as a rare creature's 26-pixel picture shown bossScale times bigger)
   const fighterH = side => (side === 'o' && V && V.boss ? Math.round(22 * bossScale()) : side === 'o' && V && V.wild ? Math.round(15 * critScale()) : 24);
   const topOf = side => { const s = spot(side); return { x: s.x, y: s.y - Math.round(fighterH(side) * 0.62) }; };
 
@@ -1930,11 +1979,24 @@
     if (warn && warnEl.hidden) { warnEl.innerHTML = `<b>${esc(V.boss.warn)}</b><span>Pick a move with a yellow BLOCK tag${V.b.p.snack && !V.b.p.snack.used ? ', or eat your snack' : ''}!</span>`; }
     warnEl.hidden = !warn;
     snackBtn.style.bottom = plateEls.p.offsetHeight + 22 + 'px'; // always just above the player's plate
-    if (V.boss) { // keep Give up and the warning just under the boss plate, whatever its height
+    if (V.boss) { // keep Give up just under the boss plate, whatever its height; the warning goes where it hides no one
       const pb = plateEls.o.offsetTop + plateEls.o.offsetHeight;
-      if (pb > 20) { runBtn.style.top = pb + 6 + 'px'; warnEl.style.top = pb + 44 + 'px'; }
-    } else { runBtn.style.top = ''; warnEl.style.top = ''; }
+      if (pb > 20) { runBtn.style.top = pb + 6 + 'px'; placeWarn(pb); }
+    } else { runBtn.style.top = ''; warnEl.style.cssText = ''; }
     updateBars();
+  }
+  // The giant-attack warning never hides the Legend's charging face: on wide screens it sits in the free space to the left of the
+  // Legend (above your Sprout), on narrow phones it covers the Legend's name plate for that one turn (the plate comes back next turn).
+  function placeWarn(pb) {
+    const st = warnEl.style; st.cssText = ''; st.top = pb + 44 + 'px';
+    if (warnEl.hidden || !cssW) return;
+    const S = bossScale(), sp = spot('o'), pTop = (spot('p').y - 26) * WPX, free = (sp.x - 13 * S) * WPX - 24;
+    if (free >= 300) {
+      st.left = '12px'; st.right = 'auto'; st.width = Math.min(free, 460) + 'px'; st.top = pb + 10 + 'px';
+      if (pb + 10 + warnEl.offsetHeight <= pTop - 4) return; // (fits above your Sprout)
+      st.cssText = ''; st.top = pb + 44 + 'px';
+    }
+    if ((sp.y - 26 * S) * WPX < pb + 44 + warnEl.offsetHeight) { st.top = plateEls.o.offsetTop + 'px'; st.zIndex = '2'; } // (narrow: over the plate)
   }
   function updateBars() { // runs every frame: only touches the DOM when the shown HP really changes
     for (const side of SIDES) {
@@ -2726,6 +2788,11 @@
     if (k === 'rain' && r() < dt * 40) add({ x: r() * (WW + 30), y: -4, vx: -22, vy: 110 + r() * 30, life: 3, c: '#9fb8e8', w: 1 / (PX.SCENE_K || 1), h: 3, rain: true });
     if (k === 'wind' && r() < dt * 2.5) add({ x: -12, y: r() * WH * 0.8, vx: 60 + r() * 30, vy: 0, life: 4, c: '#ffffff', w: 6 + Math.floor(r() * 6), h: 1 / (PX.SCENE_K || 1), alpha: 0.6 });
     if (k === 'leaves' && r() < dt * 1.2) add({ x: WW + 4, y: r() * WH * 0.6, vx: -(10 + r() * 8), vy: 6 + r() * 5, sway: r() * 6, life: 14, c: r() < 0.5 ? '#6abe30' : '#99e550', w: 2, h: 1 });
+    if (k === 'glints' && r() < dt * 3) add({ x: r() * WW, y: r() * WH * 0.85, vx: 0, vy: -1.5, life: 2.4, c: ['#ccfcff', '#f0e2ff', '#f7b6c8', '#ffffff'][Math.floor(r() * 4)], w: 1, h: 1, blink: true });
+    if (k === 'starfall') {
+      if (r() < dt * 2) add({ x: r() * (WW + 10), y: -2, vx: -3, vy: 5 + r() * 4, life: 30, c: r() < 0.5 ? '#fff6b0' : '#ffffff', w: 1, h: 1, blink: true });
+      if (r() < dt * 0.2) add({ x: WW * (0.4 + r() * 0.7), y: r() * HY() * 0.6, vx: -70, vy: 24, life: 0.9, c: '#ffffff', w: 3, h: 1 / (PX.SCENE_K || 1), alpha: 0.8 }); // a shooting star
+    }
     if (k === 'dust' && r() < dt * 1) add({ x: r() * WW, y: HY() + r() * 20, vx: 3, vy: -2, life: 5, c: '#fff6c8', w: 1, h: 1, blink: true });
     for (const p of V.amb) {
       p.life -= dt; p.x += (p.vx + (p.sway ? Math.sin(V.t * 2 + p.sway) * 6 : 0)) * dt; p.y += p.vy * dt;
@@ -2773,6 +2840,13 @@
     abyss: { sky: ['#141a30', '#1c2440', '#26305a', '#34406e'], far: 'stormsea', sea: ['#2e4a8a', '#223a70', '#8ab0e8'], gr: ['#5a6680', '#4e5a74', '#445066', '#2a3044'], pad: ['#7a88a4', '#5a6680', '#2a3044'], dots: ['#6e8ac8', '#9fb8e8'], props: [['rock', 0.06, 0], ['rock', 0.95, 1]], fixed: true, ground: 'rock', amb: 'rain', lightning: true, darkClouds: true, theme: 'night' },
     volcano: { sky: ['#1a0a18', '#3a1024', '#6a1a2a', '#a8321e'], far: 'volcano', cone: ['#4a2a3a', '#2e1a2a', '#1e1020'], lava: ['#fbf236', '#ff9a3a', '#df5a26'], gr: ['#4a3a4a', '#3e3040', '#342838', '#1e1624'], pad: ['#6a5260', '#4a3a4a', '#221828'], dots: ['#df5a26', '#ff9a3a'], props: [['rock', 0.05, 0], ['rock', 0.97, 1]], fixed: true, ground: 'basalt', amb: 'embers', theme: 'night' },
     sunfire: { sky: ['#c8401e', '#e0622a', '#f08a3a', '#f8b85a'], far: 'volcano', cone: ['#8a4a3a', '#6a3428', '#4a2018'], lava: ['#fbf236', '#ff9a3a', '#df5a26'], gr: ['#e8a870', '#d8945c', '#c47e4a', '#8a4a2a'], pad: ['#f6d2ad', '#e0a672', '#a8653a'], dots: ['#fbf236', '#8a4a2a'], props: [['rock', 0.05, 0], ['rock', 0.97, 1]], fixed: true, ground: 'redrock', amb: 'embers', sun: 'big' },
+    // the six newer Legends' arenas
+    grove: { sky: ['#9ccf8c', '#b0dc9c', '#c6e8b0', '#dcf2c8'], far: 'forest', trunk: ['#a07a54', '#7a5a40', '#4e3828'], canopy: ['#5cb43a', '#3e8948', '#21523a'], gr: ['#8fcf5a', '#7ec04c', '#6eb040', '#3e8948'], pad: ['#c8ec92', '#8fbf5a', '#4b692f'], dots: ['#f7b6c8', '#fbf236', '#ffffff'], props: [['bigtree', -6, 2], ['mushrooms', 0.47, 0], ['fern', 1.02, 1]], fixed: true, ground: 'moss', amb: 'leaves' },
+    stormsky: { sky: ['#2c3450', '#3a4466', '#4a567c', '#5e6c94'], far: 'cloudbank', bank: ['#6e7aa0', '#55618a', '#8a96b8'], gr: ['#7e8aac', '#7884a6', '#7280a0', '#4a5478'], pad: ['#c4cce0', '#9aa6c4', '#5e6a8e'], dots: ['#cbdbfc'], wisp: ['#8c98b8', '#a8b4d0', '#d4dcee'], fixed: true, ground: 'cloudsea', amb: 'rain', lightning: true, darkClouds: true, theme: 'night' },
+    moonhill: { sky: ['#12123a', '#1a1a4c', '#24245e', '#30306e'], far: 'hills', hillF: ['#3a4478', '#2c3466'], hillN: ['#2e5a78', '#244862'], bigmoon: true, stars: true, gr: ['#5e86a8', '#53799c', '#486c90', '#2c4466'], pad: ['#b0cce6', '#6e90b4', '#2c4466'], dots: ['#c9a2f0', '#fff27a', '#ffffff'], fixed: true, theme: 'night', ground: 'silver', amb: 'fireflies' },
+    crystalcave: { sky: ['#1a1636', '#221c46', '#2c2456', '#382e66'], far: 'crystals', gr: ['#4e4670', '#463e66', '#3e365c', '#26203e'], pad: ['#9a8ac0', '#5e5288', '#2c2448'], dots: ['#5ee2f2', '#c8aaf0', '#f7b6c8'], props: [['crystal', 0.06, 0], ['crystal', 1.02, 1]], fixed: true, theme: 'night', ground: 'crystal', amb: 'glints' },
+    savanna: { sky: ['#5aaee8', '#7cc0ee', '#a6d6f2', '#e6e2b8'], far: 'savanna', hillF: ['#e0c682', '#d2b46a'], hillN: ['#d8b25e', '#c49a48'], gr: ['#ecd078', '#e2c26a', '#d6b25a', '#a8823a'], pad: ['#f6e2a4', '#dcbc6a', '#a8823a'], dots: ['#df7126', '#ffffff', '#f6c83a'], clouds: true, fixed: true, ground: 'dry', amb: 'dust', sun: 'big' },
+    starsky: { sky: ['#0a0a22', '#121034', '#1a1848', '#24205c'], far: 'aurora', stars: 'many', gr: ['#26265e', '#232358', '#202052', '#141438'], pad: ['#8a96f0', '#4a4aa0', '#1c1c48'], dots: ['#fff27a', '#ffffff', '#9fd8ff'], puff: ['#2e2e6a', '#4e4ea8'], wisp: ['#2a2a62', '#3a3a7e', '#6a6ab8'], fixed: true, theme: 'night', ground: 'cloudsea', amb: 'starfall' },
     tower: { sky: ['#2c2c66', '#3a4aa8', '#5b6ee1', '#8a9ce8'], far: 'walls', wall: ['#c8d0dc', '#9aa4b8', '#6e7690', '#4a4e64'], gr: ['#d8c8a8', '#ccb898', '#c0aa88', '#8a7a5e'], pad: ['#f4e9cc', '#d8c8a8', '#8a7a5e'], dots: ['#8a7a5e'], stars: true, fixed: true, ground: 'tiles', amb: 'dust', crowd: 'mix', torches: true },
   };
   const NIGHT_SKY = ['#10102a', '#171740', '#1f1d4a', '#2c2c66'];
@@ -2845,9 +2919,14 @@
     // stars & moon / sun (fine-pixel discs)
     if (T.stars || night > 0.35) {
       const sa = T.stars ? 1 : clamp((night - 0.35) / 0.4, 0, 1);
-      for (let i = 0; i < 40; i++) { const h = hash(i * 7 + 3); if (h % 3 && sa < 0.7) continue; const s = (h >>> 11) % 3 ? FP : 1; px(g, h % WW, (h >>> 8) % Math.max(1, hy - 6), s, s, (h >>> 3) % 4 ? '#cbdbfc' : '#ffffff'); }
+      for (let i = 0, nS = T.stars === 'many' ? 110 : 40; i < nS; i++) { const h = hash(i * 7 + 3); if (h % 3 && sa < 0.7) continue; const s = (h >>> 11) % 3 ? FP : 1; px(g, h % WW, (h >>> 8) % Math.max(1, hy - 6), s, s, (h >>> 3) % 4 ? '#cbdbfc' : '#ffffff'); }
     }
-    if (T.moon || (night > 0.5 && !T.fixed)) { const mx = Math.round(WW * 0.5), my = Math.round(hy * 0.32); discF(g, mx, my, 4.1, '#fff6c8'); discF(g, mx + 2, my - 1, 3.0, sky(0)); px(g, mx - 3, my, FP, FP * 2, '#ffffff'); }
+    if (T.bigmoon) { // a huge full moon rising behind the hills, with a soft halo and pale craters
+      const mx = Math.round(WW * 0.62), r = Math.max(9, Math.min(17, Math.round(hy * 0.42))), my = Math.round(hy - r * 0.45);
+      discF(g, mx, my, r + 3, mix(sky(3), '#fff6c8', 0.2)); discF(g, mx, my, r + 1, mix(sky(3), '#fff6c8', 0.45)); discF(g, mx, my, r, '#fff6c8'); discF(g, mx - 1, my - 1, r - 2, '#fffcd0');
+      for (const [dx, dy, cr] of [[-0.35, -0.2, 0.22], [0.28, 0.3, 0.16], [0.42, -0.35, 0.12], [-0.12, 0.48, 0.1]]) discF(g, mx + Math.round(dx * r), my + Math.round(dy * r), Math.max(0.6, cr * r), '#f0e4a8');
+    }
+    else if (T.moon || (night > 0.5 && !T.fixed)) { const mx = Math.round(WW * 0.5), my = Math.round(hy * 0.32); discF(g, mx, my, 4.1, '#fff6c8'); discF(g, mx + 2, my - 1, 3.0, sky(0)); px(g, mx - 3, my, FP, FP * 2, '#ffffff'); }
     else if (T.sun === 'big') { const sx = Math.round(WW * 0.3), sy = Math.round(hy * 0.55); discF(g, sx, sy, 11, mix(T.sky[3], '#ffffff', 0.25)); discF(g, sx, sy, 8, '#fff27a'); discF(g, sx, sy, 7, mix('#fff27a', '#fffcd0', 0.5)); discF(g, sx - 2, sy - 2, 4, '#fffcd0'); }
     else if (T.sun === 'pale') { const sx = Math.round(WW * 0.16), sy = Math.round(hy * 0.28); discF(g, sx, sy, 4, '#fffcd0'); discF(g, sx, sy, 2, '#ffffff'); }
     else if ((T.sun || !T.fixed) && !T.moon && night < 0.5 && V.area !== 'candy' && T.far !== 'walls') { const sx = Math.round(WW * 0.14), sy = Math.round(hy * 0.3); discF(g, sx, sy, 3.2, '#fbe36a'); discF(g, sx, sy, 2.2, '#fff27a'); px(g, sx - 1, sy - 1, FP, FP, '#ffffff'); }
@@ -2877,6 +2956,75 @@
         volcanoCone(g, hy, { cone: ['#b07a70', '#96645c', '#7a5048'], lava: ['#fbf236', '#ff9a3a', '#df5a26'] }, Math.round(WW * 0.72), Math.min(Math.round(hy * 0.5), 30), true);
         const jh = x => 7 + 3 * Math.abs(Math.sin(x * 0.19)) + 2 * Math.sin(x * 0.05 + 1);
         for (let x = 0; x < WW; x += FP) { const top = fround(hy - jh(x)); px(g, x, top, FP, hy - top, x % 9 < 4 ? '#3f8a4a' : '#2f6a3a'); px(g, x, top, FP, FP, INK); if (hash(Math.floor(x * KS) * 3) % 9 === 0) px(g, x, top + FP, FP, FP, '#6abe30'); }
+        break;
+      }
+      case 'forest': { // an old forest: soft sunbeams, two rows of tall trunks (fine lit and shaded edges), a leafy roof, mossy stones
+        const Tr = T.trunk, Cn = T.canopy;
+        g.globalAlpha = 0.3;
+        for (const [x0, w] of [[0.16, 6], [0.44, 4], [0.7, 8]]) for (let y = 0; y < hy; y += FP) px(g, fround(WW * x0 + y * 0.42), y, w, FP, '#fffcd0');
+        g.globalAlpha = 1;
+        for (let layer = 0; layer < 2; layer++) {
+          const n = layer ? 5 : 8, cB = layer ? Tr[1] : mix(Tr[1], T.sky[2], 0.55), cL = layer ? Tr[0] : mix(Tr[0], T.sky[3], 0.5), cD = layer ? Tr[2] : mix(Tr[2], T.sky[2], 0.5);
+          for (let i = 0; i < n; i++) {
+            const h = hash(i * 17 + layer * 101 + 5), w = (layer ? 3 : 2) + (h >>> 5) % 2, x = Math.round(((i + (layer ? 0.15 : 0.6)) / n) * WW + ((h % 7) - 3));
+            px(g, x, 0, w, hy, cB); px(g, x, 0, FP, hy, cL); px(g, x + w - FP, 0, FP, hy, cD);
+            px(g, x - 1, hy - 2, w + 2, 2, cB); px(g, x - 1, hy - 2, FP, 2, cL); px(g, x + w + 1 - FP, hy - 2, FP, 2, cD); // the roots flare out
+            if (layer) for (let y = 5 + (h % 6); y < hy - 5; y += 8) px(g, x + FP * 2, y, w - FP * 4, FP, cD); // fine bark rings
+          }
+        }
+        for (let x = -6; x < WW + 6; x += 6) { const h = hash(x * 7 + 3), y = 1 + (h % 4), r = 6 + (h >>> 4) % 3; discF(g, x, y, r, Cn[2]); discF(g, x - FP * 2, y - 1, r - 1, Cn[1]); discF(g, x - 1, y - 2, Math.max(1, r - 4), Cn[0]); }
+        for (const [fx, w, h] of [[0.06, 4, 8], [0.9, 5, 10]]) { // mossy standing stones on the horizon
+          const x = Math.round(WW * fx), y0 = hy + 1 - h;
+          discF(g, x + w / 2 - 0.5, y0 + 1.5, w / 2, '#8c93a8'); px(g, x, y0 + 2, w, h - 2, '#8c93a8'); px(g, x, y0 + 2, FP, h - 2, '#b7c2cc'); px(g, x + w - FP, y0 + 2, FP, h - 2, '#595a70');
+          discF(g, x + w / 2 - 0.5, y0 + 0.5, w / 2 - 0.5, '#6abe30'); px(g, x - FP, y0 + 2, FP, h - 2, INK); px(g, x + w, y0 + 2, FP, h - 2, INK);
+        }
+        break;
+      }
+      case 'cloudbank': { // storm clouds piled up on the horizon, lit from above (the far row first)
+        const B = T.bank;
+        for (let row = 1; row >= 0; row--) for (let x = -8 + row * 5; x < WW + 10; x += 11) {
+          const h = hash(x * 13 + row * 7 + 2), r = 6 + (h % 5) + row * 2, y = hy - 5 - row * 7 - (h >>> 6) % 5;
+          discF(g, x, y + 1, r, mix(B[1], T.sky[3], row * 0.35)); discF(g, x - 1, y - 1, r - 1, mix(B[0], T.sky[3], row * 0.35)); discF(g, x - 2, y - 2, Math.max(1, r - 4), mix(B[2], T.sky[3], row * 0.35));
+        }
+        px(g, 0, hy - 3, WW, 3, B[1]);
+        break;
+      }
+      case 'crystals': { // a cave: stalactites from the roof, a dark back wall and glowing crystal clusters along the floor
+        const rock = ['#4e4478', '#3a3260', '#2a2448'], CC = [['#ccfcff', '#5ee2f2', '#2896b8'], ['#f0e2ff', '#c8aaf0', '#8c6cc4'], ['#f7b6c8', '#e07ba0', '#a2477a']];
+        px(g, 0, 0, WW, 2, rock[1]);
+        for (let x = -2; x < WW + 2; x += 5) { const h = hash(x * 11 + 5), len = 4 + h % 9, w = 1.5 + (h >>> 4) % 2; for (let y = 0; y < len; y += FP) { const ww = fround(w * (1 - y / len)); if (ww <= 0) break; px(g, x + w - ww, y + 2, ww * 2, FP, rock[1]); px(g, x + w - ww, y + 2, FP, FP, rock[0]); } }
+        for (let x = -4; x < WW + 4; x += 8) { const h = hash(x * 5 + 1); discF(g, x, hy - 3 - h % 4, 6 + (h >>> 3) % 3, rock[2]); }
+        const cry = (x, base, w, hh, C, lean) => { // a pointed prism: a lit left half, a shaded right half, fine ink sides
+          for (let y = 0; y < hh; y += FP) {
+            const t = y / hh, ww = fround(Math.max(FP, w * Math.min(1, t * 1.7))), cx = fround(x + lean * (1 - t)), yy = base - hh + y;
+            px(g, cx - ww, yy, ww, FP, C[0]); px(g, cx, yy, ww, FP, C[1]); px(g, cx + ww - FP, yy, FP, FP, C[2]); px(g, cx - ww - FP, yy, FP, FP, INK); px(g, cx + ww, yy, FP, FP, INK);
+          }
+          px(g, fround(x + lean) - FP, base - hh - FP, FP * 2, FP, INK);
+        };
+        for (let i = 0; i < 9; i++) { const h = hash(i * 29 + 3), x = Math.round((i + 0.3) / 9 * WW + (h % 7) - 3); cry(x, hy, 1.5 + (h >>> 3) % 2, 6 + (h >>> 5) % 9, CC[i % 3], ((h >>> 9) % 5 - 2) * 0.8); if (h % 2) cry(x + 3, hy, 1, 4 + (h >>> 7) % 4, CC[(i + 1) % 3], 1); }
+        break;
+      }
+      case 'savanna': { // flat golden hills, flat-topped trees and a big warm rock
+        const h1 = x => 5 + 2 * Math.sin(x * 0.05) + 1.2 * Math.sin(x * 0.17 + 1), h2 = x => 2 + 1.2 * Math.sin(x * 0.09 + 0.4);
+        for (let x = 0; x < WW; x += FP) { const t1 = fround(hy - h1(x)), t2 = fround(hy - h2(x)); px(g, x, t1, FP, hy - t1, T.hillF[1]); px(g, x, t1, FP, FP, T.hillF[0]); px(g, x, t2, FP, hy - t2, T.hillN[1]); px(g, x, t2, FP, FP, T.hillN[0]); }
+        const tree = (x, base, ht, w) => {
+          for (let y = 0; y < ht; y += FP) px(g, fround(x + Math.sin(y * 0.35) * 0.5), base - y, 1, FP, '#6a4a2a');
+          for (let y = 0; y < 2.6; y += FP) { const ww = fround(w * (y < 1 ? 0.75 + y * 0.25 : 1)); px(g, x + 0.5 - ww, base - ht - 2.6 + y, ww * 2, FP, y < FP * 2 ? '#7a9a3a' : '#4e6a2a'); px(g, x + 0.5 - ww - FP, base - ht - 2.6 + y, FP, FP, INK); px(g, x + 0.5 + ww, base - ht - 2.6 + y, FP, FP, INK); }
+          px(g, x + 0.5 - w * 0.75, base - ht - 2.6 - FP, w * 1.5, FP, INK); px(g, x + 0.5 - w, base - ht, w * 2, FP, INK);
+        };
+        tree(Math.round(WW * 0.12), hy - 3, 7, 5); tree(Math.round(WW * 0.4), hy - 2, 5, 3.5); tree(Math.round(WW * 0.93), hy - 4, 6, 4.5);
+        const rx = Math.round(WW * 0.74), rw = 13, rh = 7; // the big rock
+        for (let y = 0; y < rh; y += FP) { const ww = fround(rw * Math.min(1, 0.55 + y / rh)), x0 = rx - ww * 0.4; px(g, x0, hy - rh + y, ww, FP, y < 1 ? '#f0c888' : '#d8a060'); px(g, x0 + ww - 2, hy - rh + y, 2, FP, '#a8743e'); px(g, x0 - FP, hy - rh + y, FP, FP, INK); px(g, x0 + ww, hy - rh + y, FP, FP, INK); }
+        px(g, rx - rw * 0.22, hy - rh - FP, rw * 0.55, FP, INK);
+        break;
+      }
+      case 'aurora': { // the top of the night sky: soft ribbons of light, and the Sun and the Moon far away on either side
+        g.globalAlpha = 0.24;
+        for (const [base, amp, c, ph] of [[0.3, 4, '#5ee2f2', 0], [0.46, 5, '#c8aaf0', 2], [0.2, 3, '#a6f2d3', 4]]) for (let x = 0; x < WW; x += FP) { const y = fround(hy * base + Math.sin(x * 0.06 + ph) * amp + Math.sin(x * 0.17 + ph) * 1.5), hh = fround(4 + 3 * Math.sin(x * 0.04 + ph * 2)); px(g, x, y, FP, hh, c); }
+        g.globalAlpha = 1;
+        { const sx = Math.round(WW * 0.1), sy = Math.round(hy * 0.66); discF(g, sx, sy, 2.6, '#fbe36a'); discF(g, sx, sy, 1.8, '#fff27a'); px(g, sx - 1, sy - 1, FP, FP, '#ffffff'); }
+        { const mx = Math.round(WW * 0.9), my = Math.round(hy * 0.55); discF(g, mx, my, 2.6, '#fff6c8'); discF(g, mx + 1.3, my - 0.8, 2.1, sky(1)); }
+        for (let x = -4; x < WW + 4; x += 7) { const h = hash(x + 41); discF(g, x, hy - 1 - h % 3, 4 + (h >>> 4) % 3, T.puff[1]); discF(g, x - 1, hy - 2 - h % 3, 2 + (h >>> 4) % 3, mix(T.puff[1], '#ffffff', 0.2)); }
         break;
       }
       case 'walls': {
@@ -2949,13 +3097,28 @@
         case 'cloud': if (v === 2) px(g, x, y, 4, FP, '#c8d8f4'); break;
         case 'rock': if (v === 0) { const w = 3 + (h >>> 12) % 4; px(g, x - w, y, w * 2, 2, '#6e8ac8'); px(g, x - w + FP, y, 2, FP, '#9fb8e8'); px(g, x - w, y + 2 - FP, w * 2, FP, '#2a3044'); } else if (v < 3) px(g, x, y, 2, FP, '#2a3044'); break;
         case 'basalt': if (v < 2) { let cx = x, cy = y; for (let j = 0; j < 7; j++) { px(g, cx, cy, FP * 2, FP, j % 3 ? T.lava[2] : T.lava[1]); px(g, cx, cy + FP, FP * 2, FP, j % 3 ? T.lava[2] : T.lava[1]); cx += ((hash(h + j) % 3) - 1) * FP * 2; cy += (j % 2); } } else if (v === 2) px(g, x, y, 2, FP, '#221828'); break;
+        case 'moss': if (v < 3) { discF(g, x, y, 0.4 + ((h >>> 13) % 2) * 0.4, G(T.gr[0])); px(g, x - 1, y + 1, 2, FP, G(T.gr[3])); } else if (v === 3) { px(g, x, y, 1, 1, G(T.dots[(h >>> 11) % T.dots.length])); px(g, x, y, FP, FP, '#ffffff'); } else if (v === 4) { px(g, x, y, 2, FP, G('#c48a5c')); px(g, x + FP, y - FP, FP, FP, G('#8f563b')); } break;
+        case 'silver': if (v < 3) { const c = G(T.gr[3]); px(g, x + FP, y - 1, FP, 1 + FP, c); px(g, x - FP, y - 1 + FP, FP, 1, c); px(g, x + 3 * FP, y - 1 + FP, FP, 1, c); px(g, x + FP, y - 1, FP, FP, G('#b0cce6')); } else if (v === 3) { px(g, x, y, 1, 1, T.dots[(h >>> 11) % T.dots.length]); px(g, x, y, FP, FP, '#ffffff'); } break;
+        case 'crystal': if (v < 2) { const c = T.dots[(h >>> 11) % T.dots.length]; px(g, x, y - 2, FP * 2, 2, c); px(g, x, y - 2, FP, 2, mix(c, '#ffffff', 0.5)); px(g, x - FP, y - 1, FP, 1, INK); px(g, x + FP * 2, y - 1.5, FP, 1.5, INK); px(g, x, y - 2 - FP, FP * 2, FP, INK); } else if (v === 2) { px(g, x, y, 2, FP, G('#26203e')); } break;
+        case 'dry': if (v < 3) { const c = G(T.gr[3]); px(g, x, y - 2, FP, 2 + FP, c); px(g, x + FP * 2, y - 1.5, FP, 1.5 + FP, c); px(g, x - FP * 2, y - 1, FP, 1 + FP, c); px(g, x, y - 2, FP, FP, G('#f6e2a4')); } else if (v === 3) { px(g, x, y, 2, 1, G('#c49a48')); px(g, x, y, 2, FP, G('#e0c682')); } break;
         case 'redrock': if (v < 2) { for (let j = 0; j < 5; j += FP) px(g, x + j, y + fround(Math.sin(j * 1.6) * 0.5) + FP, FP, FP, '#8a4a2a'); } else if (v === 2) { px(g, x, y, 2, 2, '#f6d2ad'); px(g, x, y + 2 - FP, 2, FP, '#e0a672'); } break;
       }
     }
     if (T.ground === 'cloud') { // rows of puffy cloud tops, bigger nearer the front
       for (let row = 0, y = hy + 5; y < WH + 6; row++, y += 7 + row * 3) {
         const r = 3 + row, step = r * 2 + 3;
-        for (let x = (row % 2) * Math.round(step / 2) - r; x < WW + r; x += step) { discF(g, x + 1, y + 1, r, '#c8d8f4'); discF(g, x, y, r, '#ffffff'); discF(g, x - 1, y - Math.ceil(r / 2), Math.max(1, r - 2), '#ffffff'); }
+        const pf = T.puff || ['#c8d8f4', '#ffffff'], pl = T.puff ? mix(pf[1], '#ffffff', 0.25) : '#ffffff'; // (storm and night skies have their own cloud colours)
+        for (let x = (row % 2) * Math.round(step / 2) - r; x < WW + r; x += step) { discF(g, x + 1, y + 1, r, pf[0]); discF(g, x, y, r, pf[1]); discF(g, x - 1, y - Math.ceil(r / 2), Math.max(1, r - 2), pl); }
+      }
+    }
+    if (T.ground === 'cloudsea') { // a calm sea of clouds: long flat wisps (bigger nearer the front), lit along their tops
+      const Wc = T.wisp;
+      for (let row = 0, y = hy + 5; y < WH + 4; row++, y += 6 + row * 3) {
+        const len = 9 + row * 5, step = Math.round(len * 1.8);
+        for (let x = (row % 2) * Math.round(step / 2) - len; x < WW + len; x += step) {
+          const h = hash(x * 7 + row * 31 + 3), yy = y + (h % 3) - 1, L = len * (0.75 + ((h >>> 4) % 5) * 0.08);
+          for (let i = 0; i < L; i += FP) { const th = fround(0.6 + (1 + row * 0.35) * Math.sin(Math.PI * i / L)); px(g, x + i, yy - th, FP, th + FP, Wc[1]); px(g, x + i, yy - th, FP, FP, Wc[2]); px(g, x + i, yy + FP, FP, FP, Wc[0]); }
+        }
       }
     }
     if (T.ground === 'tiles') { // perspective tile lines, one fine pixel wide
@@ -3061,7 +3224,13 @@
     if (A.hide) return; // (not sent out yet)
     let spr, ax, ay, flip;
     const pf = crit && !boss && D.ANIMALS[f.critter] && D.ANIMALS[f.critter].kind === 'plant' && !A.fainting ? [0, 1, 0, 1, 0, 2][Math.floor(V.t * 3) % 6] : 0; // living plants sway and blink
-    if (crit) { spr = safe(() => bigCritter(f.critter, critScale(), pf), null); if (!spr) return; ax = Math.floor(PX.artW(spr) / 2); ay = PX.artH(spr); flip = true; }
+    let lf = '';
+    if (boss && legendArt(f.critter)) { // a Legend's own frames: charging, lunging, blinking (or fainting with its eyes shut), idle
+      lf = V.disp.o.charging && live() && !A.fainting ? 'charge' : A.lunge > 0 ? 'attack' : A.fainting || A.blinkAt - V.t < 0.13 ? 'blink' : 'idle';
+      const lb = legendBox(); if (A.lbox !== lb) { A.lbox = lb; A.lmemo = {}; } // (this battle's frames, kept while it lasts: nothing made per frame)
+      spr = A.lmemo[lf] || (A.lmemo[lf] = safe(() => PX.legend(f.critter, lf, lb), null));
+    }
+    if (crit) { if (!spr) spr = safe(() => bigCritter(f.critter, critScale(), pf), null); if (!spr) return; ax = Math.floor(PX.artW(spr) / 2); ay = PX.artH(spr); flip = true; }
     else { if (!f.look) return; spr = sprigFor(side); if (!spr) return; ax = PX.SPRIG_AX || 16; ay = PX.artH(spr) - 1; flip = side === 'p'; }
     let x = sp.x, y = sp.y;
     const bob = V.phase !== 'end' && !A.fainting && Math.floor(V.t * (boss ? 1.3 : 2) + (side === 'o' ? 1 : 0)) % 2 ? -1 : 0;
@@ -3085,7 +3254,7 @@
     lx.globalAlpha = alpha;
     // glowing aura while a boss charges its giant attack
     if (boss && V.disp.o.charging && !A.fainting && live()) {
-      const au = auraOf(spr, '#fbf236', 'a' + f.critter + bossScale()), au2 = auraOf(spr, '#df5a26', 'b' + f.critter + bossScale());
+      const au = auraOf(spr, '#fbf236', 'a' + f.critter + bossScale() + lf), au2 = auraOf(spr, '#df5a26', 'b' + f.critter + bossScale() + lf);
       PX.blit(lx, Math.floor(V.t * 8) % 2 ? au : au2, x, y + 3, flip, ax + 3, ay + 3);
     }
     PX.blit(lx, spr, x, y, flip, ax, ay);
@@ -3247,7 +3416,12 @@
     if (!(hubEl && !hubEl.hidden && fightEl.hidden)) safe(() => PS.ui.go('battle'));
     setTimeout(() => { if (!V && !wipeBusy && hubEl && !hubEl.hidden) { renderHub(); safe(fn); } }, 0);
   }
-  PS.battle = Object.assign(PS.battle || {}, { trophies: () => safe(trophyList, []), nextChallenge: () => safe(nextChallenge, null) });
+  // legends(): every Legend Challenge, easiest first: { id, name, title, els, lv, rec, blurb, egg, art: 'legend' | 'critter', unlocked,
+  // wins, tries, lock (how to unlock it) }. openLegend(id): the Battle screen on the Legends tab, with that Legend's card if it is open.
+  const legendList = () => BOSSES.map(B => { const r = bossRec(B.id); return { id: B.id, name: B.name, title: B.title, els: B.els.slice(), lv: B.lv, rec: B.rec, blurb: B.blurb, egg: B.egg || null,
+    art: B.art === 'legend' ? 'legend' : 'critter', unlocked: bossUnlocked(B), wins: r.wins, tries: r.tries, lock: unlockText(B) }; });
+  const openLegend = id => { const B = BOSS[id]; openChallenge('legends', () => { if (B && bossUnlocked(B)) previewBoss(B); }); };
+  PS.battle = Object.assign(PS.battle || {}, { trophies: () => safe(trophyList, []), nextChallenge: () => safe(nextChallenge, null), legends: () => safe(legendList, []), openLegend: id => safe(() => openLegend(id)) });
   PS.scenes.battle = { mount, show, hide, frame };
   Object.assign(window.__battle, { trophies: trophyList, nextChallenge, kitShow, start: startBattle, startWild, startBoss, startTowerFloor, towerBegin, towerEnd, startFriend, renderHub, forfeit, extra, choose,
     tab: t => { hubTab = t; renderHub(); } });

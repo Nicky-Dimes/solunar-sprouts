@@ -229,6 +229,7 @@
   // ---------------- navigation ----------------
   function go(name, params) {
     const sc = PS.scenes[name];
+    closeDrop(true); // (the garden's area drop-down belongs to the screen it was opened on)
     if (current && PS.scenes[current] && PS.scenes[current].hide) PS.scenes[current].hide();
     document.querySelectorAll('.screen').forEach(el => { el.hidden = el.dataset.screen !== name; });
     document.querySelectorAll('#nav button').forEach(b => { if (b.dataset.go === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
@@ -434,7 +435,8 @@
   function devPanel() {
     const T = PS.S.totals || {}, mins = Math.round((T.playSec || 0) / 60), n = v => Number(v || 0).toLocaleString();
     const played = mins >= 60 ? `${Math.floor(mins / 60)} h ${mins % 60} min` : `${mins} min`;
-    const stats = `<p class="bk-ver" style="margin-top:0"><b>Play stats</b> (this player, kept on this device): played ${played} since this was added · ${n(T.races)} races (${n(T.raceWins)} won) · ${n(T.battles)} battles (${n(T.battleWins)} won) · ${n(T.coinsEarned)} coins earned · ${n(T.gumballs)} gumballs · ${n(PS.S.sprouts.length)} Sprouts</p>`;
+    const RD = PS.S.raids || {}, raids = (RD.wins | 0) + (RD.losses | 0) ? ` · ${n(RD.wins)} of ${n((RD.wins | 0) + (RD.losses | 0))} night raids won` : '';
+    const stats = `<p class="bk-ver" style="margin-top:0"><b>Play stats</b> (this player, kept on this device): played ${played} since this was added · ${n(T.races)} races (${n(T.raceWins)} won) · ${n(T.battles)} battles (${n(T.battleWins)} won)${raids} · ${n(T.coinsEarned)} coins earned · ${n(T.gumballs)} gumballs · ${n(PS.S.sprouts.length)} Sprouts</p>`;
     parentGate(() => modal({
       eyebrow: 'Parent tools', title: 'Testing shortcuts', html: stats + '<p>Shortcuts for testing the whole game quickly. They skip the normal grind, so keep them away from the kids.</p><div class="dev-grid"></div>',
       buttons: [{ label: 'Close' }],
@@ -445,6 +447,12 @@
         add('+10,000 coins', () => state.addCoins(10000, 'dev'));
         add('Partner +300 XP', () => { const s = state.active(); if (s) state.gain(s, Object.fromEntries(D.STATS.map(k => [k, 300]))); else toast('Hatch a Sprout first'); });
         add('Toggle day/night', () => PS.clock.toggle());
+        // night raids (garden.js): one now, any time of day, in the garden; and the grown-up switch (PS.S.raidsOff)
+        add('Night raid now', () => { close(); go('garden'); setTimeout(() => { const r = window.__garden && window.__garden.raidNow ? window.__garden.raidNow() : ''; if (/^no |could not/.test(r)) toast('A raid needs a Sprout playing outside in the garden.', 3000); }, 450); });
+        add(`Night raids: ${PS.S.raidsOff ? 'OFF' : 'ON'} (tap to turn ${PS.S.raidsOff ? 'on' : 'off'})`, () => {
+          PS.S.raidsOff = !PS.S.raidsOff; PS.save(); close();
+          toast(PS.S.raidsOff ? 'The gloom won\'t come to the garden any more.' : 'The gloom may come to the garden at night again.', 3200);
+        });
         add('Get a Meadow egg', () => state.addEgg('meadow', 'Parent tools'));
         add('Get a Golden egg', () => state.addEgg('golden', 'Parent tools'));
         add('Get a surprise shop egg', () => { const k = PS.util.pick(D.SHOP_EGGS.filter(id => D.EGGS[id])); state.addEgg(k, 'Parent tools'); });
@@ -1129,5 +1137,111 @@
     b.setAttribute('aria-label', on ? 'Music is on. Tap to turn it off' : 'Music is off. Tap to turn it on');
   }
 
-  PS.ui = { reportError, boot, go, toast, modal, celebrate, wipe, music, setMusic, musicOn, fx: { countUp, coinsFly, banner }, closeModal, pickSprout, pickMoves, chrome, hold, refresh, devPanel, playersPanel: () => PS.ui.mainMenu(), backupPanel, parentGate, icon, paint, drawSproutTo, fitCanvas, freezeCoins, setMuted, isMuted: () => !!PX.Sound.muted, get current() { return current; }, get modalOpen() { return !!open || queue.length > 0; } };
+  // ---------------- garden areas: the drop-down map (tap the garden's name) ----------------
+  // mapPreview(area) -> a little postcard of a garden area: 150 x 84 art px at k = 2 (the game's own fine pixels, so it matches
+  // the garden): its sky by the game clock, far hills, lawn, shore and water, its rest house, its tree and one of its props, drawn
+  // at their real size. Colours come from the garden's themes (PS.gardenThemes, garden.js). Made per call; nothing is kept.
+  // pickMap(mapId, area, { anchor, onPick }) -> the drop-down under the garden's name: every area as a postcard with who lives
+  // there (Sprout faces, an egg when one is waiting). Tap one to go there (onPick(areaId)); tap outside, the X or the name again
+  // to close. (Solunar has no map skins, so mapId is ignored; the signature is PVZ Garden's.)
+  const PV_PROPS = { meadow: ['flowerbed', 'bush'], beach: ['umbrella', 'sandcastle'], moonlit: ['lantern', 'crystal'], candy: ['candycane', 'cupcake'] };
+  const PV_HOME = { meadow: 'shroomhouse', beach: 'beachhut', moonlit: 'crystalcave', candy: 'gingerhouse' };
+  const PV_TREE = { meadow: 'tree', beach: 'palm', moonlit: 'glowtree', candy: 'lollitree' };
+  const hexMix = (a, b, k) => { const p = h => [1, 3, 5].map(i => parseInt(String(h).slice(i, i + 2), 16) || 0), A = p(a), B = p(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
+  function mapPreview(id) {
+    const W = 150, H = 84, K = 2, FP = 1 / K, c = document.createElement('canvas'); c.width = W * K; c.height = H * K; c.k = K;
+    const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.setTransform(K, 0, 0, K, 0, 0);
+    const th = (PS.gardenThemes && PS.gardenThemes[id]) || {}, A = D.AREAS[id] || D.AREAS.meadow, theme = A.theme || 'day';
+    const R = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+    // a round disc in fine rows (no blurry edge: the same fine pixels as the sprites)
+    const disc = (cx, cy, r, col) => { g.fillStyle = col; for (let fy = Math.floor((cy - r) * K); fy < Math.ceil((cy + r) * K); fy++) { const dy = (fy + 0.5) / K - cy, hw = Math.sqrt(Math.max(0, r * r - dy * dy)); const a = Math.round((cx - hw) * K), b = Math.round((cx + hw) * K); if (b > a) g.fillRect(a / K, fy / K, (b - a) / K, FP); } };
+    let n = 0; try { n = PS.clock.night(); } catch (e) { n = 0; }
+    const sky = (th.sky || ['#6cc3f2', '#86cff5', '#a4dcf8', '#c4e9fb']).map((col, i) => hexMix(col, (th.skyN || [])[i] || col, n));
+    // the sky: 7 soft bands from its 4 colours (a fine row of the in-between colour where two meet)
+    for (let i = 0; i < 7; i++) { const k = i / 6 * 3, a = Math.floor(k), col = hexMix(sky[a], sky[Math.min(3, a + 1)], k - a), y0 = i * 6; R(0, y0, W, 40 - y0, col); if (i) R(0, y0, W, FP, hexMix(col, sky[Math.max(0, a)], 0.5)); }
+    const moonish = n > 0.5 || th.bigMoon;
+    if (moonish) {
+      g.fillStyle = '#ffffff'; for (let i = 0; i < 18; i++) { const x = (i * 37 + 11) % W, y = (i * 23 + 5) % 30; if (x < 104 || x > 136 || y > 24) g.fillRect(x + (i & 1) * FP, y, FP, FP); }
+      for (const [r, col] of [[6.5, '#d9cfa0'], [6, '#f4ecc8'], [5, '#fffbe6']]) disc(120, 13, r, col);
+      R(117.5, 10.5, 1.5, 1.5, '#e4dab0'); R(121, 14.5, 1, 1, '#e4dab0');
+    } else {
+      g.globalAlpha = 0.25; disc(120, 13, 10, '#fffbe0'); g.globalAlpha = 1;
+      for (const [r, col] of [[6.5, '#fbf3dc'], [6, '#fdf6c0'], [5, '#fff27a']]) disc(120, 13, r, col);
+      R(117.5, 10.5, 2, 1.5, '#fffbd0');
+    }
+    // far and near hills: smooth tops a fine pixel at a time, a 1-fine-px darker rim with a lit band under it
+    const far = th.far || ['#a6d98b', '#7fbf6a'], near = th.near || far, grass = th.grass || ['#a2de76', '#8fd46a', '#83ca61', '#76bd58'];
+    const hill = (base, amp, f, ph, fill, edge) => { for (let fx = 0; fx < W * K; fx++) { const x = (fx + 0.5) / K, top = Math.round((base - Math.sin(x * f + ph) * amp - Math.sin(x * f * 2.3 + ph * 2) * amp * 0.4) * K) / K; R(fx * FP, top, FP, H - top, fill); R(fx * FP, top, FP, FP, edge); R(fx * FP, top + FP, FP, 1, hexMix(fill, '#ffffff', 0.14)); } };
+    hill(33, 2.4, 0.07, 1, far[0], far[1]);
+    hill(39, 1.4, 0.11, 3, near[0], near[1]);
+    // the lawn: lighter at the back, soft patches, fine blades
+    R(0, 43, W, H - 43, grass[1]); R(0, 43, W, 1.5, grass[0]); R(0, 44.5, W, FP, hexMix(grass[0], grass[1], 0.5));
+    for (const [x, y, rx, ry, k] of [[24, 60, 18, 5, 2], [70, 72, 22, 6, 0], [100, 56, 14, 4, 3], [40, 79, 16, 4, 3]]) { g.fillStyle = grass[k]; for (let fy = Math.floor((y - ry) * K); fy <= (y + ry) * K; fy++) { const dy = (fy + 0.5) / K - y, hw = rx * Math.sqrt(Math.max(0, 1 - (dy / ry) * (dy / ry))); if (hw > 0.5) g.fillRect(Math.round((x - hw) * K) / K, fy / K, Math.round(hw * 2 * K) / K, FP); } }
+    for (let i = 0; i < 46; i++) { const x = (i * 53 + 7) % 104 + 2, y = 47 + (i * 29 % 36); R(x, y, FP, 1.5, th.blade || '#5aa846'); R(x, y - FP, FP, FP, th.bladeHi || '#b8ec8c'); }
+    // shore and water on the right (sand, a damp edge, foam, then deeper bands), as in the garden
+    const water = th.water || ['#9fe6f7', '#5fcde4', '#3f9fd0', '#2f7fb8'], sx = y => 108 + (y - 36) * 0.22 + Math.sin(y * 0.35) * 0.8;
+    for (let fy = 36 * K; fy < H * K; fy++) {
+      const y = (fy + 0.5) / K, s = Math.round(sx(y) * K) / K, top = fy / K;
+      R(s - 3, top, 2, FP, th.sand || '#efe0b4'); R(s - 1, top, 1, FP, th.wet || '#d9c38e');
+      R(s, top, 5, FP, water[0]); R(s + 5, top, 9, FP, water[1]); R(s + 14, top, W - s - 14, FP, water[2]); R(s + 5, top, FP, FP, hexMix(water[0], water[1], 0.5)); R(s + 14, top, FP, FP, hexMix(water[1], water[2], 0.5));
+      if ((fy & 3) < 3) R(s, top, FP, FP, th.foam || '#ffffff');
+    }
+    R(108, 36, W - 108, FP, th.hl || '#d6f5fd');
+    for (const [x, y, w] of [[128, 48, 3], [138, 60, 4], [124, 70, 3], [142, 76, 3], [133, 41, 2]]) { R(x, y, w, FP, th.hl || '#d6f5fd'); R(x + FP, y - FP, w - 1, FP, '#ffffff'); }
+    // its house, tree and props at their real size (fine pixels kept), back to front
+    const put = (kind, x, by) => { try { const p = PX.prop(kind, theme); if (p) g.drawImage(p, Math.round(x - PX.artW(p) / 2), by - PX.artH(p), PX.artW(p), PX.artH(p)); } catch (e) { /* art optional */ } };
+    const pp = PV_PROPS[id] || PV_PROPS.meadow;
+    put(PV_TREE[id] || 'tree', 92, 70); put(pp[1], 74, 82); put(PV_HOME[id] || 'shroomhouse', 42, 80); put(pp[0], 14, 84);
+    // the night: a soft tint over the land (the sky has its own night colours)
+    const nt = th.night || [20, 18, 64, 0.36], na = (th.dim || 0) + (nt[3] - (th.dim || 0) * 0.5) * n;
+    if (na > 0.01) { g.fillStyle = `rgba(${nt[0]},${nt[1]},${nt[2]},${Math.min(0.6, na).toFixed(3)})`; g.fillRect(0, 30, W, H - 30); }
+    return c;
+  }
+  let drop = null;
+  function closeDrop(quiet) {
+    if (!drop) return; const d = drop; drop = null;
+    document.removeEventListener('keydown', d.key);
+    if (!quiet) PX.Sound.play('back');
+    d.el.classList.add('am-out'); setTimeout(() => d.el.remove(), 170);
+  }
+  function pickMap(mapId, area, o) {
+    o = o || {};
+    if (drop) { closeDrop(); return; } // (the name tapped again: close it)
+    const cur = D.AREAS[area] ? area : PS.S.area, app = $('app'), el = document.createElement('div');
+    el.className = 'am-drop'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Garden areas');
+    el.innerHTML = `<div class="am-back"></div><div class="am-panel"><div class="am-head"><b class="px-title">Where to?</b>
+      <button class="am-x" type="button" aria-label="Close"><svg width="14" height="14" viewBox="0 0 7 7" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path d="M0 0h2v1h1v1h1V1h1V0h2v2H6v1H5v1h1v1h1v2H5V6H4V5H3v1H2v1H0V5h1V4h1V3H1V2H0z"/></svg></button></div><div class="am-grid"></div></div>`;
+    const grid = el.querySelector('.am-grid');
+    for (const a of D.AREA_ORDER) {
+      const A = D.AREAS[a], mine = PS.S.sprouts.filter(s => s.area === a), eggs = PS.S.eggs.filter(e => e.area === a);
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'am-card' + (a === cur ? ' on' : '') + ' am-' + a;
+      const who = mine.length ? `${mine.length} Sprout${mine.length === 1 ? '' : 's'}` : 'No Sprouts yet';
+      b.setAttribute('aria-label', `${A.name}: ${who}${eggs.length ? `, ${eggs.length} egg${eggs.length === 1 ? '' : 's'}` : ''}${a === cur ? '. You are here' : ''}`);
+      b.innerHTML = `<span class="am-pic"><canvas class="px am-pv"></canvas>${a === cur ? '<i class="am-here">Here</i>' : ''}${eggs.length ? '<canvas class="px am-egg"></canvas>' : ''}</span>
+        <b class="px-title am-name">${E(A.name)}</b><span class="am-who"></span>`;
+      const pv = b.querySelector('.am-pv'); try { const src = mapPreview(a); fitCanvas(pv, src); paint(pv, src); } catch (e) { console.error(e); }
+      const eg = b.querySelector('.am-egg'); if (eg) { try { const src = PX.item('egg', eggs[0].kind); fitCanvas(eg, src); paint(eg, src); } catch (e) { eg.remove(); } }
+      const row = b.querySelector('.am-who');
+      // the Sprouts who live there (the partner first), as little faces: a pre-reader finds "where my Sprout is" at a glance
+      const faces = mine.slice().sort((x, y) => (y.id === PS.S.activeId) - (x.id === PS.S.activeId)).slice(0, mine.length > 5 ? 4 : 5);
+      for (const s of faces) { const fc = document.createElement('canvas'); fc.className = 'px am-face'; row.appendChild(fc); try { drawSproutTo(fc, s, { eyes: 'happy' }); } catch (e) { fc.remove(); } }
+      if (mine.length > faces.length) { const m = document.createElement('i'); m.className = 'am-more'; m.textContent = '+' + (mine.length - faces.length); row.appendChild(m); }
+      if (!mine.length) { const m = document.createElement('i'); m.className = 'am-none'; m.textContent = who; row.appendChild(m); }
+      b.onclick = () => { PX.Sound.play(a === cur ? 'tick' : 'select'); closeDrop(true); if (a !== cur && o.onPick) { try { o.onPick(a); } catch (e) { console.error(e); reportError(e, 'areas'); } } };
+      grid.appendChild(b);
+    }
+    const close = () => closeDrop();
+    el.querySelector('.am-back').addEventListener('pointerdown', e => { e.preventDefault(); close(); });
+    el.querySelector('.am-x').onclick = close;
+    app.appendChild(el);
+    // drop it from under the garden's name (the pill), or from the top of the screen
+    const ar = app.getBoundingClientRect(), anc = o.anchor && o.anchor.getBoundingClientRect ? o.anchor.getBoundingClientRect() : null;
+    el.querySelector('.am-panel').style.top = Math.round((anc ? anc.bottom : $('hud').getBoundingClientRect().bottom + 60) - ar.top + 6) + 'px';
+    const key = e => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', key);
+    drop = { el, key };
+    PX.Sound.play('whoosh');
+  }
+
+  PS.ui = { reportError, boot, go, toast, modal, celebrate, wipe, music, setMusic, musicOn, fx: { countUp, coinsFly, banner }, pickMap, mapPreview, closeDrop: () => closeDrop(true), closeModal, pickSprout, pickMoves, chrome, hold, refresh, devPanel, playersPanel: () => PS.ui.mainMenu(), backupPanel, parentGate, icon, paint, drawSproutTo, fitCanvas, freezeCoins, setMuted, isMuted: () => !!PX.Sound.muted, get current() { return current; }, get modalOpen() { return !!open || queue.length > 0 || !!drop; }, get dropOpen() { return !!drop; } };
 })();
