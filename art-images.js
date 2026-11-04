@@ -9,9 +9,14 @@
 //   props     PX.prop(kind, theme)          (green plants only for the 'day' theme: night and candy plants keep their own colours)
 //   trophies  PX.trophy(id, scale, { dim }) raid    PX.raid.unit(kind, pose), PX.raid.owl(pose)
 //   hats      PX.sprig(look, pose) wearing a hat or extra (see 'hats on Sprouts'), PX.item('hat', id) (closet icons)
+//   PX.picture(kind, id) -> the loaded Image (or null): art-sprouts-hd.js puts the hat pictures on its smooth Sprouts
+// HD (opt-in, the same switch as art-sprouts-hd.js: localStorage['solunar:hd'] === '1' or hd=1 in the address): every fitted
+// picture also gets the "blend" pass below (smooth inside, solid edges, the game's dark outline), so it sits with the smooth
+// Sprouts. Off (the default), pictures are drawn exactly as before.
 (function () {
   'use strict';
   if (!window.PX || typeof window.Image !== 'function' || typeof document === 'undefined') return;
+  const HD = (() => { try { if (/[?&]hd=1(?:&|$)/.test(location.search || '')) return true; return localStorage.getItem('solunar:hd') === '1'; } catch (e) { return false; } })();
   const D = window.PSDATA || {};
   const PROPS = ['tree', 'bigtree', 'bush', 'flowerbed', 'mushrooms', 'shroomhouse', 'stump', 'fern', 'palm', 'beachhut', 'crystalcave', 'gingerhouse', 'lollitree', 'lamp', 'fence', 'rock'];
   const PLANTY = { tree: 1, bigtree: 1, bush: 1, flowerbed: 1, fern: 1 }; // (recoloured by theme in pixel.js)
@@ -51,8 +56,34 @@
     x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
     if (opt.squash) { x.save(); x.translate(X + w / 2, Y + h); x.scale(1 + opt.squash, 1 - opt.squash); x.drawImage(im, -w / 2, -h, w, h); x.restore(); }
     else x.drawImage(im, X, Y, w, h);
-    if (opt.tint) { x.globalCompositeOperation = 'source-atop'; x.fillStyle = opt.tint; x.fillRect(0, 0, c.width, c.height); x.globalCompositeOperation = 'source-over'; }
-    return c;
+    let out = c;
+    if (HD) { try { out = blendPass(c); } catch (e) { out = c; } }
+    if (opt.tint) { const ox = out.getContext('2d'); ox.globalCompositeOperation = 'source-atop'; ox.fillStyle = opt.tint; ox.fillRect(0, 0, out.width, out.height); ox.globalCompositeOperation = 'source-over'; }
+    return out;
+  }
+  // The "blend" pass (HD only; the approved prototype is outlineOnly() in _blend-sample.html): the picture stays smooth inside, its
+  // soft edge becomes solid, colours get a slight saturation lift, and the game's dark outline (2 fine px of ink #222034) goes round
+  // the silhouette. The picture first shrinks just enough to leave 2 fine px free at the top and sides (it keeps standing on the
+  // bottom), so the outline never has to overwrite a picture that touches the edge (the owl's ears).
+  const INK3 = [34, 32, 52];
+  function blendPass(src, opt) {
+    opt = opt || {}; const W = src.width, H = src.height, c = document.createElement('canvas'); c.width = W; c.height = H; if (src.k) c.k = src.k;
+    const x = c.getContext('2d'), P = 2, s = Math.min((W - 2 * P) / W, (H - P) / H);
+    x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+    x.drawImage(src, Math.round((W - W * s) / 2), Math.round(H - H * s), Math.round(W * s), Math.round(H * s));
+    const img = x.getImageData(0, 0, W, H), d = img.data, on = new Uint8Array(W * H), sat = opt.sat || 1.12, con = opt.con || 1.06;
+    for (let i = 0; i < W * H; i++) on[i] = d[i * 4 + 3] >= 128 ? 1 : 0;
+    for (let i = 0; i < W * H; i++) {
+      if (!on[i]) { d[i * 4 + 3] = 0; continue; }
+      const a = d[i * 4 + 3] / 255; let r = d[i * 4] / a, g = d[i * 4 + 1] / a, b = d[i * 4 + 2] / a; // (undo the soft edge's fade)
+      const m = (r + g + b) / 3;
+      r = (m + (r - m) * sat - 128) * con + 128; g = (m + (g - m) * sat - 128) * con + 128; b = (m + (b - m) * sat - 128) * con + 128;
+      d[i * 4] = Math.max(0, Math.min(255, r)); d[i * 4 + 1] = Math.max(0, Math.min(255, g)); d[i * 4 + 2] = Math.max(0, Math.min(255, b)); d[i * 4 + 3] = 255;
+    }
+    // the outline: the picture's outermost ring of pixels becomes ink, then one more ring of ink goes round it
+    for (let i = 0; i < W * H; i++) { if (!on[i]) continue; const X = i % W, Y = (i / W) | 0; if (X === 0 || Y === 0 || X === W - 1 || Y === H - 1 || !on[i - 1] || !on[i + 1] || !on[i - W] || !on[i + W]) { d[i * 4] = INK3[0]; d[i * 4 + 1] = INK3[1]; d[i * 4 + 2] = INK3[2]; } }
+    for (let i = 0; i < W * H; i++) { if (on[i]) continue; const X = i % W, Y = (i / W) | 0; if ((X > 0 && on[i - 1]) || (X < W - 1 && on[i + 1]) || (Y > 0 && on[i - W]) || (Y < H - 1 && on[i + W])) { d[i * 4] = INK3[0]; d[i * 4 + 1] = INK3[1]; d[i * 4 + 2] = INK3[2]; d[i * 4 + 3] = 255; } }
+    x.putImageData(img, 0, 0); return c;
   }
 
   // ---------------- critters ----------------
@@ -144,6 +175,8 @@
   // A Sprout wearing a hat (or an extra) whose picture has loaded: today's Sprout is drawn as usual, the code hat's pixels are found
   // by drawing the same Sprout without it, those pixels go back to what is under the hat, and the picture is fitted into the code
   // hat's box. The box comes from the real drawing each time, so it follows every colour, stage, pose, part and flower.
+  // (This pixel-diff swap only suits pixel Sprouts: with HD on, art-sprouts-hd.js replaces PX.sprig after this and never calls it;
+  // it draws the hat pictures on its smooth Sprouts itself, from PX.picture.)
   const sprig0 = PX.sprig;
   const HIDES = { beanie: 1, tophat: 1, wizard: 1, sunhat: 1, cap: 1, witch: 1, propeller: 1 }; // (hats that hide the leaves: pixel.js HIDES_LEAVES)
   const data = c => c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
@@ -178,4 +211,5 @@
     } catch (e) { return base; }
   };
   PX.hasPicture = (kind, id) => !!IMG[kind + '/' + id];
+  PX.picture = (kind, id) => IMG[kind + '/' + id] || null;
 })();

@@ -1745,7 +1745,7 @@
   function bindFriends() {
     const s = partner(), a = hubEl.querySelector('.b-fa'), b = hubEl.querySelector('.b-fb');
     if (a && s) PS.ui.drawSproutTo(a, s, { eyes: 'brave', arms: 'up', mouth: 'grin' });
-    if (b) { const L = PX.cloneLook(PX.DEFAULT_LOOK); L.body = 'rose'; const c = PX.sprig(L, { eyes: 'brave', arms: 'up', mouth: 'grin' }), k = c.k || 1; b.width = 32 * k; b.height = 32 * k; const x = b.getContext('2d'); x.imageSmoothingEnabled = false; x.setTransform(k, 0, 0, k, 0, 0); x.translate(32, 0); x.scale(-1, 1); x.drawImage(c, 0, 0, PX.artW(c), PX.artH(c)); x.setTransform(1, 0, 0, 1, 0, 0); } // (flipped, at the sprite's fine size)
+    if (b) { const L = PX.cloneLook(PX.DEFAULT_LOOK); L.body = 'rose'; const c = PX.sprig(L, { eyes: 'brave', arms: 'up', mouth: 'grin' }), k = c.k || 1; b.width = 32 * k; b.height = 32 * k; if (k > 2) b.style.imageRendering = 'auto'; const x = b.getContext('2d'); x.imageSmoothingEnabled = false; x.setTransform(k, 0, 0, k, 0, 0); x.translate(32, 0); x.scale(-1, 1); x.drawImage(c, 0, 0, PX.artW(c), PX.artH(c)); x.setTransform(1, 0, 0, 1, 0, 0); } // (flipped, at the sprite's fine size)
     const st = hubEl.querySelector('.b-fstart'); if (st) st.onclick = () => { sfx('pop'); friendSetup(); };
   }
   // a list modal like PS.ui.pickSprout but for any items. items: [{name, sub, draw(canvas), onPick, disabled}]
@@ -3190,8 +3190,8 @@
     const c = PX.critter(id, f || 0); let o = null;
     const pic = PX.critterPicture ? safe(() => PX.critterPicture(id, S, f || 0), null) : null; // the family's picture, drawn S x bigger (sharp)
     if (pic) return (bigCache[key] = pic);
-    if ((S === 2 || S === 3) && c.k) o = safe(() => upscaleArt(c, S), null); // fine lines at boss size
-    if (!o) { o = document.createElement('canvas'); o.width = c.width * S; o.height = c.height * S; const x = o.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(c, 0, 0, o.width, o.height); }
+    if ((S === 2 || S === 3) && c.k && c.k <= 2) o = safe(() => upscaleArt(c, S), null); // fine lines at boss size (pixel art only: a smooth hi-res picture is never Scale2x'd)
+    if (!o) { o = document.createElement('canvas'); o.width = c.width * S; o.height = c.height * S; const x = o.getContext('2d'); x.imageSmoothingEnabled = !!PX.HD && (c.k || 1) > 2; x.drawImage(c, 0, 0, o.width, o.height); }
     return (bigCache[key] = PX.keepK(c, o)); // (S x the art size: PX.artW = artW(critter) * S)
   }
   const auraCache = {};

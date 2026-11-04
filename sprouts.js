@@ -330,6 +330,9 @@
   // A canvas sized to its picture. Hi-res pictures (src.k: 2 fine pixels per art pixel) keep their fine bitmap; the CSS size is
   // art px x scale. With no scale, a canvas that no stylesheet sizes is pinned to the art size (pin), so it doesn't show twice as big.
   function put(cv, src, scale, pin) {
+    // a smooth HD Sprout (art-sprouts-hd.js, k = 4): drawn again, sharp, for the size it's shown at, and shown smoothly (no snapping)
+    if (src.hdSpr && PX.hdUp) { const s = scale || (cv.isConnected ? cv.getBoundingClientRect().width / PX.artW(src) : 0); if (s > 0) src = PX.hdUp(src, s); }
+    if (PX.HD) { if ((src.k || 1) > 2) cv.style.imageRendering = 'auto'; else if (cv.style.imageRendering === 'auto') cv.style.imageRendering = ''; }
     if (cv.width !== src.width) cv.width = src.width;
     if (cv.height !== src.height) cv.height = src.height;
     cv._pk = src.k || 1; // (app.js snaps it to whole device pixels)

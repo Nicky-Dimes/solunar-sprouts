@@ -168,6 +168,8 @@
   const sprigAX = () => (PX.SPRIG_AX == null ? 16 : PX.SPRIG_AX);
   const sprigAY = () => (PX.SPRIG_AY == null ? 31 : PX.SPRIG_AY);
   function sprig(look, pose) { return PX.sprig(look, pose || {}); }
+  // pictures finer than 2 fine px per art px (smooth HD Sprouts, art-sprouts-hd.js) are shown with the browser's smoothing
+  const smoothCv = (cv, src) => { if (!PX.HD) return; if ((src.k || 1) > 2) cv.style.imageRendering = 'auto'; else if (cv.style.imageRendering === 'auto') cv.style.imageRendering = ''; };
   const eggName = kind => (D.EGGS[kind] ? D.EGGS[kind].name : 'Egg');
   function pickW(odds, r) { const ks = Object.keys(odds), tot = ks.reduce((a, k) => a + odds[k], 0); let x = r * tot; for (const k of ks) { x -= odds[k]; if (x <= 0 && odds[k] > 0) return k; } return ks[0]; }
 
@@ -1103,14 +1105,14 @@
     const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, cv.width, cv.height); x.drawImage(src, 0, 0, cv.width, cv.height);
   }
   function paintTo(cv, src, w, h) { // (w, h in art pixels; a hi-res sprite gets k x the bitmap)
-    const k = src.k || 1; cv.width = w ? w * k : src.width; cv.height = h ? h * k : src.height;
+    const k = src.k || 1; cv.width = w ? w * k : src.width; cv.height = h ? h * k : src.height; smoothCv(cv, src);
     const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, cv.width, cv.height);
     x.drawImage(src, Math.floor((cv.width - src.width) / 2), Math.floor((cv.height - src.height) / 2), src.width, src.height);
   }
   // a sprout sprite fitted into a small square canvas (canvas can be taller for flower heads)
   function spriteBox(cv, look, pose, size) {
     const src = sprig(look, pose), k = src.k || 1; size = size || 36;
-    const h = size + Math.max(0, PX.artH(src) - 32); cv.width = size * k; cv.height = h * k; // (bitmap k x the art size)
+    const h = size + Math.max(0, PX.artH(src) - 32); cv.width = size * k; cv.height = h * k; smoothCv(cv, src); // (bitmap k x the art size)
     const x = cv.getContext('2d'); x.setTransform(k, 0, 0, k, 0, 0); x.imageSmoothingEnabled = false; x.clearRect(0, 0, size, h);
     PX.blit(x, src, size / 2, h - 2, false, sprigAX(), sprigAY());
   }
@@ -1951,7 +1953,7 @@
     const fy = V.GY + 1 - elevAt(V, wx) + Math.min(2, sinkAt(V, wx)) - (md === 'lowgrav' ? 7 : 0);
     if (R.wild && !opt.look) { // wild race banner: the Beginner animals running along
       wildAnimals(R, 0).forEach((id, i) => { const cr = safeCritter(id); if (!cr || PX.artH(cr) > V.GY) return; const x = sx - 4 + i * 26, wx2 = camX + x; PX.blit(g, cr, x, V.GY + 1 - elevAt(V, wx2) + Math.min(2, sinkAt(V, wx2))); });
-    } else { g.imageSmoothingEnabled = half; g.drawImage(spr, sx - sw / 2, fy - sh + 1, sw, sh); g.imageSmoothingEnabled = false; } // (the half-size runner is shrunk smoothly so its thin outline survives)
+    } else { g.imageSmoothingEnabled = half || (PX.HD && (spr.k || 1) > 2); if (PX.HD && (spr.k || 1) > 2) g.imageSmoothingQuality = 'high'; g.drawImage(spr, sx - sw / 2, fy - sh + 1, sw, sh); g.imageSmoothingEnabled = false; g.imageSmoothingQuality = 'low'; } // (the half-size runner, and a smooth HD Sprout, are shrunk smoothly so the outline survives)
     const f = document.createElement('canvas'); f.width = W * K; f.height = H * K; const fvg = f.getContext('2d'); fvg.setTransform(K, 0, 0, K, 0, 0);
     drawWaterFront({ g: fvg, W, H, GY: GYb, CH: 7, C, camX, t: 0, tint: V.tint });
     g.drawImage(f, 0, 0, W, H);
@@ -1967,7 +1969,7 @@
     const look = ST.lookOf(s), f = Math.floor(t * 5) % 2;
     const src = sprig(look, { walk: true, frame: f, mouth: 'grin' }), k = src.k || 1;
     const extra = Math.max(0, PX.artH(src) - 32), H = 40 + extra;
-    if (partnerCv.height !== H * k || partnerCv.width !== 40 * k) { partnerCv.width = 40 * k; partnerCv.height = H * k; partnerCv.style.height = (80 + extra * 2) + 'px'; }
+    if (partnerCv.height !== H * k || partnerCv.width !== 40 * k) { partnerCv.width = 40 * k; partnerCv.height = H * k; partnerCv.style.height = (80 + extra * 2) + 'px'; smoothCv(partnerCv, src); }
     const g = partnerCv.getContext('2d'); g.setTransform(k, 0, 0, k, 0, 0); g.imageSmoothingEnabled = false; g.clearRect(0, 0, 40, H);
     g.fillStyle = '#e3cf9d'; g.fillRect(10, H - 3, 20, 2);
     PX.blit(g, src, 20, H - 3 - f, false, sprigAX(), sprigAY());

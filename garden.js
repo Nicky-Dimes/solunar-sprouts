@@ -2419,16 +2419,20 @@
   }
   function drawAmbient(n) {
     const day = 1 - n, bc = BUGS[area];
+    // (calm on purpose, the family found the old swarm distracting: each butterfly flutters slowly round its own spot, about 2 on
+    // screen, instead of sweeping across the whole big garden, which made them zip past several screen widths a second)
     if (bc && day > 0.5 && area !== 'beach') {
-      for (const b of DECO.bugs) {
-        const p = t * 0.22 + b.p, x = Math.round(10 + (Math.sin(p * 1.1 + b.a * 6) * 0.5 + 0.5) * (shoreAt(Lw.minY + 30) - 24)), y = Math.round(Lw.minY + 4 + (Math.sin(p * 1.7 + b.b * 6) * 0.5 + 0.5) * Lw.span * 0.75 + Math.sin(t * 5 + b.p) * 2);
+      const nb = Math.min(DECO.bugs.length, Math.round(2 * (Lw.landK || 1))), bw = shoreAt(Lw.minY + 30) - 24;
+      for (let i = 0; i < nb; i++) {
+        const b = DECO.bugs[i], x = Math.round(10 + b.a * bw + Math.sin(t * 0.4 + b.p) * 16 + Math.sin(t * 1.1 + b.p * 2) * 4), y = Math.round(Lw.minY + 4 + b.b * Lw.span * 0.75 + Math.sin(t * 0.3 + b.p * 1.3) * 9 + Math.sin(t * 5 + b.p) * 1.5);
         if (x < VR.x0 - 6 || x > VR.x1 + 6 || y < VR.y0 - 6 || y > VR.y1 + 6) continue;
-        fxAt(bflySpr(bc[b.c % bc.length], Math.floor(t * 9 + b.p * 3) % 2), x - 2, y - 2);
+        fxAt(bflySpr(bc[b.c % bc.length], Math.floor(t * 7 + b.p * 3) % 2), x - 2, y - 2);
       }
     }
     const dc = DRIFT[area];
     if (dc) {
-      for (const d of DECO.drift) {
+      for (let i = 0, nd = Math.min(DECO.drift.length, Math.round(1.5 * (Lw.landK || 1))); i < nd; i++) { // (a few drifting petals: about 1 on screen)
+        const d = DECO.drift[i];
         const u = (d.p + t * d.v * 0.25) % 1.2 - 0.1, x = sn(u * ww), y = sn(Lw.minY - 20 + d.y * Lw.span * 0.9 + Math.sin(t * 1.3 + d.ph) * 5 + u * 20);
         if (x < VR.x0 - 4 || x > VR.x1 + 4 || y < VR.y0 - 4 || y > VR.y1 + 4) continue;
         const c = dc[d.c % dc.length], f = Math.floor(t * 3 + d.ph) % 3;
@@ -2475,12 +2479,14 @@
     for (const q of Lw.glowPts || []) { if (q.x < VR.x0 - 4 || q.x > VR.x1 + 4 || q.y < VR.y0 - 4 || q.y > VR.y1 + 4) continue; const pulse = 0.7 + Math.sin(t * 1.7 + q.x * 0.3) * 0.3; glow(q.x, q.y, 3, '160,250,255', 0.3 * lit * pulse); bx.fillStyle = '#c8fff8'; bx.fillRect(q.x, q.y, FP, FP); }
     if (Lw.beacon && Math.floor(t * 1.2) % 3 !== 2) { glow(Lw.beacon.x, Lw.beacon.y, 5, '255,242,170', 0.5 * lit); bx.fillStyle = '#fff27a'; bx.fillRect(Lw.beacon.x - 1, Lw.beacon.y, 3, 1); bx.fillStyle = '#ffffff'; bx.fillRect(Lw.beacon.x - FP, Lw.beacon.y, 1, FP); }
     if (area === 'moonlit') for (let i = 0; i < FLOAT_MOON.length; i++) { const p = floatPos(DECO.floats[i]); if (!p || p.x < VR.x0 - 8 || p.x > VR.x1 + 8 || p.y < VR.y0 - 4 || p.y > VR.y1 + 8) continue; glow(p.x, p.y - 4, 6, '255,220,140', 0.28 * lit); const Y = p.y - 4.5 + (Math.floor(t * DECO.floats[i].v * 2 + DECO.floats[i].ph) % 2); bx.fillStyle = '#fff27a'; bx.fillRect(p.x, Y, 1, 1); bx.fillStyle = '#ffffff'; bx.fillRect(p.x, Y, FP, FP); }
-    // fireflies: a glowing dot with a white-hot centre
-    const count = Math.round(((th.bigMoon ? 16 : 0) + 10 * n) * (Lw.landK || 1)); // (the big garden has more, spread all over it)
+    // fireflies: a glowing dot with a white-hot centre, drifting slowly round its own spot and glowing on and off gently
+    // (calm on purpose, the family found the old swarm distracting: about 2-3 lit on screen at night, a few more in the Moonlit
+    // Grove; they used to sweep across the whole big garden, zipping past several screen widths a second)
+    const count = Math.round(((th.bigMoon ? 5 : 0) + 5 * n) * (Lw.landK || 1)), fw = shoreAt(Lw.minY + 20) - 12;
     for (let i = 0; i < Math.min(count, DECO.flies.length); i++) {
-      const f = DECO.flies[i], p = t * 0.25 + f.p;
-      const x = Math.round(8 + (Math.sin(p * 1.3 + f.a * 6) * 0.5 + 0.5) * (shoreAt(Lw.minY + 20) - 12)), y = Math.round(Lw.minY - 6 + (Math.sin(p * 1.9 + f.b * 6) * 0.5 + 0.5) * Lw.span * 0.8);
-      if (x < VR.x0 - 3 || x > VR.x1 + 3 || y < VR.y0 - 3 || y > VR.y1 + 3 || Math.sin(t * 3 + f.p * 3) < -0.3) continue;
+      const f = DECO.flies[i];
+      const x = Math.round(8 + f.a * fw + Math.sin(t * 0.3 + f.p) * 9 + Math.sin(t * 0.8 + f.p * 2) * 3), y = Math.round(Lw.minY - 6 + f.b * Lw.span * 0.8 + Math.sin(t * 0.24 + f.p * 1.7) * 6 + Math.cos(t * 0.7 + f.p) * 2);
+      if (x < VR.x0 - 3 || x > VR.x1 + 3 || y < VR.y0 - 3 || y > VR.y1 + 3 || Math.sin(t * 1.5 + f.p * 3) < -0.2) continue;
       glow(x, y, 2, '255,242,122', 0.35); bx.fillStyle = '#fff27a'; bx.fillRect(x, y, 1, 1); bx.fillStyle = '#fffbd0'; bx.fillRect(x, y, FP, FP);
     }
   }

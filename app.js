@@ -153,6 +153,12 @@
   // the Sprouts tab: the hi-res Sprout drawn at the same pixel size as the other 16 x 16 tab icons (half its own size: each
   // 2 x 2 block becomes one fine pixel, ink wins so its lines stay, other colours blend), with the same outer ink ring
   function navSprout() {
+    if (PX.sprigAt) { // HD Sprouts (art-sprouts-hd.js): the smooth Sprout at half size (16 art px at k = 4), its outline drawn
+      // twice as bold first so that, halved, it matches the other tab icons' line
+      const big = PX.sprigAt(PX.cloneLook(PX.DEFAULT_LOOK), { eyes: 'happy', mouth: 'open' }, 8, { olw: 1.6 }), c = document.createElement('canvas');
+      c.width = c.height = 64; c.k = 4; const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; x.drawImage(big, 0, 0, 64, 64);
+      return c;
+    }
     const src = PX.sprig(PX.cloneLook(PX.DEFAULT_LOOK), { eyes: 'happy', mouth: 'open' }), k = src.k || 1;
     if (k !== 2 || src.width !== 64) return src;
     const d = src.getContext('2d').getImageData(0, 0, 64, 64).data, g = new PX.Grid(16, 16), hex = v => (v < 16 ? '0' : '') + v.toString(16);
@@ -170,9 +176,18 @@
   }
   // copy a sprite into a canvas element at its own (fine) size; a CSS size, or the snapper (watchCanvases), shows it crisp
   function paint(canvas, src) {
+    // a smooth HD Sprout (art-sprouts-hd.js, c.k = 4) shown bigger than its bitmap is drawn again, sharp, for its CSS size
+    if (src.hdSpr && PX.hdUp) { const w = parseFloat(canvas.style.width) || (canvas.isConnected ? canvas.getBoundingClientRect().width : 0); if (w > 0) src = PX.hdUp(src, w / PX.artW(src)); }
     if (src.k && (canvas.width !== src.width || canvas.height !== src.height)) fitCanvas(canvas, src);
-    canvas._pk = src.k || 1;
+    canvas._pk = src.k || 1; canvas._hdSrc = src.hdSpr ? src : null;
+    smoothCanvas(canvas, src);
     const x = canvas.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, canvas.width, canvas.height); x.drawImage(src, 0, 0, canvas.width, canvas.height);
+  }
+  // pictures finer than 2 fine px per art px (HD Sprouts) are smooth art: shown with the browser's smoothing, never pixel-snapped
+  function smoothCanvas(canvas, src) {
+    if (!PX.HD) return; // (HD off: everything is drawn exactly as before, incl. the arcade's finer k = 3 / 4 art)
+    if ((src.k || 1) > 2) canvas.style.imageRendering = 'auto';
+    else if (canvas.style.imageRendering === 'auto') canvas.style.imageRendering = '';
   }
   // draw a sprout (or any look) into a canvas element; pose optional
   function drawSproutTo(canvas, sOrLook, pose) {
@@ -581,6 +596,10 @@
     const dpr = window.devicePixelRatio || 1, todo = [];
     for (const c of snapQ) { // read everything first (one style pass), then write
       if (!c.isConnected || !c.width || !c.height || c.width > 400 || c.height > 400 || (c.width === 300 && c.height === 150) || 'nosnap' in c.dataset) continue; // (400: hi-res sprites are twice their art size; 300 x 150 is a canvas nothing has sized yet, e.g. a scene before its first frame)
+      // smooth HD Sprouts (c.k > 2) aren't pixel art: they keep their size and are shown smoothly. (The garden's Sprout card is
+      // painted by garden.js without the tag: with HD on, a 128-px bitmap there is an HD Sprout.)
+      if (PX.HD && !c._pk && c.width === 128 && c.height === 128 && c.closest && c.closest('.g-ch')) { c._pk = 4; c.style.imageRendering = 'auto'; }
+      if (PX.HD && c._pk > 2) continue;
       const cs = getComputedStyle(c); if (!/pixelated|crisp/.test(cs.imageRendering)) continue;
       const mine = c.dataset.sw && c.style.width === c.dataset.sw && c.style.height === c.dataset.sh;
       let rw = mine ? +c.dataset.rw : pxOf(c.style.width) || pxOf(cs.width), rh = mine ? +c.dataset.rh : pxOf(c.style.height) || pxOf(cs.height);
@@ -704,6 +723,11 @@
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   // a pixel-art canvas shown crisp: its CSS size is the bitmap times a whole number, as close to `want` CSS px tall as fits
   function crispScale(c, want, dev) {
+    if (c._hdSrc && c._pk > 2) { // a smooth HD Sprout: the size a 2-fine-px Sprout gets here (so layouts stay), then drawn sharp for it
+      const dp = dev ? window.devicePixelRatio || 1 : 1, aw = PX.artW(c._hdSrc), ah = PX.artH(c._hdSrc), m = Math.max(1, Math.floor(want * dp / (ah * 2)));
+      c.style.width = (aw * 2 * m / dp) + 'px'; c.style.height = (ah * 2 * m / dp) + 'px'; c.dataset.nosnap = '';
+      paint(c, c._hdSrc); return;
+    }
     const dpr = dev ? window.devicePixelRatio || 1 : 1, w = Math.max(1, c.width), h = Math.max(1, c.height), n = Math.max(1, Math.floor(want * dpr / h));
     c.style.width = (w * n / dpr) + 'px'; c.style.height = (h * n / dpr) + 'px'; c.dataset.nosnap = '';
   }
@@ -973,8 +997,16 @@
     const layer = root.firstElementChild, hero = layer.querySelector('.sv-evo-hero'), cv = hero.querySelector('canvas'), say = layer.querySelector('.sv-evo-say');
     let A = null, B = null;
     try { A = PX.sprig(oldL, { eyes: 'happy' }); B = PX.sprig(newL, { eyes: 'happy', mouth: 'open', arms: 'up' }); } catch (err) { console.error(err); }
+    const evoWant = Math.max(96, Math.min(window.innerHeight * 0.32, 300)), hdEvo = !!(A && A.hdSpr && PX.hdUp);
+    let evoCss = 0;
+    if (hdEvo) { // smooth HD Sprouts: the size 2-fine-px Sprouts get here, both forms drawn sharp for it (no pixel snapping)
+      const dpr = window.devicePixelRatio || 1; evoCss = 64 * Math.max(1, Math.floor(evoWant * dpr / 64)) / dpr;
+      A = PX.hdUp(A, evoCss / 32); if (B) B = PX.hdUp(B, evoCss / 32);
+    }
     const W = Math.max(A ? A.width : 64, B ? B.width : 64), H = Math.max(A ? A.height : 64, B ? B.height : 64); // (fine pixels: the sprites are hi-res)
-    cv.width = W; cv.height = H; crispScale(cv, Math.max(96, Math.min(window.innerHeight * 0.32, 300)), true);
+    cv.width = W; cv.height = H;
+    if (hdEvo) { cv.style.width = cv.style.height = evoCss + 'px'; cv.style.imageRendering = 'auto'; cv.dataset.nosnap = ''; }
+    else crispScale(cv, evoWant, true);
     const x = cv.getContext('2d'); x.imageSmoothingEnabled = false;
     const drawForm = (src, glow) => {
       x.globalCompositeOperation = 'source-over'; x.clearRect(0, 0, W, H); if (!src) return;

@@ -261,7 +261,8 @@
     const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
     // the Sprout stands inside the egg (its feet low in the shell), then the bottom of the shell goes in front with a zigzag crack
     const feetY = ey + Math.round(eh * 0.56), ax = PX.SPRIG_AX == null ? sw / 2 : PX.SPRIG_AX, ay = PX.SPRIG_AY == null ? sh - 1 : PX.SPRIG_AY;
-    x.setTransform(K, 0, 0, K, 0, 0); x.drawImage(spr, Math.round(W / 2 - ax), feetY - ay, sw, sh); x.setTransform(1, 0, 0, 1, 0, 0);
+    x.setTransform(K, 0, 0, K, 0, 0); if (PX.HD && (spr.k || 1) > K) { x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; } // (a smooth HD Sprout shrinks smoothly)
+    x.drawImage(spr, Math.round(W / 2 - ax), feetY - ay, sw, sh); x.setTransform(1, 0, 0, 1, 0, 0); x.imageSmoothingEnabled = false;
     const FW = egg.width, FH = egg.height;
     let px = null; try { px = egg.getContext('2d').getImageData(0, 0, FW, FH).data; } catch (e) { px = null; }
     x.fillStyle = '#222034';

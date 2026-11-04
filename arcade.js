@@ -156,8 +156,10 @@
   function blit(c, x, y, s, ax, ay, flip) {
     if (!c) return;
     const w = aw(c) * s, h = ah(c) * s, X = x - (ax == null ? aw(c) / 2 : ax) * s, Y = y - (ay == null ? ah(c) : ay) * s;
+    const sm = PX.HD && (c.k || 1) > 2; if (sm) { ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; } // (a smooth HD Sprout: never pixel-doubled)
     if (flip) { ctx.save(); ctx.translate(x, 0); ctx.scale(-1, 1); ctx.drawImage(c, -(w - (x - X)), Y, w, h); ctx.restore(); }
     else ctx.drawImage(c, X, Y, w, h);
+    if (sm) ctx.imageSmoothingEnabled = false;
   }
   function blitR(c, x, y, s, ax, ay, rot, sx, sy, alpha, flip) {
     if (!c) return;
@@ -997,7 +999,7 @@
   const wpick = list => { let tot = 0; for (const x of list) tot += x[1]; let r = Math.random() * tot; for (const x of list) { r -= x[1]; if (r <= 0) return x[0]; } return list[list.length - 1][0]; };
   const colOk = c => !!(D.COLORS && D.COLORS[c] && PX.RAMPS[c]);
   function prizeSpr(p) {
-    if (p.type === 'plush') return sprC('plush:' + p.c, () => PX.arcade.plush(PX.sprig(bodyLook(colOk(p.c) ? p.c : 'mint'), { eyes: 'happy', mouth: 'open' })));
+    if (p.type === 'plush') return sprC('plush:' + p.c, () => { const L = bodyLook(colOk(p.c) ? p.c : 'mint'), P = { eyes: 'happy', mouth: 'open' }; return PX.arcade.plush(PX.sprigAt ? PX.sprigAt(L, P, 2) : PX.sprig(L, P)); }); // (HD: the smooth Sprout drawn at the plushie's own 2 fine px per art px)
     if (p.type === 'egg') return sprC('nestegg:' + p.k, () => { // an egg in a straw nest: 22 x 30 art px at k 2
       const e = PX.item('egg', p.k), n = art('nest'), K = 2, c = document.createElement('canvas'); c.width = 22 * K; c.height = 30 * K;
       const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.setTransform(K, 0, 0, K, 0, 0);
@@ -1401,6 +1403,7 @@
     if (!c || !src) return;
     try { if (PS.ui.fitCanvas) PS.ui.fitCanvas(c, src); } catch (e) { /* sized below */ }
     if (c.width !== src.width) c.width = src.width; if (c.height !== src.height) c.height = src.height;
+    if (PX.HD && (src.k || 1) > 2) c.style.imageRendering = 'auto'; // (a smooth HD Sprout; HD off: the k = 3 / 4 arcade art stays crisp)
     const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, c.width, c.height); x.drawImage(src, 0, 0, src.width, src.height);
     if (want) { const d = dprNow(), n = Math.max(1, Math.floor(want * d / Math.max(c.width, c.height))); c.style.width = (c.width * n / d) + 'px'; c.style.height = (c.height * n / d) + 'px'; }
   }
@@ -1534,7 +1537,7 @@
       const K = 2, u = 1 / K, w = PRE_W, h = PRE_H, c = document.createElement('canvas'); c.width = w * K; c.height = h * K;
       const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.setTransform(K, 0, 0, K, 0, 0);
       // a sprite with its bottom middle at (X, Y) (ax / ay override the anchor, in art px)
-      const put = (s, X, Y, sc, flip, ax, ay) => { if (!s) return; sc = sc || 1; const W2 = aw(s) * sc, H2 = ah(s) * sc, A = (ax == null ? aw(s) / 2 : ax) * sc, B = (ay == null ? ah(s) : ay) * sc; x.save(); x.translate(fr(X, u), fr(Y, u)); if (flip) x.scale(-1, 1); x.drawImage(s, -A, -B, W2, H2); x.restore(); };
+      const put = (s, X, Y, sc, flip, ax, ay) => { if (!s) return; sc = sc || 1; const W2 = aw(s) * sc, H2 = ah(s) * sc, A = (ax == null ? aw(s) / 2 : ax) * sc, B = (ay == null ? ah(s) : ay) * sc; x.save(); x.translate(fr(X, u), fr(Y, u)); if (flip) x.scale(-1, 1); if (PX.HD && (s.k || 1) > 2) { x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high'; } x.drawImage(s, -A, -B, W2, H2); x.restore(); };
       const lawn = (y0, cols, seed) => { x.fillStyle = cols[0]; x.fillRect(0, y0, w, h - y0); x.fillStyle = cols[2]; x.fillRect(0, y0, w, u); tufts(x, 0, y0 + 2, w, h - y0 - 2, [cols[2], cols[3]], seed, Math.floor(w * (h - y0) / 10), u, ['#ffffff', '#f7b6c8', '#fff27a']); };
       if (id === 'fruit') {
         vgrad(x, 0, 0, w, 48, ['#a8dcf4', '#d0ecf2', '#eaf6e6']); bgPut(x, skyArt('cloud', 0), 104, 26, u);
