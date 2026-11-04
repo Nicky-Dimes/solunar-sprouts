@@ -8,6 +8,7 @@
 //   eggs      PX.item('egg', kind)          fruit   PX.item('fruit', kind)
 //   props     PX.prop(kind, theme)          (green plants only for the 'day' theme: night and candy plants keep their own colours)
 //   trophies  PX.trophy(id, scale, { dim }) raid    PX.raid.unit(kind, pose), PX.raid.owl(pose)
+//   hats      PX.sprig(look, pose) wearing a hat or extra (see 'hats on Sprouts'), PX.item('hat', id) (closet icons)
 (function () {
   'use strict';
   if (!window.PX || typeof window.Image !== 'function' || typeof document === 'undefined') return;
@@ -17,13 +18,13 @@
   const LIST = {
     critters: Object.keys(D.ANIMALS || {}).concat(Object.keys(D.RARES || {})),
     eggs: Object.keys(D.EGGS || {}), fruit: Object.keys(D.FRUITS || {}), props: PROPS,
-    trophies: (PX.TROPHY_IDS || []).slice(), raid: ['blob', 'bat', 'wisp', 'brute', 'king', 'owl'],
+    trophies: (PX.TROPHY_IDS || []).slice(), raid: ['blob', 'bat', 'wisp', 'brute', 'king', 'owl'], hats: Object.keys(D.HATS || {}),
   };
   const IMG = {}, made = new Map(); // 'kind/id' -> Image (once loaded); key -> canvas (bounded below)
   const drop = pre => { for (const k of [...made.keys()]) if (k.startsWith(pre)) made.delete(k); };
   for (const [kind, ids] of Object.entries(LIST)) for (const id of ids) {
     const im = new window.Image(), key = kind + '/' + id;
-    im.onload = () => { IMG[key] = im; drop(key + '|'); };
+    im.onload = () => { IMG[key] = im; drop(key + '|'); if (kind === 'hats') drop('sprig|'); };
     im.src = 'img/' + key + '.png';
   }
   const remember = (key, c) => { if (made.size > 600) made.delete(made.keys().next().value); made.set(key, c); return c; };
@@ -94,10 +95,10 @@
   // ---------------- eggs and fruit ----------------
   const item0 = PX.item;
   if (item0) PX.item = function (type, id) {
-    const base = item0(type, id), folder = type === 'egg' ? 'eggs' : type === 'fruit' ? 'fruit' : null, im = folder && IMG[folder + '/' + id];
+    const base = item0(type, id), folder = type === 'egg' ? 'eggs' : type === 'fruit' ? 'fruit' : type === 'hat' ? 'hats' : null, im = folder && IMG[folder + '/' + id];
     if (!im || !base) return base;
     const key = folder + '/' + id + '|'; if (made.has(key)) return made.get(key);
-    let c = null; try { c = fitted(base, im, 1, { middle: type === 'fruit' }); } catch (e) { c = null; }
+    let c = null; try { c = fitted(base, im, 1, { middle: type !== 'egg' }); } catch (e) { c = null; }
     return c ? remember(key, c) : base;
   };
 
@@ -139,5 +140,42 @@
       return c ? remember(key, c) : base;
     };
   }
+  // ---------------- hats on Sprouts ----------------
+  // A Sprout wearing a hat (or an extra) whose picture has loaded: today's Sprout is drawn as usual, the code hat's pixels are found
+  // by drawing the same Sprout without it, those pixels go back to what is under the hat, and the picture is fitted into the code
+  // hat's box. The box comes from the real drawing each time, so it follows every colour, stage, pose, part and flower.
+  const sprig0 = PX.sprig;
+  const HIDES = { beanie: 1, tophat: 1, wizard: 1, sunhat: 1, cap: 1, witch: 1, propeller: 1 }; // (hats that hide the leaves: pixel.js HIDES_LEAVES)
+  const data = c => c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  if (sprig0) PX.sprig = function (L, P) {
+    const base = sprig0(L, P); if (!L || !base) return base;
+    const slots = ['hat', 'extra'].filter(sl => L[sl] && L[sl] !== 'none' && IMG['hats/' + L[sl]]); if (!slots.length) return base;
+    const key = 'sprig|' + JSON.stringify(L) + '|' + JSON.stringify(P || {}); if (made.has(key)) return made.get(key);
+    try {
+      const W = base.width, H = base.height, o = document.createElement('canvas'); o.width = W; o.height = H; if (base.k) o.k = base.k;
+      const x = o.getContext('2d'); x.drawImage(base, 0, 0);
+      const img = x.getImageData(0, 0, W, H), od = img.data, db = data(base), put = [];
+      for (const sl of slots) {
+        const id = L[sl], bareL = Object.assign({}, L, { [sl]: 'none' }), bare = sprig0(bareL, P), dn = data(bare);
+        let leaf = null; // (a hat that hides the leaves: what is under it is leaves, which stay hidden)
+        if (sl === 'hat' && HIDES[id]) { const alt = sprig0(Object.assign({}, bareL, { leaf: L.leaf === 'rose' ? 'sky' : 'rose' }), P), da = data(alt); leaf = i => da[i] !== dn[i] || da[i + 1] !== dn[i + 1] || da[i + 2] !== dn[i + 2]; }
+        let x0 = W, y0 = H, x1 = -1, y1 = -1;
+        for (let i = 0, p = 0; p < W * H; p++, i += 4) {
+          if (!db[i + 3] || (db[i] === dn[i] && db[i + 1] === dn[i + 1] && db[i + 2] === dn[i + 2] && db[i + 3] === dn[i + 3])) continue;
+          const px = p % W, py = (p / W) | 0; if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py;
+          if (leaf && leaf(i)) { od[i + 3] = 0; continue; }
+          od[i] = dn[i]; od[i + 1] = dn[i + 1]; od[i + 2] = dn[i + 2]; od[i + 3] = dn[i + 3];
+        }
+        if (x1 >= 0) put.push({ im: IMG['hats/' + id], x0, y0, x1, y1 });
+      }
+      x.putImageData(img, 0, 0);
+      x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+      for (const q of put) { // the picture, fitted into the code hat's box (a touch bigger, so no old edge peeks out), sitting on its bottom
+        const bw = q.x1 - q.x0 + 1, bh = q.y1 - q.y0 + 1, s = Math.min(bw * 1.06 / q.im.naturalWidth, bh * 1.06 / q.im.naturalHeight), w = Math.round(q.im.naturalWidth * s), h = Math.round(q.im.naturalHeight * s);
+        x.drawImage(q.im, Math.round((q.x0 + q.x1 + 1) / 2 - w / 2), q.y1 + 1 - h, w, h);
+      }
+      return remember(key, o);
+    } catch (e) { return base; }
+  };
   PX.hasPicture = (kind, id) => !!IMG[kind + '/' + id];
 })();
