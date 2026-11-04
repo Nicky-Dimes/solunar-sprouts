@@ -3188,6 +3188,8 @@
   function bigCritter(id, S, f) {
     const key = id + S + ':' + (f || 0); if (bigCache[key]) return bigCache[key];
     const c = PX.critter(id, f || 0); let o = null;
+    const pic = PX.critterPicture ? safe(() => PX.critterPicture(id, S, f || 0), null) : null; // the family's picture, drawn S x bigger (sharp)
+    if (pic) return (bigCache[key] = pic);
     if ((S === 2 || S === 3) && c.k) o = safe(() => upscaleArt(c, S), null); // fine lines at boss size
     if (!o) { o = document.createElement('canvas'); o.width = c.width * S; o.height = c.height * S; const x = o.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(c, 0, 0, o.width, o.height); }
     return (bigCache[key] = PX.keepK(c, o)); // (S x the art size: PX.artW = artW(critter) * S)
