@@ -1317,7 +1317,7 @@
   // a rare critter centred on its feet in a square canvas (so it scales by whole pixels)
   const boxCache = {};
   // a Legend drawn by art-legends.js (BOSSES art: 'legend'): PX.legend draws it at the size it is shown, never enlarged
-  const legendArt = id => !!(BOSS[id] && BOSS[id].art === 'legend' && typeof PX.legend === 'function');
+  const legendArt = id => !!(BOSS[id] && typeof PX.legend === 'function' && (BOSS[id].art === 'legend' || (PX.legendHasImage && PX.legendHasImage(id)))); // (the family's refined pictures cover the original six too)
   function critterBox(id, box) {
     if (legendArt(id)) { const c = safe(() => PX.legend(id, 'idle', box), null); if (c) return c; }
     const key = id + box; if (boxCache[key]) return boxCache[key];
@@ -3419,7 +3419,7 @@
   // legends(): every Legend Challenge, easiest first: { id, name, title, els, lv, rec, blurb, egg, art: 'legend' | 'critter', unlocked,
   // wins, tries, lock (how to unlock it) }. openLegend(id): the Battle screen on the Legends tab, with that Legend's card if it is open.
   const legendList = () => BOSSES.map(B => { const r = bossRec(B.id); return { id: B.id, name: B.name, title: B.title, els: B.els.slice(), lv: B.lv, rec: B.rec, blurb: B.blurb, egg: B.egg || null,
-    art: B.art === 'legend' ? 'legend' : 'critter', unlocked: bossUnlocked(B), wins: r.wins, tries: r.tries, lock: unlockText(B) }; });
+    art: legendArt(B.id) ? 'legend' : 'critter', unlocked: bossUnlocked(B), wins: r.wins, tries: r.tries, lock: unlockText(B) }; });
   const openLegend = id => { const B = BOSS[id]; openChallenge('legends', () => { if (B && bossUnlocked(B)) previewBoss(B); }); };
   PS.battle = Object.assign(PS.battle || {}, { trophies: () => safe(trophyList, []), nextChallenge: () => safe(nextChallenge, null), legends: () => safe(legendList, []), openLegend: id => safe(() => openLegend(id)) });
   PS.scenes.battle = { mount, show, hide, frame };

@@ -399,10 +399,37 @@
   PX.LEGEND_IDS = Object.keys(ART);
   PX.LEGEND_FRAMES = FRAMES.slice();
   const cache = new Map(); // id|frame|box -> canvas (bounded: the oldest go first)
+
+  // The family's refined Legend art: img/legends/<id>.png, cut from their AI-refined sheets (pocket-sprout/_slice.html) and sized so
+  // a battle (box 78 = 156 fine px) draws it 1:1. Once a picture has loaded, PX.legend draws it for every frame and size; until
+  // then, or in Node (tools/check_game.js), the code art below stands in (the original six fall back to their rare-creature art).
+  const IMG_IDS = ['golem', 'yeti', 'griffin', 'dinosaur', 'kraken', 'phoenix', 'dragon', 'stormwhale', 'moonwolf', 'crystaltortoise', 'sunlion', 'starserpent'];
+  const FACES_LEFT = { crystaltortoise: 1, sunlion: 1, starserpent: 1 }; // (mirrored so every Legend faces right, like the code art)
+  const IMG = {};
+  if (typeof window.Image === 'function') for (const id of IMG_IDS) {
+    const im = new window.Image();
+    im.onload = () => { IMG[id] = im; for (const k of [...cache.keys()]) if (k.startsWith(id + '|')) cache.delete(k); };
+    im.src = 'img/legends/' + id + '.png';
+  }
+  PX.LEGEND_IMG_IDS = IMG_IDS.slice();
+  PX.legendHasImage = id => IMG_IDS.includes(id);
+  function pictureLegend(im, id, f, b) {
+    const c = document.createElement('canvas'), F = b * 2; c.width = F; c.height = F; c.k = 2; // (b art px at 2 fine px each)
+    const x = c.getContext('2d'), s = Math.min(1, F / Math.max(im.naturalWidth, im.naturalHeight)), w = Math.round(im.naturalWidth * s), h = Math.round(im.naturalHeight * s);
+    x.imageSmoothingEnabled = s < 1; x.imageSmoothingQuality = 'high';
+    const X = Math.round((F - w) / 2), Y = F - h; // centred, standing on the bottom edge (where the battle puts the ground)
+    if (FACES_LEFT[id]) { x.save(); x.translate(F, 0); x.scale(-1, 1); x.drawImage(im, F - X - w, Y, w, h); x.restore(); } else x.drawImage(im, X, Y, w, h);
+    if (f === 'charge') { x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(255, 236, 160, 0.28)'; x.fillRect(0, 0, F, F); x.globalCompositeOperation = 'source-over'; } // (powering up: a warm glow)
+    return c;
+  }
   PX.legend = function (id, frame, box) {
-    const fn = ART[id]; if (!fn || !PX.Grid || typeof document === 'undefined') return null;
+    const im = IMG[id];
+    if (!ART[id] && !im) return null;
+    if ((!im && !PX.Grid) || typeof document === 'undefined') return null;
     const f = FRAMES.includes(frame) ? frame : 'idle', b = Math.max(16, Math.min(160, Math.round(box || 78))), key = id + '|' + f + '|' + b;
     if (cache.has(key)) return cache.get(key);
+    if (im) { let pc = null; try { pc = pictureLegend(im, id, f, b); } catch (e) { pc = null; } if (pc) { if (cache.size >= 40) cache.delete(cache.keys().next().value); cache.set(key, pc); return pc; } }
+    const fn = ART[id]; if (!fn) return null;
     let c = null;
     try {
       const g = new PX.Grid(b, b); g.dither = false;
