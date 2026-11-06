@@ -394,7 +394,7 @@
   // (a colour between two hex colours)
   const mix = (a, b, k) => { const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16), ch = sh => Math.round(((pa >> sh) & 255) * (1 - k) + ((pb >> sh) & 255) * k); return `rgb(${ch(16)},${ch(8)},${ch(0)})`; };
   const DAY_SKY = ['#6cc3f2', '#86cff5', '#a4dcf8', '#c4e9fb'], NIGHT_SKY = ['#1a1d48', '#222a5a', '#2c366c', '#3a4580'];
-  const GRASS = ['#a2de76', '#8fd46a', '#83ca61', '#76bd58'];
+  const GRASS = ['#a2de76', '#8fd46a', '#83ca61', '#76bd58'], SNOW_G = ['#ffffff', '#f3f7fc', '#e7eef8', '#dbe4f2']; // (SNOW_G: holiday mode's snowy lawn)
   const aw = c => (PX.artW ? PX.artW(c) : c.width), ah = c => (PX.artH ? PX.artH(c) : c.height);
   // The scene is drawn like the game's scenes: K buffer pixels ("fine pixels") per world pixel (PX.SCENE_K), so the Sprouts,
   // animals and props keep their hi-res detail, and the land, sky, sun and moon are drawn at the same fine size (soft bands,
@@ -506,24 +506,30 @@
         prev = top; top = next;
       }
     };
-    hill(hz - 5, 5, 0.045, 1, '#a6d98b', '#7fbf6a');
-    hill(hz + 1, 2.5, 0.09, 3, '#8fd07a', '#66b35a');
+    // (holiday mode, state.js PS.holiday: snowy hills and a snowy lawn, holly instead of flowers, a holiday tree and a snowman)
+    const hol = !!Lay.hol;
+    hill(hz - 5, 5, 0.045, 1, hol ? '#eef3fa' : '#a6d98b', hol ? '#bccbe0' : '#7fbf6a');
+    hill(hz + 1, 2.5, 0.09, 3, hol ? '#f6f9fd' : '#8fd07a', hol ? '#c8d5e8' : '#66b35a');
     // the lawn: soft bands from light at the back to deeper at the front (the 4 grass greens and the tones between)
-    const NL = 13, depth = wh - lawnTop;
-    for (let i = 0; i < NL; i++) { const k = i / (NL - 1) * 3, a = Math.floor(k), y0 = fr(lawnTop + depth * i / NL); g.fillStyle = mix(GRASS[a], GRASS[Math.min(3, a + 1)], k - a); g.fillRect(0, y0, ww, wh - y0); }
+    const NL = 13, depth = wh - lawnTop, LG = hol ? SNOW_G : GRASS;
+    for (let i = 0; i < NL; i++) { const k = i / (NL - 1) * 3, a = Math.floor(k), y0 = fr(lawnTop + depth * i / NL); g.fillStyle = mix(LG[a], LG[Math.min(3, a + 1)], k - a); g.fillRect(0, y0, ww, wh - y0); }
     // fine grass blades along the lawn's back edge
-    g.fillStyle = '#66b35a';
+    g.fillStyle = hol ? '#c4d2e6' : '#66b35a';
     for (let fx = 0; fx < FW; fx++) { const h = hash(fx, 3); if (h < 0.5) { const t = h < 0.18 ? 2 : 1; g.fillRect(fx * F, lawnTop - t * F, F, t * F); } }
     // grass tufts (three fine blades) and little flowers (a fine cross of petals round a centre)
     const NT = Math.floor(ww * depth / 90), at = i => [Math.floor(hash(i, 11) * ww), Math.floor(lawnTop + 3 + hash(i, 12) * (depth - 3)) + 1];
-    g.fillStyle = '#5aa846';
-    for (let i = 0; i < NT; i++) { const [x, y] = at(i); for (const [dx, dy] of [[0, -1], [-1, -2], [1, -1], [1, -2], [1, -3], [2, -1], [3, -2]]) g.fillRect(x + dx * F, y + dy * F, F, F); }
+    g.fillStyle = hol ? '#8fae86' : '#5aa846';
+    for (let i = 0; i < NT; i += hol ? 3 : 1) { const [x, y] = at(i); for (const [dx, dy] of [[0, -1], [-1, -2], [1, -1], [1, -2], [1, -3], [2, -1], [3, -2]]) g.fillRect(x + dx * F, y + dy * F, F, F); }
+    if (hol) { // holly berries poking out of the snow, and a soft blue shadow under little drifts
+      for (let i = 1; i < NT; i += 9) { const [x, y] = at(i); g.fillStyle = '#2f7a4a'; g.fillRect(x - F, y - 2 * F, 2 * F, F); g.fillRect(x + 2 * F, y - 2 * F, 2 * F, F); g.fillStyle = '#e8445a'; g.fillRect(x + F, y - 3 * F, F, F); g.fillRect(x, y - 3 * F, F, F); }
+      g.fillStyle = '#d2ddef'; for (let i = 5; i < NT; i += 4) { const [x, y] = at(i); g.fillRect(x - 3 * F, y, 7 * F, F); }
+    }
     const PET = ['#ffffff', '#fbf236', '#f7b6c8', '#c9a2f0'];
-    for (let p = 0; p < 4; p++) {
+    if (!hol) for (let p = 0; p < 4; p++) {
       g.fillStyle = PET[p];
       for (let i = p * 3; i < NT; i += 12) { const [x, y] = at(i); for (const [dx, dy] of [[0, -5], [2, -5], [1, -6], [1, -4]]) g.fillRect(x + dx * F, y + dy * F, F, F); }
     }
-    for (let p = 0; p < 4; p++) {
+    if (!hol) for (let p = 0; p < 4; p++) {
       g.fillStyle = p === 1 ? '#ffffff' : '#fbf236';
       for (let i = p * 3; i < NT; i += 12) { const [x, y] = at(i); g.fillRect(x + F, y - 5 * F, F, F); }
     }
@@ -543,11 +549,11 @@
     };
     prop('bigtree', 0.09, lawnTop + 10);
     prop('fence', 0.42, lawnTop + 5); prop('fence', 0.42 + 26 / ww, lawnTop + 5);
-    prop('bush', 0.27, lawnTop + 6);
+    prop(hol ? 'holidaytree' : 'bush', 0.27, lawnTop + 6);
     const house = prop('shroomhouse', 0.85, lawnTop + 12);
     const lamp = prop('lamp', 0.66, lawnTop + 14);
-    prop('flowerbed', 0.3, lawnTop + 22); prop('mushrooms', 0.58, lawnTop + 20); prop('flowerbed', 0.95, wh - Lay.depth * 0.28);
-    prop('bush', 0.04, wh - Lay.depth * 0.18); prop('tree', 0.97, lawnTop + 30);
+    if (!hol) prop('flowerbed', 0.3, lawnTop + 22); prop('mushrooms', 0.58, lawnTop + 20); prop(hol ? 'snowman' : 'flowerbed', 0.95, wh - Lay.depth * 0.28);
+    prop('bush', 0.04, wh - Lay.depth * 0.18); prop(hol ? 'snowtree' : 'tree', 0.97, lawnTop + 30);
     // night: warm glows from the lamp and the house windows
     if (tint) {
       const glow = (x, y, r, a) => { for (let k = r; k > 0; k -= 2) { g.globalAlpha = a * (1 - k / (r + 1)) * 0.5; disc(x, y, k, '#ffec96'); } g.globalAlpha = 1; };
@@ -567,18 +573,20 @@
   function hash(x, y) { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
 
   let bgCv = null;
-  const ST = { w: 0, h: 0, n: -1, bg: null, buf: null, lay: null, chk: -9, nk: 0, stars: null, starA: 0 };
+  const ST = { w: 0, h: 0, n: -1, bg: null, buf: null, lay: null, chk: -9, nk: 0, stars: null, starA: 0, hk: 0, hol: 0, snow: null };
+  // the scene is made again when holiday mode switches (1) and once the garden pictures have loaded (2)
+  const holK = () => { let k = 0; try { if (PS.holiday && PS.holiday.on()) k |= 1; if (PX.hasPicture && PX.hasPicture('props', 'shroomhouse')) k |= 2; } catch (e) { /* optional */ } return k; };
   function drawBg(tNow) {
     const cv = bgCv || (bgCv = root.querySelector('.mm-bg')), W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
     // K buffer pixels per world pixel; the world zoom is picked so every fine pixel covers a whole number of screen pixels
-    const K = PX.SCENE_K || 2, F = 1 / K, dpr = Math.min(2, window.devicePixelRatio || 1);
+    const K = PX.SCENE_K || 2, F = 1 / K, dpr = Math.min(3, window.devicePixelRatio || 1); // (the real density: a 2x bitmap would be blurred 1.5x on iPhones)
     const d = Math.max(1, Math.round((W >= 700 ? 3 : 2) * dpr / K)), PXS = d * K / dpr, ww = Math.ceil(W / PXS), wh = Math.ceil(H / PXS);
     // (the clock is asked once a second; nothing here builds strings or objects while the garden just plays)
-    if (!(tNow - ST.chk < 1)) { ST.chk = tNow; ST.nk = nightK(); }
+    if (!(tNow - ST.chk < 1)) { ST.chk = tNow; ST.nk = nightK(); ST.hk = holK(); }
     const n = ST.nk;
-    if (ST.w !== ww || ST.h !== wh || ST.n !== n) {
+    if (ST.w !== ww || ST.h !== wh || ST.n !== n || ST.hol !== ST.hk) {
       const resized = ST.w !== ww || ST.h !== wh, flipped = (ST.n > 0.5) !== (n > 0.5) || ST.n < 0;
-      ST.w = ww; ST.h = wh; ST.n = n; ST.lay = layoutOf(ww, wh, K);
+      ST.w = ww; ST.h = wh; ST.n = n; ST.hol = ST.hk; ST.lay = layoutOf(ww, wh, K); ST.lay.hol = !!(ST.hk & 1);
       ST.bg = buildBg(ST.bg || document.createElement('canvas'), ST.lay, n);
       if (!ST.buf) ST.buf = document.createElement('canvas');
       if (ST.buf.width !== ww * K || ST.buf.height !== wh * K) { ST.buf.width = ww * K; ST.buf.height = wh * K; }
@@ -623,6 +631,15 @@
       else f = frameOf(w, ((tNow + w.ph * 1.7) % 3.4) < 0.14 ? 4 : 2 + (Math.floor((tNow + w.ph) / 0.55) % 2));
       const sw = hopY > 3 ? 9 : 13; g.drawImage(shadowSpr(sw, 0.2, K), Math.round(w.x) - (sw - 1) / 2, fy - 1, sw, 2);
       if (f) PX.blit(g, f, w.x, fy - hopY, w.dir < 0, PX.SPRIG_AX, PX.SPRIG_AY);
+    }
+    // holiday mode: a little light snow drifting down (none for reduced motion)
+    if (Lay.hol && !calm) {
+      if (!ST.snow) ST.snow = Array.from({ length: 18 }, () => [Math.random(), Math.random(), 0.02 + Math.random() * 0.02, Math.random() * 6.28, Math.random() < 0.3]);
+      g.fillStyle = '#ffffff';
+      for (const [sx, sy, v, ph, big] of ST.snow) {
+        const x = Math.round((((sx + Math.sin(tNow * 0.35 + ph) * 0.015) % 1 + 1) % 1) * ww * K) / K, y = Math.round(((sy + tNow * v) % 1) * wh * K) / K;
+        if (big) { g.fillRect(x - F, y, 3 * F, F); g.fillRect(x, y - F, F, 3 * F); } else g.fillRect(x, y, 2 * F, 2 * F);
+      }
     }
     g.setTransform(1, 0, 0, 1, 0, 0);
     if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
@@ -670,6 +687,7 @@
     const n = nightK(); setCritters(n > 0.5); paintLogo(n);
     renderCards(false); paintSound(); paintMusic();
     root.hidden = false; root.querySelector('.mm-scroll').scrollTop = 0; PS.ui.menuOpen = true;
+    { const tag = root.querySelector('.mm-tag'), hol = !!(PS.holiday && PS.holiday.on()); if (tag) tag.textContent = hol ? 'Happy holidays!' : 'Raise, race and battle your Sprouts!'; ST.chk = -9; } // (holiday mode's tagline; the scene checks again now)
     try { calm = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { calm = false; }
     lastT = 0; if (!raf) raf = requestAnimationFrame(loop);
     try { if (window.PX && PX.Music) PX.Music.play('title'); } catch (e) { /* audio optional */ }

@@ -378,6 +378,11 @@
   const FROST_FLAKES = [[5.5, -2.5], [-5.5, 2.5], [5.5, 4.5]];
   const BLOS = ['#ffdcea', '#f7aecb', '#d97ca6'], BLOS_AT = [[4.5, -4.5], [-4.5, -5.5], [6.5, 3.5], [-6.5, 3.5]], BLOS_ORB = [[-3.2, -2.4], [3.6, 3.4]];
   const PEARL = [['#fff8fc', '#f9e2ee', '#d4b8d8'], ['#f8fbff', '#e2e8fb', '#b8c2e4'], ['#f8fffc', '#dff3ec', '#b4d2cc'], ['#fffbf4', '#fae8d8', '#d8c0b4']];
+  // ---- holiday skins (snowman, gingerbread, candy cane, elf, reindeer). The sticker Sprout's face is at y 19.5..24.5 (eyes 19.5..23,
+  // mouth and cheeks 23..24.5; dy -2.5..2.5 from the skin centre (16, 22)), so noses sit between the eyes, scarves, collars and icing
+  // just under the chin (dy 2.55..4) and buttons down the tummy, between the feet. ----
+  const SNOWR = ['#ffffff', '#eef4fc', '#bccbe4'], GINGER = ['#e8b072', '#c67c3e', '#8c4c22'], ELFR = ['#9ee070', '#4caa3c', '#2a6a32'], DEER = ['#dcae74', '#b8783e', '#7e4c26'];
+  const CANE = [['#ffffff', '#f7f0f3', '#d4c6cc'], ['#ff8a90', '#e4303a', '#a01c2e']];
   // f(x, y, tone, dx, dy, toneAt) -> colour. dx/dy = offset from the body centre in sprig-body units.
   const SKINS = {
     gold(x, y, t, dx, dy) {
@@ -480,6 +485,42 @@
       const r = Math.hypot(dx + 3.5, dy + 4.2), band = Math.floor(r / 2.6) % 4;
       return PEARL[band][t];
     },
+    // ---- holiday skins ----
+    // Snowman: snow-white, a carrot nose, a red-and-green knitted scarf under the chin and two coal buttons
+    snowman(x, y, t, dx, dy) {
+      const nx = dx - 0.15, ny = dy + 0.25;
+      if (nx > -1 && nx < 1.25 && Math.abs(ny) < 0.6 - nx * 0.2) return nx > 0.55 ? '#e0701c' : t === 0 ? '#ffb45a' : '#ff9a30'; // (pointing right)
+      if (dy > 2.65 && dy < 3.95 && Math.abs(dx) < 7.3 - (dy - 2.65) * 0.3) {
+        const red = Math.floor((dx + 12) / 1.5) % 2, low = dy > 3.6;
+        return red ? (low ? '#b8203a' : t === 0 ? '#ff6a76' : '#e8404e') : (low ? '#1f6a34' : t === 0 ? '#5cc06a' : '#2f9a48');
+      }
+      for (const by of [5.0, 6.45]) { const q = Math.hypot(dx * 1.05, dy - by); if (q < 0.62) return q < 0.3 && dx < 0 && dy < by ? '#5a5a70' : '#2a2838'; }
+      return SNOWR[t];
+    },
+    // Gingerbread: cookie brown, white icing (a wavy line over the brow and one across the tummy) and gumdrop buttons
+    gingerbread(x, y, t, dx, dy) {
+      const w = Math.sin(dx * 1.7) * 0.42;
+      if (Math.abs(dy + 5.0 - w) < 0.36 && Math.abs(dx) < 5.4) return '#fffaf0';
+      if (Math.abs(dy - 3.3 - w) < 0.36 && Math.abs(dx) < 7.0) return '#fffaf0';
+      for (const [by, c] of [[5.05, ['#ff9aa6', '#e8445a']], [6.55, ['#b4f08a', '#4fba3a']]]) { const q = Math.hypot(dx * 1.05, dy - by); if (q < 0.66) return dx < -0.1 && dy < by - 0.1 ? c[0] : c[1]; }
+      return GINGER[t];
+    },
+    // Candy cane: red and white peppermint stripes running diagonally
+    candycane(x, y, t, dx, dy) { return (Math.floor((dx + dy + 60) / 2.7) % 2 ? CANE[0] : CANE[1])[t]; },
+    // Elf: a green suit, a red collar with a scalloped white edge just under the chin, and two gold buttons
+    elf(x, y, t, dx, dy) {
+      const sc = Math.abs(Math.sin(dx * 1.25)) * 0.42;
+      if (Math.abs(dx) < 7.3 && dy > 2.55 && dy < 3.55 + sc) return dy > 3.25 + sc ? '#ffffff' : t === 0 ? '#ff6a76' : t === 2 ? '#b8203a' : '#e4303a';
+      for (const by of [5.0, 6.45]) { const q = Math.hypot(dx * 1.05, dy - by); if (q < 0.6) return dx < -0.1 && dy < by - 0.1 ? '#fff6a0' : '#f2c030'; }
+      return ELFR[t];
+    },
+    // Reindeer: warm brown, a bright red nose just above a cream muzzle round the mouth (the belly is cream too: SKIN_BELLY)
+    reindeer(x, y, t, dx, dy) {
+      const n = Math.hypot(dx - 0.05, (dy + 0.3) / 0.82);
+      if (n < 1) return n < 0.42 && dx < 0 && dy < -0.45 ? '#ffb4b8' : dy > 0.05 ? '#c41c2c' : '#ee2e3e';
+      if ((dx / 2.4) ** 2 + ((dy - 1.65) / 1.25) ** 2 < 1) return t === 2 ? '#e6bc92' : '#f6dab8';
+      return DEER[t];
+    },
   };
   // the face stays readable on patterned skins: an oval around the eyes and mouth (sprig-body units)
   const faceZone = (dx, dy, grow) => (dx / (6.2 + grow)) ** 2 + ((dy + 0.9) / (3.5 + grow)) ** 2 < 1;
@@ -491,17 +532,20 @@
     vampire: ['#4a3a6c', '#e8506a', '#c9a2f0'], witch: ['#8e56c8', '#9ad862', '#fff27a'],
     eclipse: ['#fff27a', '#f6a83a', '#ffffff', '#9aa6f4'], galaxy: ['#ffffff', '#fff6b0', '#c9a2f0', '#b8f0ff'], frost: ['#ffffff', '#c8ecfa', '#e8f6ff'],
     blossom: ['#ffffff', '#f7b6c8', '#fbf236'], pearl: ['#ffffff', '#fce8f0', '#e4ecfc', '#ece4fc'],
+    snowman: ['#ffffff', '#c8ecfa'], gingerbread: ['#fffaf0', '#e8b072', '#e8445a'], candycane: ['#ffffff', '#ff6a76'], elf: ['#fbf236', '#8ee060', '#e8445a'], reindeer: ['#ff6a76', '#fff27a', '#ecc890'],
     shiny: ['#ffffff', '#fff6c8'],
   };
   const SPOOKY_SKINS = ['pumpkin', 'ghost', 'mummy', 'candycorn', 'vampire', 'witch'];
   const SKIN_BELLY = { ember: '#fff0c4', pumpkin: '#ffe2b0', ghost: '#ffffff', candycorn: '#fff8e0', vampire: '#f4eeff', witch: '#f0e2ff', mummy: null,
-    eclipse: '#fff4d6', galaxy: '#e6dcff', frost: '#f6fbff', blossom: '#fff6fa', pearl: '#fffaf6' };
-  const SKIN_BELLY_SHADE = { eclipse: '#c89060', galaxy: '#8a78c8', frost: '#8cb4dc', blossom: '#d890b0', pearl: '#b8aed0' }; // newer skins (older ones keep the brown)
+    eclipse: '#fff4d6', galaxy: '#e6dcff', frost: '#f6fbff', blossom: '#fff6fa', pearl: '#fffaf6',
+    snowman: null, gingerbread: null, candycane: null, elf: null, reindeer: '#f6dab8' }; // (holiday skins: their own scarf / icing / collar instead)
+  const SKIN_BELLY_SHADE = { eclipse: '#c89060', galaxy: '#8a78c8', frost: '#8cb4dc', blossom: '#d890b0', pearl: '#b8aed0', reindeer: '#c48a5c' }; // newer skins (older ones keep the brown)
   const SKIN_DARK = { galaxy: 1 }; // dark skins get the pale eye patches that dark bodies have
   // [mid, dark] of each skin, so the newer pattern stickers can pick a colour that shows up on it
   const SKIN_TONE = { gold: ['#fcd850', '#a8680e'], rainbow: ['#fbe46a', '#8062c0'], crystal: ['#c8ecfa', '#8ab8e0'], ember: ['#d24552', '#8a2433'], pumpkin: ['#f7922e', '#c8581c'],
     ghost: ['#efeaff', '#c9bdf0'], mummy: ['#ece0c4', '#8a7456'], candycorn: ['#ff9a22', '#d0660c'], vampire: ['#4a3a6c', '#2e2448'], witch: ['#8e56c8', '#5a2e8a'],
-    eclipse: ['#fcc43e', '#c86a1c'], galaxy: ['#3a2e88', '#231a56'], frost: ['#c4e4f8', '#8cbae2'], blossom: ['#fbc2da', '#e690b8'], pearl: ['#ecf0fc', '#c8cfe8'] };
+    eclipse: ['#fcc43e', '#c86a1c'], galaxy: ['#3a2e88', '#231a56'], frost: ['#c4e4f8', '#8cbae2'], blossom: ['#fbc2da', '#e690b8'], pearl: ['#ecf0fc', '#c8cfe8'],
+    snowman: ['#eef4fc', '#bccbe4'], gingerbread: ['#c67c3e', '#8c4c22'], candycane: ['#e4303a', '#a01c2e'], elf: ['#4caa3c', '#2a6a32'], reindeer: ['#b8783e', '#7e4c26'] };
     function applySkin(g, skin, cx, cy, k, base) {
       const f = SKINS[skin]; if (!f) return;
       base = base || RAMPS.cream;
@@ -514,7 +558,7 @@
     }
   
   // ---------------- Hats & extras (shared by buildSprig and the hat icons; sprig 32x32 coordinates) ----------------
-  const HAT_IDS = ['crown', 'beanie', 'tophat', 'flower', 'bow', 'leafcap', 'party', 'wizard', 'sunhat', 'cap', 'witch', 'flowercrown', 'bandana', 'headphones', 'propeller'];
+  const HAT_IDS = ['crown', 'beanie', 'tophat', 'flower', 'bow', 'leafcap', 'party', 'wizard', 'sunhat', 'cap', 'witch', 'flowercrown', 'bandana', 'headphones', 'propeller', 'santa', 'elf', 'antlers'];
   const EXTRA_IDS = ['halo', 'star', 'moon', 'heart'];
   const HIDES_LEAVES = { beanie: 1, tophat: 1, wizard: 1, sunhat: 1, cap: 1, witch: 1, propeller: 1 };
   // striped cone from base-left / base-right to tip; stripes spiral a little, 3-tone across the cone
@@ -616,6 +660,46 @@
         h.px([[16, 9], [16, 10]], '#8c93a8'); // post
         h.ell(13.2, 7.9, 2.7, 0.95, P4[0], -0.22).ell(18.8, 7.9, 2.7, 0.95, P4[1], -0.22).ell(16, 8, 0.9, 0.9, '#fbf236');
         h.px([[11, 12], [12, 11]], '#ffffff');
+        break;
+      }
+      // ---- holiday hats (their pictures, img/hats/santa|elf|antlers.png, are fitted into these boxes by art-images.js) ----
+      case 'santa': { // a floppy red cap with a white fur brim and pompom, tipped to the left (off to the left of a bud or bloom)
+        const RD = ['#ff8a90', '#e42a2e', '#a01828'], WH = ['#ffffff', '#eef2fb', '#c4cee2'];
+        const [bl, br, tp, pr] = icon ? [[10.8, 15.4], [21.2, 15.4], [9.6, 7.4], 1.8] : crowned ? [[7.6, 17.2], [15.4, 14.4], [4.6, 7.8], 1.8] : [[10, 15.4], [22, 15.4], [8.6, 6.6], 2];
+        cone(h, bl, br, tp, [RD], 1);
+        const mx = (bl[0] + br[0]) / 2, my = (bl[1] + br[1]) / 2, a = Math.atan2(br[1] - bl[1], br[0] - bl[0]);
+        piece(h, t => t.ell(mx, my + 0.15, Math.hypot(br[0] - bl[0], br[1] - bl[1]) / 2 + 0.6, 1.7, WH, a));
+        piece(h, t => t.ell(tp[0] - 0.2, tp[1], pr, pr, WH));
+        h.dots([[tp[0] - 0.9, tp[1] - 0.8], [tp[0] - 0.4, tp[1] - 0.8], [tp[0] - 0.9, tp[1] - 0.3]], '#ffffff');
+        break;
+      }
+      case 'elf': { // a green elf cap leaning right, a red-and-white striped brim and a golden bell (off to the right of a bud or bloom)
+        const GR = ['#8ee060', '#3f9a3a', '#255e2c'], WH = ['#ffffff', '#f4f2f4', '#cfc6cc'], GB = ['#fff6a0', '#f6c83a', '#c7861c'], W5 = ramp5(WH);
+        const [bl, br, tp, pr] = icon ? [[11, 15.4], [21, 15.4], [22.4, 4.8], 1.5] : crowned ? [[16.6, 14.4], [24.4, 17.2], [27.6, 6.0], 1.5] : [[10.4, 15.4], [21.6, 15.4], [23.8, 4.0], 1.7];
+        cone(h, bl, br, tp, [GR], 1);
+        const mx = (bl[0] + br[0]) / 2, my = (bl[1] + br[1]) / 2, a = Math.atan2(br[1] - bl[1], br[0] - bl[0]), ca = Math.cos(a), sa = Math.sin(a);
+        piece(h, t => {
+          t.ell(mx, my + 0.15, Math.hypot(br[0] - bl[0], br[1] - bl[1]) / 2 + 0.5, 1.6, WH, a);
+          for (let fy = 0; fy < t.fh; fy++) for (let fx = 0; fx < t.fw; fx++) {
+            const c = t.fget(fx, fy), w = W5.indexOf(c); if (w < 0) continue;
+            const u = ((fx + 0.5) / t.k - mx) * ca + ((fy + 0.5) / t.k - my) * sa; if (Math.floor(u / 1.3 + 40) % 2) t.fset(fx, fy, w >= 3 ? '#b01c2c' : '#e4303a');
+          }
+        });
+        piece(h, t => t.ell(tp[0] + 0.2, tp[1], pr, pr, GB));
+        h.dots([[tp[0] - 0.4, tp[1] - 0.6], [tp[0] + 0.1, tp[1] - 0.6]], '#ffffff');
+        break;
+      }
+      case 'antlers': { // two branching antlers on the sides of the head (the leaves, bud or bloom stay in view between them)
+        const AN = ['#ecc890', '#b8804a', '#7a4a24'], sx = icon ? 0.72 : 1;
+        for (const s of [-1, 1]) {
+          const X = v => 16 + s * v * sx;
+          piece(h, t => {
+            stroke(t, [[X(5.0), 15.6], [X(5.8), 12.4], [X(7.0), 9.4], [X(8.4), 5.8]], 0.95, 0.6, AN[1]);
+            stroke(t, [[X(6.0), 11.8], [X(8.2), 10.4], [X(9.8), 10.6]], 0.62, 0.5, AN[1]);
+            stroke(t, [[X(7.0), 8.6], [X(6.0), 5.2]], 0.62, 0.45, AN[1]);
+            shade(t, X(7.2), 10.2, 4.2, 6.2, AN);
+          });
+        }
         break;
       }
     }
@@ -727,49 +811,56 @@
     }
     // the face: glossy eyes at today's spots (centres x 13 / 19, y 20.5), soft blush, thin fine-pixel mouths
     function hrFace(g, L, P, eyes, skin) {
-      const ec = L.eyeColor || '#5b6ee1', iris = hrMix(ec, INK, 0.3), irisHi = hrMix(ec, '#ffffff', 0.45), W = '#ffffff';
-      const ln = (pts, r, c) => stroke(g, pts, r || 0.34, r || 0.34, c || INK);
-      const glossy = (cx, cy, rx, ry, o) => {
+      const ec = L.eyeColor || '#5b6ee1', iris = hrMix(ec, SS_EYE, 0.3), W = '#ffffff', K = g.k || 1, DY = 1; // (eyes and brows 1 art px lower than today)
+      const ln = (pts, r, c) => stroke(g, pts.map(([x, y]) => [x, y + DY]), r || 0.34, r || 0.34, c || INK);
+      // a bead eye: a w x h fine-px dark oval with its top-left fine pixel at (x0, y0), a big shine up-left (2 x 2, 3 x 3 when big),
+      // a small shine down-right and a glint of the eye colour low in the eye
+      const bead = (x0, y0, w, h, o) => {
         o = o || {};
-        g.ell(cx, cy, rx, ry, INK);
-        g.ell(cx + 0.1, cy + ry * 0.56, rx * 0.56, ry * 0.27, iris); // a glow of eye colour low in the eye
-        g.dot(cx + 0.1, cy + ry * 0.62, irisHi);
-        const sx = cx - rx * 0.36, sy = cy - ry * 0.5; // big shine up-left (2 x 2 fine pixels, 3 x 3 on big eyes)
-        g.dots([[sx, sy], [sx + 0.5, sy], [sx, sy + 0.5], [sx + 0.5, sy + 0.5]], W);
-        if (o.big) g.dots([[sx + 1, sy], [sx + 1, sy + 0.5], [sx, sy + 1], [sx + 0.5, sy + 1]], W);
-        g.dot(cx + rx * 0.4, cy + ry * 0.32, W); // small shine down-right
-        if (o.sparkle) { const tx = cx + rx * 0.55, ty = cy - ry * 0.75; g.dots([[tx, ty - 0.5], [tx - 0.5, ty], [tx + 0.5, ty], [tx, ty + 0.5]], '#fff6b0'); g.dot(tx, ty, W); }
+        for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const dx = (i + 0.5 - w / 2) / (w / 2), dy = (j + 0.5 - h / 2) / (h / 2); if (dx * dx + dy * dy <= 1.15) g.fset(x0 + i, y0 + j, SS_EYE); }
+        g.fset(x0 + 1, y0 + h - 2, iris); g.fset(x0 + 2, y0 + h - 2, iris);
+        const s = w >= 6 ? 3 : 2; for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) if (!(s === 3 && i === 2 && j === 2) || o.big) g.fset(x0 + 1 + i, y0 + 1 + j, W);
+        g.fset(x0 + w - 2, y0 + h - 2, W);
+        if (o.sparkle) { const tx = x0 + w - 2, ty = y0 + 2; g.fset(tx, ty, W); for (const [a, b] of [[1, 0], [0, -1], [-1, 0], [0, 1]]) if (g.fget(tx + a, ty + b) === SS_EYE) g.fset(tx + a, ty + b, '#fff6b0'); }
       };
+      // eye boxes (fine px): today's eye centres x 13 / 19 -> 12.5 / 19.5, y 20.45 -> 21.25 (bottom row always fine row 45)
+      const box = (sd, w, h) => [sd < 0 ? 28 - w : 36, 46 - h];
       const eye = (cx, sd) => {
         switch (eyes) {
           case 'happy': ln([[cx - 1.2, 21.3], [cx - 0.65, 20.3], [cx, 20.0], [cx + 0.65, 20.3], [cx + 1.2, 21.3]]); break;
           case 'closed': ln([[cx - 1.2, 20.4], [cx - 0.6, 21.2], [cx + 0.6, 21.2], [cx + 1.2, 20.4]]); break;
           case 'blink': ln([[cx - 1.15, 21.0], [cx, 21.3], [cx + 1.15, 21.0]]); break;
-          case 'sleepy': g.ell(cx, 20.9, 1.2, 1.3, INK, 0, (x, y) => y >= 20); g.dot(cx - 0.5, 20.6, W); ln([[cx - 1.4, 20.2], [cx, 20.0], [cx + 1.4, 20.2]], 0.3); break;
-          case 'dot': g.ell(cx + (sd < 0 ? 0.25 : -0.25), 20.7, 0.62, 0.95, INK); g.dot(cx + (sd < 0 ? 0 : -0.5), 20.1, W); break;
-          case 'sparkle': glossy(cx, 20.5, 1.4, 1.8, { sparkle: true }); break;
+          case 'sleepy': g.ell(cx, 20.9 + DY, 1.2, 1.3, SS_EYE, 0, (x, y) => y >= 20 + DY); g.dot(cx - 0.5, 20.6 + DY, W); ln([[cx - 1.4, 20.2], [cx, 20.0], [cx + 1.4, 20.2]], 0.3); break;
+          case 'dot': g.ell(cx + (sd < 0 ? 0.25 : -0.25), 20.7 + DY, 0.62, 0.95, SS_EYE); g.dot(cx + (sd < 0 ? 0 : -0.5), 20.1 + DY, W); break;
+          case 'sparkle': { const [x0, y0] = box(sd, 6, 7); bead(x0, y0, 6, 7, { sparkle: true }); break; }
           case 'star': {
             const c = cx + (sd < 0 ? -0.05 : 0.05);
-            g.poly(starPts(c, 20.7, 2.05, 0.95, 5), INK); g.poly(starPts(c, 20.75, 1.45, 0.62, 5), '#fbd84a');
-            g.ell(c, 20.75, 0.45, 0.4, '#fff6c8'); g.dot(c - 0.5, 20.0, W); break;
+            g.poly(starPts(c, 20.7 + DY, 2.05, 0.95, 5), SS_EYE); g.poly(starPts(c, 20.75 + DY, 1.45, 0.62, 5), '#fbd84a');
+            g.ell(c, 20.75 + DY, 0.45, 0.4, '#fff6c8'); g.dot(c - 0.5, 20.0 + DY, W); break;
           }
-          case 'wink': if (sd > 0) ln([[cx - 1.2, 21.3], [cx - 0.65, 20.3], [cx, 20.0], [cx + 0.65, 20.3], [cx + 1.2, 21.3]]); else glossy(cx, 20.45, 1.35, 1.85); break;
-          case 'big': glossy(cx + (sd < 0 ? -0.1 : 0.1), 20.35, 1.65, 2.1, { big: true }); break;
-          default:
-            glossy(cx, 20.45, 1.35, 1.85);
-            if (eyes === 'brave') ln(sd < 0 ? [[cx - 1.5, 18.1], [cx + 0.9, 18.85]] : [[cx + 1.5, 18.1], [cx - 0.9, 18.85]], 0.3);
-            if (eyes === 'sad') ln(sd < 0 ? [[cx - 1.4, 18.9], [cx + 0.9, 18.15]] : [[cx + 1.4, 18.9], [cx - 0.9, 18.15]], 0.3);
+          case 'wink': if (sd > 0) ln([[cx - 1.2, 21.3], [cx - 0.65, 20.3], [cx, 20.0], [cx + 0.65, 20.3], [cx + 1.2, 21.3]]); else { const [x0, y0] = box(sd, 6, 7); bead(x0, y0, 6, 7); } break;
+          case 'big': { const [x0, y0] = box(sd, 7, 8); bead(x0, y0, 7, 8, { big: true }); break; }
+          default: {
+            const [x0, y0] = box(sd, 6, 7); bead(x0, y0, 6, 7);
+            if (eyes === 'brave') ln(sd < 0 ? [[cx - 1.5, 18.3], [cx + 0.9, 19.0]] : [[cx + 1.5, 18.3], [cx - 0.9, 19.0]], 0.3);
+            if (eyes === 'sad') ln(sd < 0 ? [[cx - 1.4, 19.0], [cx + 0.9, 18.3]] : [[cx + 1.4, 19.0], [cx - 0.9, 18.3]], 0.3);
+          }
         }
       };
-      if (L.cheek) for (const bx of [10.75, 21.25]) { g.ell(bx, 22.75, 1.3, 0.62, L.cheek, 0, (x, y) => g.filled(x, y)); g.dot(bx - 0.6, 22.5, hrMix(L.cheek, '#ffffff', 0.5)); }
-      eye(13, -1); eye(19, 1);
-      const m = P.mouth || 'smile', R2 = '#e8607a';
-      if (m === 'open') { g.ell(16, 22.7, 1.2, 1.15, INK, 0, (x, y) => y >= 22.45); g.ell(16.15, 23.4, 0.62, 0.42, R2); }
-      else if (m === 'o') { g.ell(16, 23.0, 0.72, 0.85, INK); g.ell(16, 23.15, 0.32, 0.4, '#7a3048'); }
-      else if (m === 'flat') ln([[15.1, 23.1], [16.9, 23.1]], 0.3);
-      else if (m === 'grin') { g.ell(16, 22.55, 1.55, 1.05, INK, 0, (x, y) => y >= 22.35); g.ell(16, 22.75, 1.1, 0.32, W); }
-      else ln([[14.85, 22.5], [15.45, 23.15], [16.55, 23.15], [17.15, 22.5]], 0.3);
-      if (skin === 'vampire' && m !== 'o' && m !== 'flat') g.dots([[15.0, 23.4], [16.5, 23.4]], W);
+      // rosy blush: a 5 x 3 fine-px oval under each eye, its rim blended with whatever is under it
+      if (L.cheek) for (const x0 of [19, 40]) for (let j = 0; j < 3; j++) for (let i = 0; i < 5; i++) {
+        if ((j !== 1) && (i === 0 || i === 4)) continue;
+        const fx = x0 + i, fy = 46 + j, c = g.fget(fx, fy); if (!c || c === INK || c[0] !== '#' || c.length !== 7) continue;
+        g.fset(fx, fy, j === 1 && i > 0 && i < 4 ? L.cheek : hrMix(L.cheek, c, 0.35));
+      }
+      eye(12.75, -1); eye(19.25, 1);
+      const m = P.mouth || 'smile', R2 = '#e8607a', MY = 0.75;
+      if (m === 'open') { g.ell(16, 22.7 + MY, 1.2, 1.15, INK, 0, (x, y) => y >= 22.45 + MY); g.ell(16.15, 23.4 + MY, 0.62, 0.42, R2); }
+      else if (m === 'o') { g.ell(16, 23.0 + MY, 0.72, 0.85, INK); g.ell(16, 23.15 + MY, 0.32, 0.4, '#7a3048'); }
+      else if (m === 'flat') ln([[15.1, 23.1 + MY - DY], [16.9, 23.1 + MY - DY]], 0.3);
+      else if (m === 'grin') { g.ell(16, 22.55 + MY, 1.55, 1.05, INK, 0, (x, y) => y >= 22.35 + MY); g.ell(16, 22.75 + MY, 1.1, 0.32, W); }
+      else for (const [dx, dy] of [[0, 0], [2, 0], [3, 0], [5, 0], [1, 1], [4, 1]]) g.fset(29 + dx, 46 + dy, INK); // a little "w"
+      if (skin === 'vampire' && m !== 'o' && m !== 'flat') g.dots([[15.0, 23.4 + MY], [16.5, 23.4 + MY]], W);
     }
   
     // ---------------- HD finishing kit (PX.hd): one consistent level of detail for any k = 2 grid ----------------
@@ -868,6 +959,132 @@
       return g;
     }
   
+    // ---------------- sticker Sprout (sample) ----------------
+    const SS_INK = '#15131d', SS_EYE = '#17151f'; // the bold outer edge (outer rings) and the bead eyes: near-black, like the target
+    const SS_DY = 1; // head things sit 1 art px lower (the body is squatter)
+    const SS_BODY = [16, 22.45, 8.4, 7.15, 2.2, 2.5]; // the body: cx, cy, rx, ry, power above / below the middle (a round dome on a fuller tummy; top 15.3, bottom 29.6)
+    const ssSS = (a, b, v) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+    function ssSuperD(x, y) { const b = SS_BODY, p = y < b[1] ? b[4] : b[5], dx = Math.abs(x - b[0]) / b[2], dy = Math.abs(y - b[1]) / b[3]; return (Math.pow(Math.pow(dx, p) + Math.pow(dy, p), 1 / p) - 1) * b[3]; }
+    function ssEllD(x, y, e) { const dx = (x - e[0]) / e[2], dy = (y - e[1]) / e[3]; return (Math.hypot(dx, dy) - 1) * Math.min(e[2], e[3]); }
+    function ssSmin(a, b, k) { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * 0.25; }
+    // a saturation lift: each channel moved away from the colour's own grey (same hue and lightness, more vivid)
+    function ssVivid(h, k) {
+      if (!h || h[0] !== '#' || h.length !== 7) return h;
+      const c = [1, 3, 5].map(j => parseInt(h.slice(j, j + 2), 16)), L = c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11;
+      return '#' + c.map(v => Math.max(0, Math.min(255, Math.round(L + (v - L) * (1 + k)))).toString(16).padStart(2, '0')).join('');
+    }
+    // the body's 5 tones for ramp R: [lit, main, lower, low shade, deepest] (mixes of the ramp's own colours, a little more vivid)
+    const ssPalMemo = new Map();
+    function ssPal(R) {
+      const key = R.join(''); let v = ssPalMemo.get(key); if (v) return v;
+      v = [ssVivid(mixHex(R[0], '#ffffff', 0.06), 0.32), ssVivid(mixHex(R[0], R[1], 0.32), 0.4), ssVivid(mixHex(R[0], R[1], 0.85), 0.32), ssVivid(mixHex(R[1], R[2], 0.55), 0.26), ssVivid(mixHex(R[2], INK, 0.1), 0.2)];
+      if (ssPalMemo.size > 200) ssPalMemo.clear(); ssPalMemo.set(key, v); return v;
+    }
+    const ssSentOf = k => SKIN_SENT[k === 0 ? 0 : k <= 2 ? 1 : 2]; // skinned bodies: a sentinel tone the skin repaints
+    // the sticker for one pose: per fine pixel U (inside), F (a foot, outside the body + arms), B (body + arms) and tone index T
+    const ssMemo = new Map();
+    function ssSticker(g, arms, feet) {
+      const key = JSON.stringify([arms, feet]); let S = ssMemo.get(key); if (S) return S;
+      const K = g.k || 1, FW = g.fw, FH = g.fh, N = FW * FH, D = new Float32Array(N), DB = new Float32Array(N);
+      for (let fy = 0; fy < FH; fy++) for (let fx = 0; fx < FW; fx++) {
+        const x = (fx + 0.5) / K, y = (fy + 0.5) / K; let d = ssSuperD(x, y);
+        for (const A of arms) d = ssSmin(d, ssEllD(x, y, A), 0.6);
+        let e = d; for (const F of feet) e = ssSmin(e, ssEllD(x, y, F), 0.55);
+        DB[fy * FW + fx] = d; D[fy * FW + fx] = e;
+      }
+      const U = new Uint8Array(N), F = new Uint8Array(N), B = new Uint8Array(N), T = new Uint8Array(N);
+      const at = (fx, fy) => D[Math.max(0, Math.min(FH - 1, fy)) * FW + Math.max(0, Math.min(FW - 1, fx))];
+      for (let fy = 0; fy < FH; fy++) for (let fx = 0; fx < FW; fx++) {
+        const i = fy * FW + fx; if (D[i] >= 0) continue;
+        U[i] = 1; if (DB[i] < 0) B[i] = 1; else F[i] = 1;
+        const x = (fx + 0.5) / K, y = (fy + 0.5) / K, dep = -D[i];
+        let nx = at(fx + 1, fy) - at(fx - 1, fy), ny = at(fx, fy + 1) - at(fx, fy - 1); const n = Math.hypot(nx, ny) || 1; nx /= n; ny /= n;
+        const v = (y - 15.3) / 15.2; // 0 = the head top .. 1 = the soles
+        let t = 0.25 + 0.8 * ssSS(0.46, 0.97, v);
+        if (dep < 0.6 && -0.45 * nx - 0.89 * ny > 0.3 && v < 0.62) t -= 0.32; // the lit rim (1 fine px), up-left and on top
+        if (dep < 1.3 && ny > 0.42) t += 0.24; // shade along the lower edges (arm undersides, lower sides, feet)
+        if (dep < 0.8 && nx > 0.55 && ny > -0.35) t += 0.13; // a deeper rim down the right side
+        t += 0.22 * ssSS(0.3, 1.0, (x - 16) / 9); // the right side a step deeper (rounder)
+        if (inEll(x, y, 11.7, 18.5, 3.7, 2.4, -0.5).in) t -= 0.3; // a lit zone round the sheen
+        T[i] = t < 0.06 ? 0 : t < 0.42 ? 1 : t < 0.63 ? 2 : t < 0.85 ? 3 : 4;
+      }
+      S = { U, F, B, T, inBody: (x, y) => DB[Math.floor(y * K) * FW + Math.floor(x * K)] < 0 };
+      if (ssMemo.size > 64) ssMemo.clear(); ssMemo.set(key, S); return S;
+    }
+    // paint the sticker: every U pixel its tone (feet in the sock colour when the pattern is socks)
+    function ssPaint(g, S, R, skin, sock) {
+      const P5 = skin ? null : ssPal(R), SK = sock ? [mixHex(sock, '#ffffff', 0.25), sock, sock, mixHex(sock, INK, 0.18), mixHex(sock, INK, 0.3)] : null;
+      for (let i = 0; i < S.U.length; i++) { if (!S.U[i]) continue; const k = S.T[i]; g.a[i] = SK && S.F[i] ? SK[k] : skin ? ssSentOf(k) : P5[k]; }
+    }
+    // a body-ramp lobe in the same tones (raised arms, ears, tail): lit up-left, deeper low-right
+    function ssEll(G, cx, cy, rx, ry, R, rot, skin) {
+      const K = G.k || 1, r = Math.max(rx, ry) + 1, P5 = skin ? null : ssPal(R);
+      for (let fy = Math.floor((cy - r) * K); fy <= Math.ceil((cy + r) * K); fy++) for (let fx = Math.floor((cx - r) * K); fx <= Math.ceil((cx + r) * K); fx++) {
+        const q = inEll((fx + 0.5) / K, (fy + 0.5) / K, cx, cy, rx, ry, rot || 0); if (!q.in) continue;
+        const wx = ((fx + 0.5) / K - cx) / Math.max(rx, ry), wy = ((fy + 0.5) / K - cy) / Math.max(rx, ry), d = wx * 0.45 + wy * 0.89, e = q.nx * q.nx + q.ny * q.ny;
+        const k = d < -0.42 && e > 0.4 ? 0 : d < 0.38 ? 1 : d < 0.7 ? 2 : 3;
+        G.fset(fx, fy, skin ? ssSentOf(k) : P5[k]);
+      }
+      return G;
+    }
+    // a 1-fine-px ink line where the sticker meets a part drawn behind it (only(i): which pixels may become line)
+    function ssRing(g, U, only) {
+      const FW = g.fw, FH = g.fh, a = g.a, out = [];
+      for (let i = 0; i < a.length; i++) {
+        if (U[i] || !a[i] || a[i] === INK || a[i][0] !== '#' || (only && !only(i))) continue;
+        const fx = i % FW, fy = (i / FW) | 0;
+        if ((fx > 0 && U[i - 1]) || (fx < FW - 1 && U[i + 1]) || (fy > 0 && U[i - FW]) || (fy < FH - 1 && U[i + FW])) out.push(i);
+      }
+      for (const i of out) a[i] = INK;
+    }
+    // a view of grid G whose drawing lands DY art px lower (masks written for the view see view coordinates; a mask marked
+    // .real is in G's own coordinates and is passed straight through)
+    function ssView(G, DY) {
+      const K = G.k || 1, DF = Math.round(DY * K);
+      const wm = m => { if (!m || m.real) return m; const f = (x, y) => m(x, y - DY); f.fine = m.fine; return f; };
+      const V = {
+        k: G.k, w: G.w, h: G.h, fw: G.fw, fh: G.fh, get a() { return G.a; }, get dither() { return G.dither; }, get soft() { return G.soft; }, get spec() { return G.spec; },
+        get: (x, y) => G.get(x, y + DY), set: (x, y, c) => { G.set(x, y + DY, c); }, fget: (fx, fy) => G.fget(fx, fy + DF), fset: (fx, fy, c) => { G.fset(fx, fy + DF, c); },
+        ffilled: (fx, fy) => G.ffilled(fx, fy + DF), filled: (x, y) => G.filled(x, y + DY),
+        dot: (x, y, c) => { G.dot(x, y + DY, c); return V; }, dots: (l, c) => { for (const [x, y] of l) G.dot(x, y + DY, c); return V; },
+        ell: (cx, cy, rx, ry, col, rot, mask) => { G.ell(cx, cy + DY, rx, ry, col, rot, wm(mask)); return V; },
+        sell: (cx, cy, rx, ry, R, rot, mask) => { G.sell(cx, cy + DY, rx, ry, R, rot, wm(mask)); return V; },
+        rect: (x, y, w, h, col) => { G.rect(x, y + DY, w, h, col); return V; },
+        poly: (pts, col) => { G.poly(pts.map(([x, y]) => [x, y + DY]), col); return V; },
+        px: (l, col) => { G.px(l.map(([x, y]) => [x, y + DY]), col); return V; },
+        str: (rows, x0, y0, map) => { G.str(rows, x0, y0 + DY, map); return V; },
+        merge: o => { const n = DF * G.fw; for (let i = 0; i < o.a.length; i++) if (o.a[i] !== null && i + n < G.a.length) G.a[i + n] = o.a[i]; return V; },
+      };
+      return V;
+    }
+    // move a whole grid down by dy art px (hats and extras)
+    function ssShift(G, dy) { const n = Math.round(dy * (G.k || 1)) * G.fw, a = G.a; for (let i = a.length - 1; i >= 0; i--) a[i] = i - n >= 0 ? a[i - n] : null; return G; }
+    // the white sheen up-left on the head (over body tones and patterns, never over ink), plus a small second glint
+    function ssSheen(g, U) {
+      const K = g.k || 1, FW = g.fw;
+      for (let fy = Math.floor(15 * K); fy < 20 * K; fy++) for (let fx = Math.floor(7.5 * K); fx < 16 * K; fx++) {
+        const i = fy * FW + fx, c = g.a[i]; if (!U[i] || !c || c === INK || c[0] !== '#' || c.length !== 7) continue;
+        const x = (fx + 0.5) / K, y = (fy + 0.5) / K, q = inEll(x, y, 11.95, 18.05, 2.6, 1.1, -0.55);
+        if (q.in) { const r2 = q.nx * q.nx + q.ny * q.ny; g.a[i] = hrMix(c, '#ffffff', r2 < 0.55 ? 0.97 : 0.66); continue; }
+        if (inEll(x, y, 14.75, 16.95, 0.55, 0.45, 0).in) g.a[i] = hrMix(c, '#ffffff', 0.85);
+      }
+    }
+    // glossy leaf: re-tone the leaf-ramp pixels inside a leaf ellipse in 4 crisp tones (a pale gloss streak on the upper half,
+    // a lit upper half, a main tone, a darker lower edge) and an optional soft midrib
+    const ssLeafMemo = new Map();
+    function ssLeafCols(LR) { const key = LR.join(''); let v = ssLeafMemo.get(key); if (!v) { v = [mixHex(LR[0], '#ffffff', 0.5), ssVivid(LR[0], 0.25), ssVivid(mixHex(LR[0], LR[1], 0.6), 0.28), ssVivid(mixHex(LR[1], LR[2], 0.6), 0.2)]; ssLeafMemo.set(key, v); } return v; }
+    function ssLeaf(g, cx, cy, rx, ry, rot, LR, rib) {
+      const K = g.k || 1, L5 = ramp5(LR), r = Math.max(rx, ry) + 1, C = ssLeafCols(LR);
+      for (let fy = Math.floor((cy - r) * K); fy <= Math.ceil((cy + r) * K); fy++) for (let fx = Math.floor((cx - r) * K); fx <= Math.ceil((cx + r) * K); fx++) {
+        const c = g.fget(fx, fy); if (!L5.includes(c) && c !== LR[2]) continue;
+        const q = inEll((fx + 0.5) / K, (fy + 0.5) / K, cx, cy, rx, ry, rot); if (!q.in) continue;
+        let k = q.ny < -0.08 ? 1 : q.ny < 0.5 ? 2 : 3;
+        if (q.ny < -0.2 && q.ny > -0.8 && Math.abs(q.nx) < 0.55) k = 0;
+        g.fset(fx, fy, C[k]);
+      }
+      if (rib) { const c = Math.cos(rot), s = Math.sin(rot); for (let u = -0.5; u <= 0.62; u += 0.12) { const x = cx + c * u * rx, y = cy + s * u * rx + 0.2, v = g.get(x, y); if (v && v !== INK && v[0] === '#') g.dot(x, y, C[3]); } }
+    }
+  
   function buildSprig(L, P) {
     L = L || DEFAULT_LOOK; P = P || {};
     const g = new Grid(32, 32), B = new Grid(32, 32); // B = layer behind everything
@@ -879,6 +1096,7 @@
     const flap = P.flap ? (P.frame ? -1.6 : 1.2) : 0;
     const W = (ox, oy, kx, ky, pts) => pts.map(([x, y]) => [ox + x * kx, oy + y * ky + (y < -5 ? flap : 0)]);
     const both = (G, pts, col) => { G.poly(pts, col); G.poly(mirX(pts, 32), col); };
+    const SV = ssView(g, SS_DY); // (head things draw through SV: 1 art px lower, on the squatter head)
     // --- far behind (layer B): big wings, fan tails, back spikes, fluff collar ---
     if (pt.dragonwings > 0) {
       const k = sz(pt.dragonwings), w = W(9.5, 17.5, Math.min(k, 1), k * 0.95, [[0, -1.5], [-2.6, -8], [-6, -12.6], [-8.4, -12], [-8.6, -8], [-6.8, -7], [-8.6, -3.4], [-6.4, -3], [-7, 1.2], [-4.6, 0], [-3.4, 3.4], [0, 2]]);
@@ -919,95 +1137,99 @@
     if (pt.spikes > 0) {
       const k = sz(pt.spikes);
       for (const deg of [-160, -134, -108, -72, -46, -20]) {
-        const a = deg * Math.PI / 180, rim = t => [16 + 8 * Math.cos(t), 22 + 7.4 * Math.sin(t)];
-        B.poly([rim(a - 0.26), rim(a + 0.26), [16 + (8.3 + 4.4 * k) * Math.cos(a), 22 + (7.7 + 4.4 * k) * Math.sin(a)]], R[2]);
+        const a = deg * Math.PI / 180, rim = t => [16 + 8.2 * Math.cos(t), 22.6 + 7.0 * Math.sin(t)];
+        B.poly([rim(a - 0.26), rim(a + 0.26), [16 + (8.3 + 4.4 * k) * Math.cos(a), 22.6 + (7.3 + 4.4 * k) * Math.sin(a)]], R[2]);
       }
     }
     if (pt.fluff > 0) {
       const k = sz(pt.fluff);
-      for (const deg of [-170, -138, -106, -74, -42, -10, 20, 160]) { const a = deg * Math.PI / 180; B.ell(16 + (8.4 + 1.2 * k) * Math.cos(a), 22 + (7.8 + 1.2 * k) * Math.sin(a), 2.7 * k, 2.5 * k, RAMPS.cloud); }
+      for (const deg of [-170, -138, -106, -74, -42, -10, 20, 160]) { const a = deg * Math.PI / 180; B.ell(16 + (8.4 + 1.2 * k) * Math.cos(a), 22.6 + (7.3 + 1.2 * k) * Math.sin(a), 2.7 * k, 2.5 * k, RAMPS.cloud); }
     }
     // plant parts behind: a petal collar round the head, little thorns along the body edge
     if (pt.petals > 0) {
       const k = sz(pt.petals), PT = L.leaf === 'sun' ? ['#fff8b0', '#fbd84a', '#d0a02a'] : L.leaf === 'plum' ? ['#f4e8ff', '#c8aaf0', '#8c6cc4'] : ['#ffe4f0', '#f7a6c8', '#d0609a'];
       for (const deg of [-168, -140, -112, -90, -68, -40, -12, 14, 166]) {
         const a = deg * Math.PI / 180, r = 8.6 + 1.3 * k;
-        piece(B, t => t.ell(16 + Math.cos(a) * r, 21.4 + Math.sin(a) * r * 0.9, 2.5 * k, 1.8 * k, PT, a));
+        piece(B, t => t.ell(16 + Math.cos(a) * r, 22.1 + Math.sin(a) * r * 0.86, 2.5 * k, 1.8 * k, PT, a));
       }
     }
     if (pt.thorns > 0) {
       const k = sz(pt.thorns);
       for (const deg of [-156, -126, -54, -24, 8, 172]) {
-        const a = deg * Math.PI / 180, rim = t => [16 + 8.2 * Math.cos(t), 22 + 7.6 * Math.sin(t)], tip = 9 + 3.2 * k;
-        B.poly([rim(a - 0.17), rim(a + 0.17), [16 + tip * Math.cos(a), 22 + tip * 0.93 * Math.sin(a)]], '#b8804a');
+        const a = deg * Math.PI / 180, rim = t => [16 + 8.4 * Math.cos(t), 22.6 + 7.1 * Math.sin(t)], tip = 9 + 3.2 * k;
+        B.poly([rim(a - 0.17), rim(a + 0.17), [16 + tip * Math.cos(a), 22.6 + tip * 0.87 * Math.sin(a)]], '#b8804a');
       }
     }
     // --- behind (main layer) ---
-    if (pt.wings > 0) { const k = sz(pt.wings); const fl = P.flap ? (P.frame ? 0.35 : -0.25) : 0; g.ell(6.2, 19, 2.7 * k, 4.9 * k, RAMPS.cloud, -0.6 - fl); g.ell(25.8, 19, 2.7 * k, 4.9 * k, RAMPS.cloud, 0.6 + fl); }
+    if (pt.wings > 0) { const k = sz(pt.wings); const fl = P.flap ? (P.frame ? 0.35 : -0.25) : 0; g.ell(6.0, 20, 2.8 * k, 4.9 * k, RAMPS.cloud, -0.72 - fl); g.ell(26.0, 20, 2.8 * k, 4.9 * k, RAMPS.cloud, 0.72 + fl); }
     if (pt.shell > 0) { const k = pt.shell >= 0.9 ? 1.08 : pt.shell >= 0.5 ? 1 : 0.94; g.ell(16, 22.6, 10.2 * k, 8.4 * k, RAMPS.moss); }
-    if (pt.tail > 0) { const k = sz(pt.tail); g.ell(24.6 + k, 26.4 - k, 3.6 * k, 2.1 * k, R, -0.7); g.ell(26.8 + 1.8 * k, 24.4 - 1.4 * k, 1.5 * k, 1.5 * k, LR[1]); }
-    if (pt.ears > 0) { const k = sz(pt.ears); g.ell(10.4 - k, 13.6 - 1.2 * k, 1.9, 4.6 * k, R, -0.42); g.ell(21.6 + k, 13.6 - 1.2 * k, 1.9, 4.6 * k, R, 0.42); }
+    if (pt.tail > 0) { const k = sz(pt.tail); ssEll(g, 24.6 + k, 26.4 - k, 3.6 * k, 2.1 * k, R, -0.7, skin); g.ell(26.8 + 1.8 * k, 24.4 - 1.4 * k, 1.5 * k, 1.5 * k, LR[1]); }
+    if (pt.ears > 0) { const k = sz(pt.ears); ssEll(SV, 10.4 - k, 13.6 - 1.2 * k, 1.9, 4.6 * k, R, -0.42, skin); ssEll(SV, 21.6 + k, 13.6 - 1.2 * k, 1.9, 4.6 * k, R, 0.42, skin); }
     if (pt.vines > 0) { const k = sz(pt.vines); for (const s2 of [-1, 1]) piece(g, t => stroke(t, [[16 + s2 * 7.6, 17.6], [16 + s2 * (9 + k), 16.4], [16 + s2 * (9.4 + k), 14.4], [16 + s2 * (8.2 + k), 13.6]], 0.6, 0.5, '#3f8a3a')); }
-    const LEAFE = pt.leafears > 0 ? [9.4 - sz(pt.leafears) * 1.2, 14 - 1.6 * sz(pt.leafears), 4.4 * sz(pt.leafears)] : null;
+    const LEAFE = pt.leafears > 0 ? [9.4 - sz(pt.leafears) * 1.2, 14 + SS_DY - 1.6 * sz(pt.leafears), 4.4 * sz(pt.leafears)] : null;
     if (LEAFE) { const [ex2, ey2, el] = LEAFE; g.ell(ex2, ey2, 2.3, el, LR, -0.78); g.ell(32 - ex2, ey2, 2.3, el, LR, 0.78); }
     if (pt.fins > 0) { const k = sz(pt.fins); g.ell(7 - k * 0.6, 19, 2 * k, 3.4 * k, RAMPS.sky, -0.55); g.ell(25 + k * 0.6, 19, 2 * k, 3.4 * k, RAMPS.sky, 0.55); }
-    if (pt.horns > 0) { const k = sz(pt.horns), HN = ['#fff0dc', '#eec39a', '#b88a5c']; piece(g, t => { t.poly([[10.5, 16.5], [13.8, 15.2], [10 - k, 10.5 - 2 * k]], HN[1]); shade(t, 11.2, 13.2, 2.8, 4.6, HN); }); piece(g, t => { t.poly([[21.5, 16.5], [18.2, 15.2], [22 + k, 10.5 - 2 * k]], HN[1]); shade(t, 20.4, 13.2, 2.8, 4.6, HN); }); }
-    if (pt.antennae > 0) { const k = sz(pt.antennae); g.ell(11 - 3.2 * k, 15 - 6 * k, 1.3, 1.3, RAMPS.sun); g.ell(21 + 3.2 * k, 15 - 6 * k, 1.3, 1.3, RAMPS.sun); }
+    if (pt.horns > 0) { const k = sz(pt.horns), HN = ['#fff0dc', '#eec39a', '#b88a5c']; piece(SV, t => { t.poly([[10.5, 16.5], [13.8, 15.2], [10 - k, 10.5 - 2 * k]], HN[1]); shade(t, 11.2, 13.2, 2.8, 4.6, HN); }); piece(SV, t => { t.poly([[21.5, 16.5], [18.2, 15.2], [22 + k, 10.5 - 2 * k]], HN[1]); shade(t, 20.4, 13.2, 2.8, 4.6, HN); }); }
+    if (pt.antennae > 0) { const k = sz(pt.antennae); SV.ell(11 - 3.2 * k, 15 - 6 * k, 1.3, 1.3, RAMPS.sun); SV.ell(21 + 3.2 * k, 15 - 6 * k, 1.3, 1.3, RAMPS.sun); }
     // feet or tentacles
     const tent = pt.tentacles > 0;
+    // the sticker (sample): body + resting arm lobes + feet as one soft shape, toned once
+    const ssArm = (() => { let a = P.arms || 'down'; if (a === 'paddle') a = P.frame ? 'up' : 'out'; return a; })(), ssSw = P.walk ? (P.frame ? 0.5 : -0.5) : 0;
+    const SS_ARMS = ssArm === 'down' ? [[7.9, 24.0 + ssSw, 2.0, 2.2], [24.1, 24.0 - ssSw, 2.0, 2.2]] : [];
+    const SS_FEET = tent || skin === 'ghost' ? [] : [[12.4, 29.05 + (P.walk && P.frame ? -1 : 0), 2.5, 1.55], [19.6, 29.05 + (P.walk && !P.frame ? -1 : 0), 2.5, 1.55]];
+    const SSS = ssSticker(g, SS_ARMS, SS_FEET), SSU = SSS.U;
     if (tent) {
       const k = sz(pt.tentacles), wig = P.frame ? 0.7 : 0;
       for (const s of [-1, 1]) {
         const o = 16 + s * 5.5, n = 16 + s * 2.2, w2 = wig * s;
-        stroke(g, [[o, 25], [o + s * 2.4 * k + w2, 28.4], [o + s * 4.8 * k, 29.3], [o + s * 6.6 * k, 27.8], [o + s * 6 * k - w2 * 0.5, 25.8]], 1.8, 0.9, R[1]);
-        stroke(g, [[n, 27], [n + s * 0.8 - w2 * 0.6, 29.4], [n + s * 2.6 * k, 29.6], [n + s * 3.4 * k, 28.4]], 1.7, 0.9, R[1]);
+        stroke(g, [[o, 25], [o + s * 2.4 * k + w2, 28.4], [o + s * 4.8 * k, 29.3], [o + s * 6.6 * k, 27.8], [o + s * 6 * k - w2 * 0.5, 25.8]], 1.8, 0.9, skin ? R[1] : ssPal(R)[3]);
+        stroke(g, [[n, 27], [n + s * 0.8 - w2 * 0.6, 29.4], [n + s * 2.6 * k, 29.6], [n + s * 3.4 * k, 28.4]], 1.7, 0.9, skin ? R[1] : ssPal(R)[3]);
       }
-    } else {
-      const fl = P.walk && P.frame ? -1 : 0, fr = P.walk && !P.frame ? -1 : 0, fc = L.pattern === 'socks' ? pc2 : R[2];
-      if (skin === 'ghost') { const wv = P.frame ? 0.5 : 0; for (const [x, dy2] of [[10.4, wv], [16, -wv], [21.6, wv]]) g.ell(x, 28.4 + dy2, 2.4, 1.9, R); }
-      else { g.ell(12.4, 29.2 + fl, 2.8, 1.8, fc); g.ell(19.6, 29.2 + fr, 2.8, 1.8, fc); }
-    }
+    } else if (skin === 'ghost') { const wv = P.frame ? 0.5 : 0; for (const [x, dy2] of [[10.4, wv], [16, -wv], [21.6, wv]]) g.ell(x, 28.4 + dy2, 2.4, 1.9, R); }
+  
     // body
     const bodyMask = new Set(), bodyIdx = new Uint8Array(32 * 32);
-    g.ell(16, 22, 8.3, 7.7, R, 0, (x, y) => { bodyMask.add(x + ',' + y); if (x >= 0 && y >= 0 && x < 32 && y < 32) bodyIdx[y * 32 + x] = 1; return true; });
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) if (SSS.inBody(x + 0.5, y + 0.5)) { bodyMask.add(x + ',' + y); bodyIdx[y * 32 + x] = 1; }
+    ssPaint(g, SSS, R, skin, L.pattern === 'socks' ? pc2 : null); ssRing(g, SSU);
     // pattern on body
-    const onBody = (x, y) => bodyMask.has(x + ',' + y);
+    const onBody = (x, y) => bodyMask.has(x + ',' + y); onBody.real = true;
     const pc = L.patternColor;
-    if (L.pattern === 'spots') for (const [x, y, r] of [[10.9, 16.9, 1.2], [21.3, 17.9, 1.0], [9.7, 24.7, 0.85], [22.5, 25.1, 1.0], [13.9, 15.3, 0.62], [18.7, 14.9, 0.55]]) g.ell(x, y, r, r * 0.92, pc, 0, onBody);
-    if (L.pattern === 'stripes') hrBlob(g, [[12, 15], [12, 16], [15, 14], [16, 14], [15, 15], [16, 15], [19, 15], [19, 16], [9, 18], [22, 18]], pc, 0.62);
-    if (L.pattern === 'twotone' && !skin) for (const k of bodyMask) { const [x, y] = k.split(',').map(Number); if (y <= 18) g.set(x, y, pc); }
-    if (L.pattern === 'mask') { const band = []; for (let y = 19; y <= 21; y++) for (let x = 10; x <= 21; x++) band.push([x, y]); hrBlob(g, band, pc, 0.7); }
-    if (L.pattern === 'freckles') for (const [x, y] of [[8, 21], [9, 20], [10, 21], [23, 21], [22, 20], [21, 21], [9, 23], [22, 23]]) hrBlob(g, [[x, y]], pc2, 0.52);
+    if (L.pattern === 'spots') for (const [x, y, r] of [[10.9, 16.9, 1.2], [21.3, 17.9, 1.0], [9.7, 24.7, 0.85], [22.5, 25.1, 1.0], [13.9, 15.3, 0.62], [18.7, 14.9, 0.55]]) SV.ell(x, y, r, r * 0.92, pc, 0, onBody);
+    if (L.pattern === 'stripes') hrBlob(SV, [[12, 15], [12, 16], [15, 14], [16, 14], [15, 15], [16, 15], [19, 15], [19, 16], [9, 18], [22, 18]], pc, 0.62);
+    if (L.pattern === 'twotone' && !skin) for (const k of bodyMask) { const [x, y] = k.split(',').map(Number); if (y <= 18 + SS_DY) g.set(x, y, pc); }
+    if (L.pattern === 'mask') { const band = []; for (let y = 19; y <= 21; y++) for (let x = 10; x <= 21; x++) band.push([x, y]); hrBlob(SV, band, pc, 0.7); }
+    if (L.pattern === 'freckles') for (const [x, y] of [[8, 21], [9, 20], [10, 21], [23, 21], [22, 20], [21, 21], [9, 23], [22, 23]]) hrBlob(SV, [[x, y]], pc2, 0.52);
     // newer stickers: in the pattern colour, or a deeper body tone when that colour would vanish on a pale body
     const newPat = Object.prototype.hasOwnProperty.call(PAT_PTS, L.pattern) ? L.pattern : null;
     const pcN = newPat ? patternInk(newPat === 'moonmark' && pc2 === BELLY ? '#fff27a' : pc2, skin ? (SKIN_TONE[skin] || [])[0] : R[1], skin ? (SKIN_TONE[skin] || [])[1] : R[2]) : null;
-    if (newPat) hrBlob(g, PAT_PTS[newPat], pcN, newPat === 'patches' || newPat === 'moonmark' ? 0.68 : 0.6);
+    if (newPat) hrBlob(SV, PAT_PTS[newPat], pcN, newPat === 'patches' || newPat === 'moonmark' ? 0.68 : 0.6);
     // belly (ember skin: warm cream dragon belly)
     const bellyCol = skin && skin in SKIN_BELLY ? SKIN_BELLY[skin] : (L.belly || BELLY);
-    if (bellyCol) g.ell(16, 26, 4.8, 2.9, bellyCol, 0, onBody);
-    if (skin === 'ember') for (let y = 23; y < 30; y += 2) for (let x = 10; x < 22; x++) if (g.get(x, y) === bellyCol) g.set(x, y, '#f6d68a');
-    // soft shading under the belly (dithered one row up) and a glossy highlight on the head
-    if (bellyCol) {
-      const bsh = mixHex(bellyCol, skin ? (SKIN_BELLY_SHADE[skin] || '#b08a60') : R[2], 0.28), bmid = mixHex(bellyCol, bsh, 0.5), KB = g.k || 1;
-      for (let fy = 22 * KB; fy < 30 * KB; fy++) for (let fx = 9 * KB; fx < 23 * KB; fx++) {
-        const c = g.fget(fx, fy); if (c !== bellyCol && c !== '#f6d68a') continue;
-        const x = (fx + 0.5) / KB, y = (fy + 0.5) / KB;
-        if (!inEll(x, y, 15.75, 25.3, 4.85, 2.9, 0).in) g.fset(fx, fy, bsh); else if (!inEll(x, y, 15.55, 24.75, 4.8, 2.85, 0).in) g.fset(fx, fy, bmid);
+    const ssBc = bellyCol ? (skin ? bellyCol : ssVivid(bellyCol, 0.4)) : null;
+    if (ssBc) {
+      const K = g.k || 1, FW = g.fw, hi = hrMix(ssBc, '#ffffff', 0.6), sh = hrMix(ssBc, skin ? (SKIN_BELLY_SHADE[skin] || '#c8955e') : '#d9a05a', 0.26);
+      for (let fy = Math.floor(23.5 * K); fy < 30.5 * K; fy++) for (let fx = Math.floor(10 * K); fx < 22 * K; fx++) {
+        const i = fy * FW + fx, c = g.a[i]; if (!SSU[i] || SSS.F[i] || !c || c === INK) continue;
+        const q = inEll((fx + 0.5) / K, (fy + 0.5) / K, 16, 26.75, 5.2, 3.0, 0); if (!q.in) continue;
+        g.a[i] = q.ny < -0.62 && Math.abs(q.nx) < 0.62 ? hi : q.ny > 0.55 || (q.ny > 0.2 && Math.abs(q.nx) > 0.72) ? sh : ssBc;
       }
-  
     }
+    if (skin === 'ember') for (let y = 24; y < 30; y += 2) for (let x = 10; x < 22; x++) if (g.get(x, y) === ssBc) g.set(x, y, '#f6d68a');
+  
     if (L.pattern === 'star') { const sc = pc === BELLY ? '#f6c83a' : pc; g.poly(starPts(16, 26.1, 2.2, 0.95, 5), sc); g.dots([[15.5, 25.5], [16, 25.5]], mixHex(sc, '#ffffff', 0.55)); }
     if (L.pattern === 'heart') { const hc = pc2 === (L.belly || BELLY) || pc2 === BELLY ? '#e8608a' : pc2; g.ell(14.65, 25.9, 1.5, 1.35, hc); g.ell(17.35, 25.9, 1.5, 1.35, hc); g.poly([[13.2, 26.3], [18.8, 26.3], [16, 29.0]], hc); g.dots([[14.1, 25.4], [14.6, 25.4], [14.1, 25.9]], mixHex(hc, '#ffffff', 0.55)); }
     // front fluff tufts
-    if (pt.fluff > 0) { const k = sz(pt.fluff); for (const s of [-1, 1]) { g.ell(16 + s * 7.4, 27.2, 2.3 * k, 1.9 * k, RAMPS.cloud); g.ell(16 + s * 6.6, 15.8, 1.8 * k, 1.5 * k, RAMPS.cloud); } }
+    if (pt.fluff > 0) { const k = sz(pt.fluff); for (const s of [-1, 1]) { g.ell(16 + s * 7.4, 27.2, 2.3 * k, 1.9 * k, RAMPS.cloud); g.ell(16 + s * 6.6, 15.8 + SS_DY, 1.8 * k, 1.5 * k, RAMPS.cloud); } }
     // arms (or pincers)
     let arms = P.arms || 'down';
     if (arms === 'paddle') arms = P.frame ? 'up' : 'out';
     let hands;
-    if (arms === 'up') { g.ell(7.4, 17.6, 1.7, 2.8, R, 0.45); g.ell(24.6, 17.6, 1.7, 2.8, R, -0.45); hands = [6, 15, -0.35, -1]; }
-    else if (arms === 'out') { g.ell(6.4, 21.2, 2.8, 1.7, R); g.ell(25.6, 21.2, 2.8, 1.7, R); hands = [4, 20.4, -1, -0.45]; }
-    else if (arms === 'hold') { g.ell(10, 23.5, 2, 1.7, R); g.ell(22, 23.5, 2, 1.7, R); hands = [9.6, 23, -0.2, -1]; }
-    else { const s = P.walk ? (P.frame ? 0.5 : -0.5) : 0; g.ell(7.9, 23 + s, 1.8, 2.6, R); g.ell(24.1, 23 - s, 1.8, 2.6, R); hands = [6.4, 24.2 + s, -0.6, -0.8]; }
+    const ssLobe = A => { for (const [x, y, rx, ry, rot] of A) piece(g, t => ssEll(t, x, y, rx, ry, R, rot, skin)); };
+    if (arms === 'up') { ssLobe([[7.3, 18.2, 1.8, 2.8, 0.45], [24.7, 18.2, 1.8, 2.8, -0.45]]); hands = [6, 15.6, -0.35, -1]; }
+    else if (arms === 'out') { ssLobe([[6.2, 21.8, 2.85, 1.8, 0], [25.8, 21.8, 2.85, 1.8, 0]]); hands = [4, 21, -1, -0.45]; }
+    else if (arms === 'hold') { ssLobe([[10, 24.2, 2.1, 1.8, 0], [22, 24.2, 2.1, 1.8, 0]]); hands = [9.6, 23.7, -0.2, -1]; }
+    else hands = [6.9, 25.0 + ssSw, -0.6, -0.8];
+  
     if (pt.claws > 0) {
       const k = sz(pt.claws), C = new Grid(32, 32);
       for (const s of [-1, 1]) {
@@ -1020,26 +1242,30 @@
     }
     // mushroom cap on the head (hats cover it; leaves, buds and blooms poke up through it)
     const capOn = pt.mushcap > 0 && (!L.hat || L.hat === 'none');
-    if (capOn) { const k = sz(pt.mushcap); piece(g, t => t.ell(16, 15.6, 5.6 * k + 0.8, 4.6 * k, ['#ff9aa0', '#e8404a', '#a02c3a'], 0, (x, y) => y <= 15)); }
-    // sprout / bud / bloom
-    if (!hatHidesLeaves && L.bloom) {
-      g.rect(15, 11, 2, 4, '#37946e');
-      g.ell(13, 13.4, 2.1, 1, RAMPS.leaf, 0.45); g.ell(19, 13.4, 2.1, 1, RAMPS.leaf, -0.45);
-      flowerArt(g, L.bloom, 16, 6.5);
-    } else if (!hatHidesLeaves && L.bud) {
-      const BR = BUD_RAMP[L.bud] || BUD_RAMP.wild;
-      g.rect(15, 10, 2, 5, '#37946e');
-      g.ell(12.9, 12.9, 2.3, 1.1, LR, 0.45); g.ell(19.1, 12.9, 2.3, 1.1, LR, -0.45);
-      g.ell(16, 6.8, 2.9, 3.4, BR); g.poly([[13.7, 6], [18.3, 6], [16, 1.6]], BR[1]); g.ell(16, 6.8, 2.9, 3.4, BR, 0, (x, y) => y >= 5);
-      g.poly([[12.8, 7.6], [14.4, 9.8], [16, 8.6], [17.6, 9.8], [19.2, 7.6], [18.2, 10.8], [13.8, 10.8]], '#6abe30');
-    } else if (!hatHidesLeaves) {
-      g.rect(15, 12, 2, 3, skin === 'pumpkin' ? '#7a4a2a' : LR[2]);
-      g.ell(12.6, 11.4, 3.1, 1.6, LR, 0.42); g.ell(19.4, 11.4, 3.1, 1.6, LR, -0.42);
+    if (capOn) { const k = sz(pt.mushcap); piece(SV, t => t.ell(16, 15.6, 5.6 * k + 0.8, 4.6 * k, ['#ff9aa0', '#e8404a', '#a02c3a'], 0, (x, y) => y <= 15)); }
+    // sprout / bud / bloom (sample: through SV, 1 art px lower; bigger seedling leaves)
+    { const g = SV;
+      if (!hatHidesLeaves && L.bloom) {
+        g.rect(15, 11, 2, 4, '#37946e');
+        g.ell(13, 13.4, 2.1, 1, RAMPS.leaf, 0.45); g.ell(19, 13.4, 2.1, 1, RAMPS.leaf, -0.45);
+        flowerArt(g, L.bloom, 16, 6.5);
+      } else if (!hatHidesLeaves && L.bud) {
+        const BR = BUD_RAMP[L.bud] || BUD_RAMP.wild;
+        g.rect(15, 10, 2, 5, '#37946e');
+        g.ell(12.9, 12.9, 2.3, 1.1, LR, 0.45); g.ell(19.1, 12.9, 2.3, 1.1, LR, -0.45);
+        g.ell(16, 6.8, 2.9, 3.4, BR); g.poly([[13.7, 6], [18.3, 6], [16, 1.6]], BR[1]); g.ell(16, 6.8, 2.9, 3.4, BR, 0, (x, y) => y >= 5);
+        g.poly([[12.8, 7.6], [14.4, 9.8], [16, 8.6], [17.6, 9.8], [19.2, 7.6], [18.2, 10.8], [13.8, 10.8]], '#6abe30');
+      } else if (!hatHidesLeaves) {
+        g.rect(15, 12, 2, 3, skin === 'pumpkin' ? '#7a4a2a' : LR[2]);
+        g.ell(12.45, 11.35, 3.4, 1.8, LR, 0.4); g.ell(19.55, 11.35, 3.4, 1.8, LR, -0.4);
+      }
     }
+  
     // unicorn horn (front)
     let horn = null;
-    if (pt.unihorn > 0) { const k = sz(pt.unihorn); horn = new Grid(32, 32); horn.poly([[14, 17.8], [18, 17.8], [16.4, 17.8 - 10.5 * k]], '#fff8fc'); }
+    if (pt.unihorn > 0) { const k = sz(pt.unihorn); horn = new Grid(32, 32); horn.poly([[14, 17.8 + SS_DY], [18, 17.8 + SS_DY], [16.4, 17.8 + SS_DY - 10.5 * k]], '#fff8fc'); }
     const behind = under(g, B), KK = g.k || 1, FW = g.fw || 32;
+    ssRing(g, SSU, i => behind.has(i));
     g.outline();
     // ---------- details after outline ----------
     if (pt.dragonwings > 0) { const k = sz(pt.dragonwings); const tx = Math.floor(9.5 - 6 * Math.min(k, 1)), ty = Math.floor(17.5 - 12.6 * k * 0.95 + flap); for (const X of [tx, 31 - tx]) if (g.get(X, ty - 1) === INK) g.set(X, ty - 1, '#fbf3dc'); }
@@ -1051,10 +1277,10 @@
     if (pt.flamewings > 0) for (const i of behind) { const fx = i % FW, fy = (i / FW) | 0, x = (fx + 0.5) / KK, y = (fy + 0.5) / KK, c = g.a[i]; void x; void y; if ((c === '#df7126' || c === '#f6c83a') && (fx + fy * 2) % 7 === 0) g.a[i] = '#fff27a'; }
     if (pt.multitail > 0) { const km = Math.min(sz(pt.multitail), 1); for (const i of behind) { const fx = i % FW, fy = (i / FW) | 0, x = (fx + 0.5) / KK, y = (fy + 0.5) / KK, c = g.a[i]; if (!ramp5(RAMP_X.cream).includes(c)) continue; const d = Math.hypot(x - 19.5, y - 25); if (d > 8.4 * km) g.a[i] = d > 9.8 * km ? '#df7126' : '#f6a83a'; } }
     if (pt.spikes > 0) for (const i of behind) { const fx = i % FW, fy = (i / FW) | 0, x = (fx + 0.5) / KK, y = (fy + 0.5) / KK, c = g.a[i]; if (c === R[2] && Math.hypot(x - 16, (y - 22) * 1.08) > 10.6) g.a[i] = R[1]; }
-    if (pt.ears > 0) { const k = sz(pt.ears); g.ell(10.4 - k, 13.6 - 1.2 * k, 0.7, 3.2 * k, L.cheek, -0.42, (x, y) => g.filled(x, y)); g.ell(21.6 + k, 13.6 - 1.2 * k, 0.7, 3.2 * k, L.cheek, 0.42, (x, y) => g.filled(x, y)); }
+    if (pt.ears > 0) { const k = sz(pt.ears); SV.ell(10.4 - k, 13.6 - 1.2 * k, 0.7, 3.2 * k, L.cheek, -0.42, (x, y) => SV.filled(x, y)); SV.ell(21.6 + k, 13.6 - 1.2 * k, 0.7, 3.2 * k, L.cheek, 0.42, (x, y) => SV.filled(x, y)); }
     if (pt.shell > 0) for (const [x, y] of [[7.5, 19.6], [7.5, 20.1], [7.5, 20.6], [7.5, 21.1], [7.5, 21.6], [24.5, 19.6], [24.5, 20.1], [24.5, 20.6], [24.5, 21.1], [24.5, 21.6], [8.5, 27.2], [9.0, 27.5], [23.5, 27.2], [23.0, 27.5]]) if (g.filled(x, y) && !onBody(Math.floor(x), Math.floor(y))) { g.dot(x, y, '#4b692f'); if (g.filled(x - 0.5, y)) g.dot(x - 0.5, y, '#c3d66a'); }
     if (LEAFE) { const [ex2, ey2, el] = LEAFE; const L5 = ramp5(LR), m = (x, y) => L5.includes(g.get(x, y)); g.ell(ex2, ey2, 0.5, el - 1, LR[2], -0.78, m); g.ell(32 - ex2, ey2, 0.5, el - 1, LR[2], 0.78, m); }
-    if (capOn) { const CAPC = ['#ff9aa0', '#e8404a', '#a02c3a']; { const C5 = ramp5(CAPC), m = (X, Y) => C5.includes(g.get(X, Y)); m.fine = true; for (const [x, y, r] of [[13.0, 13.5, 0.9], [16.9, 11.9, 1.0], [20.0, 14.0, 0.7], [11.4, 14.7, 0.5]]) g.ell(x, y, r, r * 0.85, '#ffffff', 0, m); } }
+    if (capOn) { const CAPC = ['#ff9aa0', '#e8404a', '#a02c3a']; { const C5 = ramp5(CAPC), m = (X, Y) => C5.includes(SV.get(X, Y)); m.fine = true; for (const [x, y, r] of [[13.0, 13.5, 0.9], [16.9, 11.9, 1.0], [20.0, 14.0, 0.7], [11.4, 14.7, 0.5]]) SV.ell(x, y, r, r * 0.85, '#ffffff', 0, m); } }
     if (pt.thorns > 0) for (const i of behind) { const fx = i % FW, fy = (i / FW) | 0, x = (fx + 0.5) / KK, y = (fy + 0.5) / KK, c = g.a[i]; if (c === '#b8804a' && Math.hypot(x - 16, (y - 22) * 1.07) > 9.3) g.a[i] = '#f0d8a8'; }
     if (pt.vines > 0) { // curly vines winding down both sides
       const k = sz(pt.vines), VN = '#3f8a3a', VL = '#8ee06a';
@@ -1064,38 +1290,42 @@
         if (i % 7 === 3) { const m = (X, Y) => g.filled(X, Y); m.fine = true; g.ell(x + s2 * 0.9, y - 0.5, 0.8, 0.45, VL, s2 * -0.5, m); }
       }
     }
-    if (pt.antennae > 0) { const k = sz(pt.antennae); const tx = Math.round(11 - 3.2 * k), ty = Math.round(15 - 6 * k) + 1; line(g, 11, 15, tx + 1, ty, INK); line(g, 20, 15, 32 - tx - 2, ty, INK); g.set(Math.floor(11 - 3.2 * k - 0.6), Math.floor(15 - 6 * k - 0.6), '#ffffff'); g.set(Math.floor(21 + 3.2 * k - 0.6), Math.floor(15 - 6 * k - 0.6), '#ffffff'); }
+    if (pt.antennae > 0) { const k = sz(pt.antennae); const tx = Math.round(11 - 3.2 * k), ty = Math.round(15 - 6 * k) + 1; line(SV, 11, 15, tx + 1, ty, INK); line(SV, 20, 15, 32 - tx - 2, ty, INK); SV.set(Math.floor(11 - 3.2 * k - 0.6), Math.floor(15 - 6 * k - 0.6), '#ffffff'); SV.set(Math.floor(21 + 3.2 * k - 0.6), Math.floor(15 - 6 * k - 0.6), '#ffffff'); }
     if (tent) { const k = sz(pt.tentacles); for (const s of [-1, 1]) for (const [x, y] of [[16 + s * (5.5 + 3.4 * k), 29], [16 + s * (5.5 + 5.6 * k), 28], [16 + s * (2.2 + 1.6 * k), 30]]) { const m = (X, Y) => g.filled(X, Y) && !inEll(X + 0.25, Y + 0.25, 16, 22, 8.3, 7.7, 0).in; m.fine = true; g.ell(x, y + 0.2, 0.55, 0.45, L.belly || BELLY, 0, m); } }
     if (pt.claws > 0) { const s0 = hands; const cx = Math.floor(s0[0] - 1), cy = Math.floor(s0[1] - 1); if (g.filled(cx, cy)) g.set(cx, cy, '#ffc8b0'); if (g.filled(31 - cx, cy)) g.set(31 - cx, cy, '#ffc8b0'); }
     if (horn) {
       for (let fy = 0; fy < horn.fh; fy++) for (let fx = 0; fx < horn.fw; fx++) if (horn.fget(fx, fy)) { const s = (fx * 0.6 + fy) % 5; if (s < 1.4) horn.fset(fx, fy, '#e2b8f0'); else if (s < 2.6 && fx >= 32) horn.fset(fx, fy, '#f7d0e4'); }
       horn.outline(); g.merge(horn);
     }
-    if (!hatHidesLeaves && L.bloom) flowerDetail(g, L.bloom, 16, 6.5);
-    else if (!hatHidesLeaves && L.bud) {
-      const BR = BUD_RAMP[L.bud] || BUD_RAMP.wild;
-      g.px([[16, 4], [16, 5], [16, 6], [15, 7]].filter(([x, y]) => g.filled(x, y)), BR[2]); g.px([[14, 5], [14, 6]].filter(([x, y]) => g.filled(x, y)), BR[0]);
-      if (L.bud === 'wild') g.px([[15, 2], [16, 2], [15, 3], [16, 3], [15, 4], [17, 4]].filter(([x, y]) => g.filled(x, y)), '#e07ba0');
-      if (L.bud === 'moon') g.px([[19, 3], [12, 5]], '#dcd0ff');
-      if (L.bud === 'sun') g.px([[19, 3], [12, 5]], '#fff27a');
+    { const g = SV; // (the stage art sits 1 art px lower)
+      if (!hatHidesLeaves && L.bloom) { flowerDetail(g, L.bloom, 16, 6.5); ssLeaf(g, 13, 13.4, 2.1, 1, 0.45, RAMPS.leaf); ssLeaf(g, 19, 13.4, 2.1, 1, -0.45, RAMPS.leaf); }
+      else if (!hatHidesLeaves && L.bud) {
+        const BR = BUD_RAMP[L.bud] || BUD_RAMP.wild;
+        g.px([[16, 4], [16, 5], [16, 6], [15, 7]].filter(([x, y]) => g.filled(x, y)), BR[2]); g.px([[14, 5], [14, 6]].filter(([x, y]) => g.filled(x, y)), BR[0]);
+        if (L.bud === 'wild') g.px([[15, 2], [16, 2], [15, 3], [16, 3], [15, 4], [17, 4]].filter(([x, y]) => g.filled(x, y)), '#e07ba0');
+        if (L.bud === 'moon') g.px([[19, 3], [12, 5]], '#dcd0ff');
+        if (L.bud === 'sun') g.px([[19, 3], [12, 5]], '#fff27a');
+        ssLeaf(g, 12.9, 12.9, 2.3, 1.1, 0.45, LR); ssLeaf(g, 19.1, 12.9, 2.3, 1.1, -0.45, LR); hrGloss(g, 14.9, 6.2, 0.62, 1.45, 0.25);
+      }
+      else if (!hatHidesLeaves) { ssLeaf(g, 12.45, 11.35, 3.4, 1.8, 0.4, LR, true); ssLeaf(g, 19.55, 11.35, 3.4, 1.8, -0.4, LR, true); }
     }
-    else if (!hatHidesLeaves) { stroke(g, [[11.0, 10.7], [14.1, 12.1]], 0.28, 0.24, LR[2]); stroke(g, [[21.0, 10.7], [17.9, 12.1]], 0.28, 0.24, LR[2]); g.dots([[10.6, 10.4], [11.1, 10.2], [20.4, 10.2], [20.9, 10.4]], mixHex(LR[0], '#ffffff', 0.4)); }
+  
     // socks: shade the sole of each foot
     if (L.pattern === 'socks' && !tent) { const sd = mixHex(pc2, INK, 0.3); for (let y = 26; y < 32; y++) for (let x = 8; x < 24; x++) if (g.get(x, y) === pc2 && !onBody(x, y) && g.get(x, y + 1) === INK) g.set(x, y, sd); }
     // hi-res soft volume (PX.RIM): 5-step body shading, a 1-fine-pixel rim light up-left, a soft bounce light down-right and a
     // glossy highlight; found on plain body-ramp (or skin-sentinel) pixels once everything else is drawn
     hd(g, { outer: false });
-    const rim = RIM ? hrRim(g, R) : null;
-    if (RIM && !skin) hrSoftBody(g, R);
-    if (rim && !skin) for (const [i, t, s] of rim) g.a[i] = hrRimColor(R, t, s);
+    const rim = RIM && skin ? hrRim(g, R) : null;
     if (skin) applySkin(g, skin, 16, 22, 1, RAMPS[L.body] || RAMPS.mint);
-    if (rim && skin) for (const [i, t, s] of rim) if (!(skin === 'ghost' && i >= 26 * KK * FW)) g.a[i] = rimColor(g.a[i], t, s, null);
+    if (rim) for (const [i, t, s] of rim) if (!(skin === 'ghost' && i >= 26 * KK * FW)) g.a[i] = rimColor(g.a[i], t, s, null);
+    if (RIM) ssSheen(g, SSU);
+  
   
     // shiny (L.shiny === true): a soft lighter diagonal band high on the right of the head and two tiny white glints.
     // Recolours body pixels only (never the outline), so the silhouette stays the same; skinned bodies just get the glints.
     if (L.shiny === true) {
       const KS = g.k || 1;
-      if (!skin) for (let fy = 13 * KS; fy < 20 * KS; fy++) for (let fx = 17 * KS; fx < 24 * KS; fx++) { const x = (fx + 0.5) / KS, y = (fy + 0.5) / KS, c = g.fget(fx, fy); if (!c || c === INK || c[0] !== '#' || !inEll(x, y, 16, 22, 8.3, 7.7, 0).in) continue; const q = inEll(x, y, 20, 16.6, 2.4, 0.62, 0.64); if (q.in) g.fset(fx, fy, hrMix(c, '#ffffff', q.nx * q.nx + q.ny * q.ny < 0.35 ? 0.6 : 0.38)); }
+      if (!skin) for (let fy = 13 * KS; fy < 20 * KS; fy++) for (let fx = 17 * KS; fx < 24 * KS; fx++) { const x = (fx + 0.5) / KS, y = (fy + 0.5) / KS, c = g.fget(fx, fy); if (!c || c === INK || c[0] !== '#' || !inEll(x, y, 16, 22, 8.3, 7.7, 0).in) continue; const q = inEll(x, y, 20, 17.6, 2.4, 0.62, 0.64); if (q.in) g.fset(fx, fy, hrMix(c, '#ffffff', q.nx * q.nx + q.ny * q.ny < 0.35 ? 0.6 : 0.38)); }
       for (const [x, y] of SHINY_GLINTS) if (onBody(x, y) && g.filled(x + 0.5, y + 0.5)) { g.dots([[x + 0.5, y], [x, y + 0.5], [x + 1, y + 0.5], [x + 0.5, y + 1]], '#fff6c8'); g.dot(x + 0.5, y + 0.5, '#ffffff'); }
     }
     // face
@@ -1104,8 +1334,9 @@
     const bodyMid = ((RAMPS[L.body] || RAMPS.mint)[1]).slice(1), lum = (parseInt(bodyMid.slice(0, 2), 16) * 0.3 + parseInt(bodyMid.slice(2, 4), 16) * 0.59 + parseInt(bodyMid.slice(4, 6), 16) * 0.11) / 255;
     if ((!skin && lum < 0.42) || (skin && SKIN_DARK[skin])) {
       const pale = '#e8ecff', onFace = (x, y) => g.filled(x, y);
-      for (const cx of [13, 19]) g.ell(cx, 20.5, 2.05, 2.45, pale, 0, onFace);
-      g.ell(16, 23, 2.6, 1.3, pale, 0, onFace);
+      for (const x0 of [21, 35]) for (let fy = 38; fy <= 46; fy++) for (let fx = x0; fx <= x0 + 7; fx++) { if ((fx === x0 || fx === x0 + 7) && (fy === 38 || fy === 46)) continue; if (g.ffilled(fx, fy)) g.fset(fx, fy, pale); }
+      g.ell(16, 23.95, 2.75, 1.3, skin ? pale : ssVivid(L.belly || BELLY, 0.4), 0, onFace);
+  
     }
     hrFace(g, L, P, eyes, skin);
   
@@ -1124,9 +1355,9 @@
     const crowned = !hatHidesLeaves && (L.bloom || L.bud);
     hatArt(h, L.hat, crowned, L.bloom);
     extraArt(h, L.extra, crowned);
-    hd(h, { outline: true, shade: 0.16, outer: false }); g.merge(h);
+    hd(h, { outline: true, shade: 0.16, outer: false }); ssShift(h, SS_DY); g.merge(h);
     { const ha = h.a, FWh = h.fw; hdThin(g, INK, i => ha[i] !== null || ha[i + 1] !== null || ha[i + FWh] !== null || ha[i + 2] !== null || ha[i + 2 * FWh] !== null || ha[i - 1] !== null || ha[i - FWh] !== null); } // (hat outline + head outline -> one line)
-    g.outerLine();
+    g.outerLine(SS_INK); g.outerLine(SS_INK);
     return g;
   }
   const cache = new Map();
@@ -1847,6 +2078,26 @@
       g.set(21, 5, '#ffffff');
       for (const [x, y] of [[3, 3], [24, 11], [2, 21], [23, 20], [5, 23]]) if (!g.get(x, y)) g.set(x, y, '#fff27a');
     },
+    // ----- holiday visitor (18x18; its picture is img/critters/reindeer.png) -----
+    reindeer(g) { // a little brown reindeer with branching antlers, a cream chest, a white tail tuft and a red nose
+      const M = DEER;
+      g.rect(5, 13, 1, 4, M[2]); g.rect(7, 13, 1, 4, M[1]); g.rect(10, 13, 1, 4, M[2]); g.rect(12, 13, 1, 4, M[1]);
+      g.ell(3.4, 9.4, 1.3, 1.1, '#fff8ee');
+      g.ell(8.6, 11.2, 4.8, 2.8, M);
+      g.ell(12.2, 8.4, 1.6, 3, M, 0.35);
+      g.ell(13.4, 5.8, 2.3, 2.1, M);
+      g.ell(15.4, 6.8, 1.7, 1.2, ['#f6dab8', '#e6bc92', '#b88a5c']);
+      g.ell(11, 4.6, 1.9, 0.9, M[1], -0.5);
+      g.outline();
+      const An = new Grid(18, 18);
+      stroke(An, [[12.6, 3.6], [12.2, 2.0], [11.0, 0.6]], 0.45, 0.35, '#b8804a'); stroke(An, [[12.3, 2.3], [13.4, 1.0]], 0.35, 0.3, '#b8804a');
+      stroke(An, [[14.4, 3.4], [15.0, 1.8], [16.4, 0.6]], 0.45, 0.35, '#b8804a'); stroke(An, [[14.9, 2.0], [14.0, 0.7]], 0.35, 0.3, '#b8804a');
+      An.outline(); for (let i = 0; i < An.a.length; i++) if (An.a[i] && !g.a[i]) g.a[i] = An.a[i];
+      g.ell(8.8, 12.6, 2.4, 1.2, '#f6dab8', 0, MK(g));
+      g.px([[6, 10], [8, 9], [10, 10]].filter(([x, y]) => g.filled(x, y)), '#fff4e4');
+      g.ell(14.2, 5.4, 0.45, 0.55, INK); g.dot(14.0, 5.1, '#ffffff'); g.ell(17.0, 6.6, 0.8, 0.75, ['#ff9aa6', '#e42a2e', '#a01828']); g.set(10, 4, '#f7b6c8');
+      g.px([[5, 16], [7, 16], [10, 16], [12, 16]], '#5a3a22');
+    },
   };
   // ---------------- Living plants (18x18, facing right, 3 frames: 0 rest, 1 sway/wave/open, 2 blink or squish) ----------------
   const pEyes = (g, x1, x2, y, blink) => { for (const x of [x1, x2]) { if (blink) g.set(x, y + 1, INK); else { g.set(x, y, INK); g.set(x, y + 1, INK); } } };
@@ -2371,6 +2622,47 @@
       g.outline();
       g.px([[5, 6], [6, 6], [5, 7], [6, 5], [4, 8]], '#ffffff'); g.px([[7, 5], [4, 9]], '#fff8fc');
       g.px([[1, 5], [0, 6], [2, 6], [1, 7]], '#ffffff'); g.px([[18, 16], [18, 17]], '#f7c6de'); g.px([[17, 19], [16, 2]], '#c8d8ff');
+    },
+    // ---- Holiday eggs (pictures: img/eggs/<id>.png; the elf hat and the antlers reach above the shell, as in the pictures) ----
+    snowman(g) { // a snowy egg with a little face, a red-and-green scarf and blue polka dots
+      eggShape(g, SNOWR); const on = MK(g);
+      for (const [x, y] of [[5.4, 15.6], [9.6, 17.4], [14.2, 15.8], [6.8, 20.2], [12.4, 20.6], [15.4, 18.8], [4.6, 18.4]]) g.ell(x, y, 0.62, 0.6, '#6a94e0', 0, on);
+      for (let fy = 12 * g.k; fy < 14.6 * g.k; fy++) for (let fx = 0; fx < g.fw; fx++) { if (!g.fget(fx, fy)) continue; const x = (fx + 0.5) / g.k, low = fy >= 14 * g.k; g.fset(fx, fy, Math.floor(x / 2) % 2 ? (low ? '#b8203a' : '#e8404e') : (low ? '#1f6a34' : '#2f9a48')); }
+      g.outline();
+      g.ell(7.3, 8.4, 0.62, 0.75, INK); g.ell(12.7, 8.4, 0.62, 0.75, INK); g.poly([[9.3, 9.6], [11.9, 10.2], [9.3, 10.8]], '#ff9a30'); g.dot(9.6, 9.8, '#ffc070');
+      g.ell(5.9, 10.4, 0.85, 0.42, '#f7b6c8'); g.ell(14.1, 10.4, 0.85, 0.42, '#f7b6c8');
+    },
+    gingerbread(g) { // a cookie egg with wavy white icing, a gumdrop nose and a green gumdrop button
+      eggShape(g, GINGER); const on = MK(g);
+      for (const yc of [5.6, 14.2]) for (let x = 3; x <= 17; x += 0.25) { const y = yc + Math.sin(x * 1.6) * 0.7; if (g.filled(x, y)) g.ell(x, y, 0.42, 0.42, '#fffaf0', 0, on); }
+      g.outline();
+      g.ell(7.2, 8.6, 0.62, 0.72, INK); g.ell(12.8, 8.6, 0.62, 0.72, INK); g.ell(10, 10.6, 1.1, 1.0, ['#ff9aa6', '#e8445a', '#a82a3c']);
+      g.ell(5.8, 10.6, 0.85, 0.42, '#f7a0a8'); g.ell(14.2, 10.6, 0.85, 0.42, '#f7a0a8'); g.ell(10, 18.6, 1.0, 0.9, ['#b4f08a', '#4fba3a', '#2f8a34']);
+    },
+    candycane(g) { // red and white peppermint stripes
+      const T = ['#0a0a01', '#0a0a02', '#0a0a03']; eggShape(g, T);
+      for (let fy = 0; fy < g.fh; fy++) for (let fx = 0; fx < g.fw; fx++) { const i = T.indexOf(g.fget(fx, fy)); if (i >= 0) g.fset(fx, fy, (Math.floor(((fx + 0.5) + (fy + 0.5)) / g.k / 3.2) % 2 ? CANE[0] : CANE[1])[i]); }
+      g.outline();
+    },
+    elf(g) { // a green egg in an elf hat (a golden bell on its tip), a red-and-white band and a gold button
+      eggShape(g, ELFR); const on = MK(g);
+      for (let fy = 11.6 * g.k; fy < 15.4 * g.k; fy++) for (let fx = 0; fx < g.fw; fx++) { if (!g.fget(fx, fy)) continue; const x = (fx + 0.5) / g.k, y = (fy + 0.5) / g.k; g.fset(fx, fy, y < 12.2 || y > 14.8 ? '#ffffff' : Math.floor((x + 0.6) / 2.2) % 2 ? '#e4303a' : '#ffffff'); }
+      g.ell(10, 18.6, 0.95, 0.95, ['#fff6a0', '#f2c030', '#c7861c'], 0, on);
+      const H = new Grid(20, 24); H.poly([[3.4, 8.2], [16.6, 8.2], [15.6, 5.4], [16.4, 2.6], [17.4, 1.4], [14.2, 2.0], [10.4, 2.4], [6.4, 4.6]], '#3f9a3a'); shade(H, 9.4, 4.6, 7, 4.4, ['#8ee060', '#3f9a3a', '#255e2c']);
+      H.ell(10, 7.9, 7.4, 1.4, ['#c8f0a0', '#9ee070', '#5aa83a']); H.outline();
+      g.outline(); g.merge(H);
+      piece(g, t => t.ell(17.6, 1.6, 1.5, 1.5, ['#fff6a0', '#f6c83a', '#c7861c']));
+    },
+    reindeer(g) { // a brown egg with antlers, a red nose, a cream tummy and rosy cheeks
+      eggShape(g, DEER); const on = MK(g);
+      g.ell(10, 18.4, 4.4, 4.0, ['#fff0dc', '#f6dab8', '#dcb48c'], 0, on);
+      g.outline();
+      const A = new Grid(20, 24);
+      for (const s of [-1, 1]) { const X = v => 10 + s * v; stroke(A, [[X(3.6), 5.6], [X(5.6), 3.2], [X(8.4), 1.0]], 0.75, 0.5, '#b8804a'); stroke(A, [[X(5.0), 3.8], [X(8.6), 4.0]], 0.55, 0.45, '#b8804a'); stroke(A, [[X(6.6), 2.0], [X(5.8), 0.5]], 0.5, 0.4, '#b8804a'); }
+      shade(A, 10, 3, 10, 4, ['#ecc890', '#b8804a', '#7a4a24']); A.outline();
+      for (let i = 0; i < A.a.length; i++) if (A.a[i] && !g.a[i]) g.a[i] = A.a[i];
+      g.ell(7.4, 9.6, 0.62, 0.72, INK); g.ell(12.6, 9.6, 0.62, 0.72, INK); g.ell(10, 11.6, 1.15, 1.0, ['#ff9aa6', '#e42a2e', '#a01828']);
+      g.ell(5.8, 11.8, 0.85, 0.42, '#f7a0a8'); g.ell(14.2, 11.8, 0.85, 0.42, '#f7a0a8');
     },
   };
   const EL_ICON = {
@@ -3058,6 +3350,55 @@
         g.outline();
         for (let y = 11; y < 22; y++) for (let x = 0; x < 14; x++) if (g.get(x, y) === '#e8b060' && ((x + y) % 3 === 0 || (x - y + 30) % 3 === 0)) g.set(x, y, '#b87830');
         g.px([[5, 2], [5, 6], [4, 9]].filter(([x, y]) => g.filled(x, y)), '#ffffff'); g.px([[9, 7], [6, 11], [8, 4]].filter(([x, y]) => g.filled(x, y)), '#f07a84'); g.set(9, 11, '#5fcde4');
+        break;
+      }
+      // ---- holiday mode (pictures: img/props/<kind>.png, fitted into these boxes by art-images.js) ----
+      case 'holidaytree': { // the holiday tree: a pine with baubles and lights, a star on top and a little drift of snow at its foot
+        g = new Grid(36, 46); g.dither = false;
+        const PINE = ['#7ad26a', '#3f9a3a', '#22603a'], SN = ['#ffffff', '#eef4fc', '#bccbe4'];
+        piece(g, t => { t.ell(18, 43.4, 16.4, 2.4, SN); t.ell(10, 42.2, 6, 2.2, SN); t.ell(26.5, 42.4, 6.5, 2.1, SN); });
+        piece(g, t => { t.poly([[15.6, 44], [15.8, 36.6], [20.2, 36.6], [20.4, 44]], '#8f563b'); t.rect(16, 37, 1, 6, '#a8653a'); });
+        for (const [a, b, c] of [[[18, 16], [1.8, 38.4], [34.2, 38.4]], [[18, 10.4], [5, 29.4], [31, 29.4]], [[18, 5], [8.6, 20.6], [27.4, 20.6]]]) piece(g, t => { t.poly([a, b, c], PINE[1]); shade(t, 15, (a[1] + b[1]) / 2 + 1, 12, 9, PINE); });
+        for (const [x, y, c] of [[12.4, 18.2, '#ff6a8a'], [22.6, 16.6, '#ff6a8a'], [9.6, 27.6, '#ffb03a'], [24.8, 25.4, '#e8404a'], [16.4, 23.8, '#5cb8ff'], [7.6, 35.6, '#e8404a'], [28.2, 35.2, '#ffb03a'], [18.4, 33.4, '#ff6a8a']]) { g.ell(x, y, 1.15, 1.15, c); g.dot(x - 0.5, y - 0.5, '#ffffff'); }
+        for (const [x, y, c] of [[15, 12, '#fff27a'], [21.6, 21.6, '#fff27a'], [11.2, 23.2, '#ffffff'], [13.4, 30.6, '#fff27a'], [23.6, 31.4, '#ffffff'], [5.8, 36.8, '#fff27a'], [30.4, 37.2, '#ffffff'], [20.4, 27.6, '#fff27a']]) g.ell(x, y, 0.55, 0.55, c);
+        piece(g, t => t.poly(starPts(18, 3.6, 3.4, 1.45, 5), '#fbd23a')); g.dots([[17, 2.5], [17.5, 2.5], [17, 3]], '#fff8b0');
+        break;
+      }
+      case 'gift': case 'giftblue': case 'giftpink': { // the gift waiting under the holiday tree: a wrapped box, a ribbon and a bow
+        g = new Grid(13, 12);
+        const BOX = kind === 'giftblue' ? ['#a8ccff', '#4a78f0', '#2a44ac'] : kind === 'giftpink' ? ['#ffc8e2', '#ff7cc0', '#c4448e'] : ['#ff8a90', '#e42a2e', '#a01828'];
+        const RIB = kind === 'giftblue' ? ['#ffffff', '#e8eefb', '#b8c4dc'] : ['#fff6a0', '#fbd23a', '#c8901c'];
+        piece(g, t => { t.poly([[1.4, 5.4], [11.6, 5.4], [11.6, 11.5], [1.4, 11.5]], BOX[1]); shade(t, 5, 7, 8, 6, BOX); });
+        piece(g, t => { t.poly([[0.5, 3.7], [12.5, 3.7], [12.5, 5.9], [0.5, 5.9]], BOX[1]); shade(t, 5, 4, 8, 3, BOX); });
+        piece(g, t => t.poly([[5.6, 3.7], [7.4, 3.7], [7.4, 11.5], [5.6, 11.5]], RIB[1]));
+        piece(g, t => { t.ell(4.4, 2.2, 2.2, 1.35, RIB, -0.45); t.ell(8.6, 2.2, 2.2, 1.35, RIB, 0.45); t.ell(6.5, 3.2, 0.9, 0.8, RIB[2]); });
+        g.dots([[2, 6.5], [2, 7]], '#ffffff');
+        break;
+      }
+      case 'snowman': { // holiday mode: a snowman in a top hat, with a carrot nose, a red scarf and coal buttons
+        g = new Grid(16, 23);
+        const SN = ['#ffffff', '#eef4fc', '#bccbe4'];
+        piece(g, t => t.ell(8, 17.6, 6.6, 5.2, SN));
+        piece(g, t => t.ell(8, 9.8, 4.6, 4.2, SN));
+        piece(g, t => { t.ell(8, 13.6, 4.7, 1.15, ['#ff8a90', '#e8404e', '#a82a3c']); t.poly([[9.6, 13.8], [11.8, 13.8], [11.4, 17.6], [9.8, 17.2]], '#e8404e'); });
+        piece(g, t => { t.poly([[4.8, 0.6], [11.2, 0.6], [11.2, 5.8], [4.8, 5.8]], '#4a4a70'); t.poly([[4.8, 4.2], [11.2, 4.2], [11.2, 5.1], [4.8, 5.1]], '#e8445a'); });
+        piece(g, t => t.poly([[3, 5.6], [13, 5.6], [13, 6.8], [3, 6.8]], '#3a3a5c'));
+        g.ell(6.3, 9.4, 0.55, 0.65, INK); g.ell(9.7, 9.4, 0.55, 0.65, INK); g.poly([[7.6, 10.6], [10.4, 11.1], [7.6, 11.6]], '#ff9a30');
+        g.ell(5.2, 11.4, 0.8, 0.4, '#f7b6c8'); g.ell(10.8, 11.4, 0.8, 0.4, '#f7b6c8'); g.ell(8, 16.8, 0.6, 0.6, INK); g.ell(8, 19.2, 0.6, 0.6, INK);
+        break;
+      }
+      case 'snowtree': { // holiday mode: today's garden tree with snow on its crowns (the same size, so the garden's layout keeps)
+        g = new Grid(30, 38); g.dither = false;
+        const crowns = [[15, 15, 10.5, 9], [7.5, 20, 6.2, 5], [22.5, 20, 6.2, 5], [15, 7.5, 7, 5.6]], L5 = ramp5(leafR);
+        g.poly([[12.5, 38], [13.5, 22], [16.5, 22], [17.5, 38]], '#8f563b'); g.rect(13, 22, 1, 16, '#a8653a');
+        for (const [cx, cy, rx, ry] of crowns) g.ell(cx, cy, rx, ry, leafR);
+        g.outline();
+        foliage(g, leafR, 0.05, 3); bark(g, ['#8f563b'], '#663931', 1);
+        for (let fy = 0; fy < g.fh; fy++) for (let fx = 0; fx < g.fw; fx++) {
+          const c = g.fget(fx, fy); if (!L5.includes(c)) continue;
+          const x = (fx + 0.5) / g.k, y = (fy + 0.5) / g.k;
+          for (const [cx, cy, rx, ry] of crowns) if (inEll(x, y, cx, cy, rx, ry, 0).in && y < cy - ry * 0.25 + Math.sin(x * 1.3 + cx) * 0.7) { g.fset(fx, fy, y < cy - ry * 0.25 - 0.8 ? '#ffffff' : '#e4ecf8'); break; }
+        }
         break;
       }
       default:

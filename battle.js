@@ -154,7 +154,7 @@
     f.max = f.hp = Math.round((40 + 2 * L) * B.hpK);
     return f;
   }
-  const wildList = area => Object.keys(D.ANIMALS).filter(k => D.ANIMALS[k].area === area);
+  const wildList = area => Object.keys(D.ANIMALS).filter(k => D.ANIMALS[k].area === area && !D.ANIMALS[k].season); // (a seasonal visitor is never a Wild Battle: stars and "all Alphas" stay the same all year)
   // level order inside an area: gentler creatures (smaller total gives) get the lower levels, so new additions don't all land at the top
   const giveSum = id => Object.values(D.ANIMALS[id].gives || {}).reduce((t, v) => t + Math.abs(v), 0);
   const wildRank = area => wildList(area).map((id, i) => [id, giveSum(id) + i * 0.001]).sort((x, y) => x[1] - y[1]).map(x => x[0]);
@@ -455,7 +455,7 @@
     o = o || {};
     const r = srng(seed), pick = a => a[Math.floor(r() * a.length)];
     const area = o.area || pick(D.AREA_ORDER);
-    const pool = Object.keys(D.ANIMALS).filter(k => D.ANIMALS[k].area === area);
+    const pool = Object.keys(D.ANIMALS).filter(k => D.ANIMALS[k].area === area && !D.ANIMALS[k].season);
     const absorbed = {};
     const nA = lv < 12 ? 1 : lv < 45 ? 2 : 3;
     for (let i = 0; i < nA; i++) { const k = pick(pool); absorbed[k] = Math.min(6, (absorbed[k] || 0) + 1 + Math.floor(lv / 25 + r() * 2)); }
@@ -2373,7 +2373,7 @@
   // an animal that teaches an attack of this element (the first one in the data, e.g. water -> Duck)
   const teacherCache = {};
   function teacherOf(el) {
-    if (!(el in teacherCache)) teacherCache[el] = Object.keys(D.ANIMALS).find(k => D.ANIMALS[k].el === el && D.ANIMALS[k].moves.some(m => D.MOVES[m] && D.MOVES[m].el === el && D.MOVES[m].pow > 0)) || null;
+    if (!(el in teacherCache)) teacherCache[el] = Object.keys(D.ANIMALS).find(k => D.ANIMALS[k].el === el && !D.ANIMALS[k].season && D.ANIMALS[k].moves.some(m => D.MOVES[m] && D.MOVES[m].el === el && D.MOVES[m].pow > 0)) || null;
     return teacherCache[el];
   }
   function typeTip(foeEl) {

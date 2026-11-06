@@ -168,6 +168,36 @@
     },
   };
   PS.gardenThemes = TH; // (the area drop-down's postcards use these colours: app.js mapPreview)
+  // ---------------- holiday mode: snow on every island ----------------
+  // While holiday mode is on (PS.holiday, state.js) the land is painted from the area's theme with these keys swapped in: a snowy
+  // lawn (soft drifts in 4 tones), snow-capped hills and shrubs, frosted sand, a trodden-snow path and more snow on the peaks. The
+  // water, sky, houses and fruit trees stay as they are, so every island still reads at a glance. HOL is checked a few times a
+  // second (frame) and on the 'holiday' event (Parent tools).
+  const holOn = () => { try { return !!(PS.holiday && PS.holiday.on()); } catch (e) { return false; } };
+  let HOL = holOn();
+  const SNOWY = {
+    meadow: { lawn: ['#ffffff', '#c6d4ea'], grass: ['#ffffff', '#f2f6fc', '#e4ecf8', '#d4e0f2'], patch: 1.3, blade: '#7fa86a', bladeHi: '#ffffff', shade: '#bfcde4', shadowC: '#a8bad6',
+      far: ['#e8eff8', '#b4c5dc'], farDots: ['#3f8a5a', '#ffffff', '#2a5e44'], near: ['#f5f8fd', '#c2d1e6'], nearDots: ['#4f8f5c', '#ffffff'],
+      sand: '#f6efd6', wet: '#dccfa8', sandEdge: '#c8bc98', path: ['#ffffff', '#dde6f2', '#b9c8de'] },
+    beach: { lawn: ['#fffdf8', '#d9cfb8'], grass: ['#fffefa', '#f9f6ee', '#f1ece0', '#e7e0d0'], patch: 1.1, blade: '#b8b090', bladeHi: '#ffffff', shade: '#d8ccb4', shadowC: '#cdbf9e',
+      far: ['#eef3f9', '#b9c9de'], farDots: ['#3f7a4a', '#ffffff', '#2f6a3a'], near: ['#fbf8f1', '#d8ccb0'], nearDots: ['#c8b48a', '#ffffff'],
+      sand: '#f7ecd0', wet: '#e2cc9c', sandEdge: '#cdb486', path: ['#ffffff', '#e2dccd', '#c4b89c'] },
+    moonlit: { lawn: ['#eef0ff', '#9aa6d6'], grass: ['#f0f2ff', '#e2e6fb', '#d0d6f2', '#bcc4e8'], patch: 1.3, blade: '#3f8a8a', bladeHi: '#e8f0ff', shade: '#a2acd6', shadowC: '#8e98c8',
+      far: ['#56659a', '#3a4676'], farDots: ['#2a5a5e', '#e4ecff', '#1c4044'], near: ['#9aaad0', '#7484b0'], nearDots: ['#2a5a5e', '#eef2ff'],
+      sand: '#d6d2ea', wet: '#aaa4cc', sandEdge: '#8e88b4', path: ['#ffffff', '#e2d4fa', '#a88ad8'] },
+    candy: { lawn: ['#ffffff', '#e0c6dc'], grass: ['#ffffff', '#fdf5fb', '#f6eaf4', '#ecdcec'], patch: 1.1, blade: '#c8a8c8', bladeHi: '#ffffff', shade: '#e2cde0', shadowC: '#d6bcd6',
+      far: ['#fde8f4', '#ebb8d8'], farStripe: '#ffffff', near: ['#fff8fc', '#e6cde0'], sand: '#fcefd6', wet: '#efd6b0', sandEdge: '#dcb88c' },
+  };
+  const snowTH = {};
+  // the theme the land is painted with: the area's own, or its snowy version while holiday mode is on
+  const TA = a => { a = a || area; if (!HOL || !SNOWY[a]) return TH[a]; return snowTH[a] || (snowTH[a] = Object.assign({}, TH[a], SNOWY[a], { snowy: true })); };
+  PS.gardenTheme = a => TA(a); // (app.js mapPreview: the area drop-down's postcards are snowy too)
+  // holiday decorations: the gift's wrapping per area, and the scenery (decorative trees wear snow; the fruit trees stay green, so
+  // they're easy to find)
+  const GIFT_OF = { meadow: 'gift', beach: 'giftblue', moonlit: 'gift', candy: 'giftpink' };
+  const SNOWMEN = { meadow: [[0.3, 0.64], [0.84, 0.36], [0.1, 0.86], [0.6, 0.12]], beach: [[0.22, 0.4], [0.7, 0.76], [0.44, 0.92], [0.86, 0.5]],
+    moonlit: [[0.3, 0.2], [0.76, 0.74], [0.12, 0.58], [0.56, 0.92]], candy: [[0.14, 0.62], [0.74, 0.62], [0.46, 0.84], [0.88, 0.3]] }; // ([u, v] tries: 2 stand)
+  const pk = kind => (HOL && kind === 'tree' && themeOf(area) === 'day' ? 'snowtree' : kind);
   // where fruit hangs on each tree (share of sprite width/height from the base)
   const TREE_SLOTS = {
     palm: [[-0.08, -0.74], [0.14, -0.69], [0.34, -0.76]],
@@ -208,6 +238,8 @@
   for (let i = 0; i < 4; i++) DECO.birds.push({ p: srand(), y: 0.2 + srand() * 0.4, v: 0.012 + srand() * 0.01, ph: srand() * 6 });
   // (the restyle: more fireflies for the Moonlit Grove's twilight, added last so everything above keeps its seeded place)
   for (let i = 0; i < 40; i++) DECO.flies.push({ p: srand() * 10, a: srand(), b: srand() });
+  // (holiday mode's falling snow, added last for the same reason: a fixed handful of flakes, placed across the view; see drawSnow)
+  const SNOW = []; for (let i = 0; i < 22; i++) SNOW.push({ x: srand(), y: srand(), v: 0.022 + srand() * 0.02, ph: srand() * 6.28, big: srand() < 0.3 });
 
   // ---------------- sprites (guarded: art is still being drawn, so nothing may crash) ----------------
   const sprCache = new Map();
@@ -240,7 +272,7 @@
     if (!scenery || !Lw.props) return;
     // (a picture is fitted into the same canvas as the code art it replaces, so sizes, hitboxes and fruit spots stay put)
     const theme = themeOf(area);
-    for (const q of Lw.props) q.c = propSpr(q.kind, theme);
+    for (const q of Lw.props) q.c = propSpr(pk(q.kind), theme);
     for (const T of Lw.trees || []) T.c = propSpr(T.kind, theme);
     if (Lw.home) Lw.home.c = propSpr(Lw.home.kind, theme);
   }
@@ -302,7 +334,7 @@
   // ---------------- module state ----------------
   let root, cv, ctx, buf, bx, skyC, skx, bgC, bgx, pillName, pillSub, dotsEl, trayEl, pouchStrip, fruitStrip, pouchCnt, hintEl, cardEl, ghostEl, gctx, labelsEl, handEl, guideNow = null;
   const card = {};
-  let W = 0, H = 0, DPR = 1, ww = 0, wh = 0, t = 0, visible = false, mounted = false, area = 'meadow';
+  let W = 0, H = 0, DPR = 1, LDPR = 1, ww = 0, wh = 0, t = 0, visible = false, mounted = false, area = 'meadow';
   // camera (Z = CSS px per world px; cam = world px at the top-left of the screen)
   let Z = 3, ZMIN = 2, ZMAX = 6, camX = 0, camY = 0, zoomAnim = null, pinch = null, camV = { x: 0, y: 0 }, lastTapBg = null, zoomSnapT = 0;
   // ZFAR: zoomed all the way out, the whole garden fits above the tray. follow: the Sprout the camera gently keeps in view (the
@@ -411,11 +443,25 @@
     // props: the area's own pieces, its little scenes, then the seeded scatter that fills the rest
     Lw.props = []; let i = 0;
     const add = (kind, x, y, grp) => {
-      const c = propSpr(kind, theme), w = artW(c); x = Math.round(x); y = Math.round(y);
+      const c = propSpr(pk(kind), theme), w = artW(c); x = Math.round(x); y = Math.round(y);
       if (x - w / 2 < 2 || x + w / 2 > lawnRight(y) || y < Lw.minY - 2 || y > Lw.maxY + 2) return false;
       if (!free(x - w / 2 + 1, y - 6, x + w / 2 - 1, y + 3, grp, artH(c) > 18) || onPathNear(x, y, w / 2) || pondAt(x, y, w / 2 + 3)) return false;
       foot.push([x - w / 2, y - 6, x + w / 2, y + 3, grp == null ? null : grp]); Lw.props.push({ kind, x, y, c, i: i++ }); return true;
     };
+    // holiday mode: the holiday tree stands near the house (the heart of the garden, where the Sprouts play) with room in front for
+    // its daily gift, and a snowman or two stand about; they take their spots before the usual scenery
+    Lw.xmas = null; Lw.gift = null;
+    if (HOL) {
+      const h = Lw.heart;
+      for (const r of [46, 60, 76, 94, 116, 140]) {
+        for (const a of [180, 0, 205, 335, 155, 25, 230, 310, 130, 50]) { const q = a * Math.PI / 180; if (add('holidaytree', h.x + Math.cos(q) * r, h.y - 8 + Math.sin(q) * r * 0.55)) { Lw.xmas = Lw.props[Lw.props.length - 1]; break; } }
+        if (Lw.xmas) break;
+      }
+      if (!Lw.xmas) { const c = propSpr('holidaytree', theme), y = Math.round(h.y - 8), x = Math.round(clamp(h.x - 60, artW(c) / 2 + 2, lawnRight(y) - artW(c) / 2)); Lw.props.push(Lw.xmas = { kind: 'holidaytree', x, y, c, i: i++ }); }
+      const X = Lw.xmas; Lw.gift = { x: X.x + 12, y: X.y + 4 };
+      foot.push([X.x + 4, X.y - 4, X.x + 22, X.y + 9, null], [X.x - 22, X.y + 3, X.x + 26, X.y + 44, null, 1]); // (the gift's spot stays clear; nothing tall hides the tree)
+      let sm = 0; for (const [u, v] of SNOWMEN[area] || []) { const p = atUV(u, v); if (add('snowman', p.x, p.y) && ++sm >= 2) break; }
+    }
     for (const [kind, u, v] of th.props || []) { const p = atUV(u, v); add(kind, p.x, p.y); }
     (th.groups || []).forEach(([u, v, list], g) => { const p = atUV(u, v); for (const [kind, dx, dy] of list) add(kind, p.x + dx, p.y + dy, 'g' + g); });
     let land = 0; for (let y = Lw.minY; y <= Lw.maxY; y += 4) land += Math.max(0, lawnRight(y)) * 4;
@@ -587,7 +633,7 @@
   const f32 = (k, n) => (landBuf[k] && landBuf[k].length >= n ? landBuf[k] : (landBuf[k] = new Float32Array(n)));
   const i32 = (k, n) => (landBuf[k] && landBuf[k].length >= n ? landBuf[k] : (landBuf[k] = new Int32Array(n)));
   function paintLand() {
-    const th = TH[area], X = bgx, hz = Lw.hz, wt = Lw.waterTop, FW = ww * SK, FH = wh * SK;
+    const th = TA(), X = bgx, hz = Lw.hz, wt = Lw.waterTop, FW = ww * SK, FH = wh * SK;
     X.setTransform(1, 0, 0, 1, 0, 0); X.globalAlpha = 1; X.clearRect(0, 0, FW, FH);
     // (the small noise buffers are kept between paints; the big pixel buffer is let go once it is on the canvas)
     const img = X.createImageData(FW, FH), P = new Uint32Array(img.data.buffer);
@@ -606,12 +652,12 @@
       const top = i => base - amp * h(i);
       for (let fi = 0; fi < Math.min(ww, seaX) * SK; fi++) {
         const i = fc(fi), ii = Math.floor(i), tp = top(i), sl = top(i + 1) - top(i - 1);
-        const snowTo = base - amp * 0.6 + hash2(ii >> 2, 1, AS) * 2 + (sh === 'drop' && ii % 6 < 2 ? 2 : 0);
+        const snowTo = base - amp * (th.snowy ? 0.25 : 0.6) + hash2(ii >> 2, 1, AS) * 2 + (sh === 'drop' && ii % 6 < 2 ? 2 : 0); // (holiday mode: snow further down the peaks)
         const face = sl < -0.15 ? 0 : sl <= 0.15 ? 1 : sl <= 0.26 ? 2 : 3;
         for (let fy = Math.max(0, Math.round(tp * SK)); fy < (lawnTop + 2) * SK; fy++) {
           const y = fc(fy);
           let c = face === 0 ? (y - tp > 3 ? M01 : M[0]) : face === 1 ? M01 : face === 2 ? M12 : M[2];
-          if (y < snowTo && y - tp < 6) c = face >= 2 ? snowShU : snowU;
+          if (y < snowTo && y - tp < (th.snowy ? 11 : 6)) c = face >= 2 ? snowShU : snowU;
           if (y > base - 6) c = mixU(c, hazeU, Math.min(1, Math.round((y - (base - 6)) / 8 * 6) / 6));
           P[fy * FW + fi] = c;
         }
@@ -841,7 +887,27 @@
     };
     const SGL = th.singles || null;
     const single = (x0, y0, k) => { const f = FL[SGL ? SGL[k % SGL.length] : (k * 7 + 3) % FL.length]; el(x0 + 0.5, y0 + 2.4, 2, 0.75, leafD); bloom(x0 + 0.5, y0 + 0.5, f, 0.75); };
-    if (th.deco === 'meadow') {
+    if (th.snowy) {
+      // holiday mode: soft snow drifts (a blue shadow on their low side), frosty glints, a few tufts and holly sprigs poking through,
+      // pebbles with a cap of snow, and each island's own touch here and there (shells, glowing specks, gumdrops). Calm and sparse.
+      const drift = (x0, y0, k) => { const w = 2.4 + (k % 3) * 1.1, cx = x0 + 0.5, cy = y0 + 0.5; mixEl(cx + 0.5, cy + 0.7, w + 0.3, 0.95, sh, 0.5); el(cx, cy, w, 0.9, '#ffffff'); el(cx - w * 0.3, cy - 0.35, w * 0.45, 0.35, mixH('#ffffff', th.grass[0], 0.5)); };
+      const glint = (x0, y0, k) => { dot(x0 + 0.25, y0 + 0.25, '#ffffff'); if (k % 4 === 0) { dot(x0 - 0.25, y0 + 0.25, mixH(sh, '#ffffff', 0.5)); dot(x0 + 0.75, y0 + 0.25, mixH(sh, '#ffffff', 0.5)); } };
+      const BERRY = area === 'moonlit' ? '#9fd8ff' : area === 'candy' ? '#f07aa0' : '#e8445a';
+      const holly = (x0, y0, k) => {
+        const cx = x0 + 0.5, cy = y0 + 0.5;
+        mixEl(cx + 0.4, cy + 1.4, 3, 0.8, sh, 0.4); el(cx - 1.4, cy + 0.4, 1.6, 0.75, '#2f7a4a'); el(cx + 1.5, cy + 0.6, 1.6, 0.75, '#3f8a52'); dot(cx - 1.9, cy + 0.2, '#5aa86a');
+        el(cx - 0.2, cy - 0.3, 0.6, 0.6, BERRY); el(cx + 0.7, cy + 0.1, 0.55, 0.55, BERRY); if (k % 2) el(cx + 0.1, cy + 0.5, 0.5, 0.5, BERRY); dot(cx - 0.45, cy - 0.55, '#ffffff');
+      };
+      const capped = (x0, y0, k) => { pebble(x0, y0, k); const w = k % 2 ? 2 : 3; el(x0 + w / 2, y0 - 0.15, w / 2 - 0.1, 0.4, '#ffffff'); };
+      scatter(430, drift); scatter(300, glint); scatter(1300, tuft); scatter(2600, holly); scatter(2400, capped);
+      if (area === 'beach') scatter(1600, (x0, y0, k) => { const c = th.dots[k % 4]; el(x0 + 1, y0 + 0.4, 1.1, 0.8, c); ln(x0 + 0.5, y0 + 0.5, x0 + 1.5, y0 - 0.5, mixH(c, '#ffffff', 0.5)); dot(x0 + 1.5, y0, '#ffffff'); });
+      else if (area === 'moonlit') scatter(900, (x0, y0, k) => { const cx = x0 + 0.5, cy = y0 + 0.5, c = k % 3 ? '#fff27a' : '#9ff8ff'; mixEl(cx, cy, 2.4, 2.1, c, 0.22); mixEl(cx, cy, 1.2, 1.05, c, 0.5); el(cx, cy, 0.55, 0.5, '#ffffff'); });
+      else if (area === 'candy') {
+        const GUMS = ['#f04848', '#f8a030', '#62cc4a', '#4a90f0', '#b070e0', '#ff7ab8'];
+        scatter(1500, (x0, y0, k) => { const g = GUMS[k % GUMS.length], cx = x0 + 0.5, cy = y0 + 0.5; mixEl(cx + 0.4, cy + 0.5, 2.4, 0.8, shc, 0.45); el(cx, cy, 1.9, 1.6, mixH(g, '#4a2a5a', 0.3), cy + 0.3); el(cx - 0.1, cy - 0.2, 1.7, 1.4, g, cy); el(cx - 0.1, cy - 1.05, 1.3, 0.45, '#ffffff'); dot(cx - 0.8, cy - 0.6, '#ffffff'); });
+        scatter(700, (x0, y0, k) => { const c = th.dots[k % 4]; if (k % 2) ln(x0 + 0.25, y0 + 0.25, x0 + 1.5, y0 + 0.25, c, 1); else ln(x0 + 0.25, y0 + 0.25, x0 + 0.75, y0 + 1.5, c, 1); });
+      }
+    } else if (th.deco === 'meadow') {
       scatter(125, tuft); scatter(150, wisp); scatter(320, flower);
       scatter(1100, single); scatter(2600, cluster);
       scatter(900, (x0, y0) => { for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0]]) { el(x0 + dx * 1.6 + 0.5, y0 + dy * 1.6 + 1, 1.05, 0.95, '#3f8f1a'); dot(x0 + dx * 1.6, y0 + dy * 1.6 + 0.5, '#a8e858'); } ln(x0 + 0.5, y0 + 1, x0 + 0.5, y0 + 2.5, bl); });
@@ -892,7 +958,7 @@
       scatter(260, tuft);
     }
     // ---- soft shadows under the scenery (painted with the ground, so the props and fruit trees stand on them) ----
-    const TALL = { tree: 1, bigtree: 1, palm: 1, glowtree: 1, lollitree: 1 }, FLAT = { towel: 1, shells: 1, rockpool: 1, gumdrops: 1, donut: 1 };
+    const TALL = { tree: 1, bigtree: 1, palm: 1, glowtree: 1, lollitree: 1, holidaytree: 1 }, FLAT = { towel: 1, shells: 1, rockpool: 1, gumdrops: 1, donut: 1 };
     for (const q of (Lw.props || []).concat(Lw.trees || [])) {
       if (!q.c || FLAT[q.kind]) continue;
       const w = artW(q.c);
@@ -1026,7 +1092,7 @@
   }
   function ensureBg(n) {
     const nq = Math.round(n * 20) / 20;
-    const k1 = area + ww + 'x' + wh + ':' + nq, k2 = area + ww + 'x' + wh + ':' + Lw.maxY;
+    const k1 = area + ww + 'x' + wh + ':' + nq, k2 = area + ww + 'x' + wh + ':' + Lw.maxY + (HOL ? ':snow' : '');
     if (k1 !== skyKey) { skyKey = k1; paintSky(nq); }
     if (k2 !== bgKey) { bgKey = k2; paintLand(); }
   }
@@ -1035,17 +1101,23 @@
   function resize() {
     const r = root.getBoundingClientRect();
     if (r.width < 10 || r.height < 10) return false;
-    DPR = Math.min(2, window.devicePixelRatio || 1);
+    // DPR: the screen's real density (iPhones are 3), for the canvas and the zoom steps, so nothing is stretched by the browser.
+    // LDPR: the 2x figure the garden's size and zoom range were tuned with; it keeps the world, its props and zooms as they were.
+    DPR = Math.min(3, window.devicePixelRatio || 1); LDPR = Math.min(2, DPR);
     const oldW = ww, oldMin = Lw.minY, oldSpan = Lw.span, k0 = ww ? Z / ZMIN : 0;
     W = r.width; H = r.height;
     // at ZMIN the screen shows about TUNE.worldW world pixels across (rounded to whole device pixels, so it's crisp too; wide
     // screens get a slightly wider world); the garden is mapW x mapH that view, so there is plenty to explore
-    ZMIN = Math.max(TUNE.zoomMinPx, Math.floor(Math.min(W / TUNE.worldW, H / TUNE.worldH) * DPR) / DPR);
-    ZMIN = Math.ceil(ZMIN * DPR - 0.001) / DPR; ZMAX = ZMIN * TUNE.zoomMax;
+    ZMIN = Math.max(TUNE.zoomMinPx, Math.floor(Math.min(W / TUNE.worldW, H / TUNE.worldH) * LDPR) / LDPR);
+    ZMIN = Math.ceil(ZMIN * LDPR - 0.001) / LDPR; ZMAX = ZMIN * TUNE.zoomMax;
     ww = Math.ceil(W / ZMIN * TUNE.mapW); wh = Math.ceil(H / ZMIN * TUNE.mapH);
     // the world buffer and the ground are SK x finer than the world (the sky sizes itself in paintSky: it only needs the top)
     for (const c of [buf, bgC]) { c.width = ww * SK; c.height = wh * SK; }
-    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    // the bitmap is exactly the CSS size x DPR device pixels (the browser never rescales it), and the canvas starts on a whole
+    // device pixel even when the top bar's height is fractional
+    cv.width = Math.ceil(W * DPR - 0.01); cv.height = Math.ceil(H * DPR - 0.01);
+    cv.style.width = cv.width / DPR + 'px'; cv.style.height = cv.height / DPR + 'px';
+    { const fx = (r.left * DPR) % 1, fy = (r.top * DPR) % 1; cv.style.transform = fx > 0.001 || fy > 0.001 ? `translate(${-(fx / DPR).toFixed(4)}px,${-(fy / DPR).toFixed(4)}px)` : ''; }
     layout();
     // keep everything where it was relative to the (possibly resized) world
     const fx = oldW ? ww / oldW : 1;
@@ -1063,12 +1135,11 @@
   function snapZ(z) {
     z = clamp(z, ZFAR, ZMAX);
     if (z < ZFAR * 1.04) return ZFAR;
-    let s = Math.round(z * DPR) / DPR;
-    // prefer a whole number of device pixels per fine pixel (every fine pixel the same size)
-    const s2 = Math.round(z * DPR / SK) * SK / DPR;
-    if (s2 >= ZFAR - 0.001 && s2 <= ZMAX + 0.001 && Math.abs(s2 - z) <= 0.5 / DPR + 0.001) s = s2;
+    // every fine pixel a whole number of device pixels (SK fine px per world px): zoom moves in steps of SK / DPR
+    const step = SK / DPR;
+    let s = Math.max(1, Math.round(z / step)) * step;
+    if (s > ZMAX + 0.001) s = Math.max(1, Math.floor(ZMAX / step + 0.001)) * step;
     if (s < ZFAR - 0.001) s = ZFAR;
-    if (s > ZMAX + 0.001) s = Math.floor(ZMAX * DPR) / DPR;
     return s;
   }
   function camLimits() {
@@ -1667,7 +1738,10 @@
   // ---------------- critters ----------------
   function critterPool() {
     const night = PS.clock.isNight();
-    return Object.keys(D.ANIMALS).filter(id => { const a = D.ANIMALS[id]; return a.area === area && (a.time === 'any' || (a.time === 'night') === night); });
+    const pool = Object.keys(D.ANIMALS).filter(id => { const a = D.ANIMALS[id]; return a.area === area && !a.season && (a.time === 'any' || (a.time === 'night') === night); });
+    // holiday mode: the Reindeer visits every garden (twice in the draw, so it comes by every few minutes)
+    if (HOL) for (const id of Object.keys(D.ANIMALS)) if (D.ANIMALS[id].season === 'holiday') pool.push(id, id);
+    return pool;
   }
   // is a world point on screen right now (clear of the top bar and the tray)? m = margin in world px
   function inView(x, y, m) {
@@ -1681,8 +1755,8 @@
     return lawnPoint();
   }
   // animals show up where the player is looking when they can (a kid shouldn't have to hunt off-screen for a 30-second visitor)
-  function spawnCritter() {
-    const pool = critterPool(); if (!pool.length) return;
+  function spawnCritter(want) { // (want: an animal id, for testing: __garden.spawnCritter('reindeer'))
+    const pool = want && D.ANIMALS[want] ? [want] : critterPool(); if (!pool.length) return;
     const fresh = pool.filter(id => !critters.some(c => c.id === id)), ids = (fresh.length ? fresh : pool).slice().sort(() => Math.random() - 0.5);
     let id = ids[0], p = null;
     for (const cand of ids) {
@@ -1780,8 +1854,8 @@
   const FUN_OF = {};
   for (const [rec, kinds] of Object.entries({
     bush: 'bush fern', flower: 'flowerbed', fence: 'fence', clank: 'bench driftwood surfboard bucket towel', rock: 'rock', stump: 'stump',
-    shroom: 'mushrooms glowshroom', shine: 'crystal moonstone', shells: 'shells', light: 'lantern lamp', spin: 'umbrella', bounce: 'ball', leafy: 'tree bigtree palm glowtree lollitree',
-    sand: 'sandcastle', pond: 'rockpool', sweet: 'candycane cupcake gumdrops donut lollipop icecream',
+    shroom: 'mushrooms glowshroom', shine: 'crystal moonstone', shells: 'shells', light: 'lantern lamp holidaytree', spin: 'umbrella', bounce: 'ball', leafy: 'tree bigtree palm glowtree lollitree',
+    sand: 'sandcastle', pond: 'rockpool', sweet: 'candycane cupcake gumdrops donut lollipop icecream', snowy: 'snowman',
   })) for (const k of kinds.split(' ')) FUN_OF[k] = rec;
   // recipe -> [move, seconds, sound, pitch]; anything not listed wobbles and bumps
   const FUN = {
@@ -1789,7 +1863,7 @@
     clank: ['wobble', 0.6, 'bump', 0.9], rock: ['wobble', 0.6, 'thud', 1.1], stump: ['squash', 0.5, 'thud', 1.4], shroom: ['squash', 0.5, 'bloop', 1.2],
     shine: ['squash', 0.5, 'twinkle', 1], shells: ['hop', 0.5, 'twinkle', 1.3], light: ['flicker', 0.9, 'chime', 0.9], spin: ['spin', 0.9, 'whoosh', 1.8],
     bounce: ['hop', 0.6, 'bump', 0.7], sand: ['squash', 0.5, 'thud', 1.5], pond: ['squash', 0.5, 'splash', 1.2], sweet: ['squash', 0.5, 'bloop', 1.5],
-    wobble: ['wobble', 0.6, 'bump', 1],
+    snowy: ['squash', 0.5, 'pop', 1.4], wobble: ['wobble', 0.6, 'bump', 1],
   };
   const FUN_GLOW = { light: '255,236,150', shine: '190,225,255' };
   const SWEETS = ['#f07aa0', '#fff09a', '#9fe8ff', '#c9a2f0', '#ffffff'];
@@ -1845,8 +1919,9 @@
         break;
       }
       case 'bush': puff(6, 'leaf', x, top + h * 0.3, w / 2); if (Math.random() < 0.4) flutterOut(x, top + 2); break;
-      case 'leafy': // a tree that bears no fruit: leaves (or sweets) shake down and sometimes a butterfly flutters out
-        if (q.kind === 'lollitree' || area === 'candy') puff(7, 'bit', x, top + h * 0.3, w * 0.4, SWEETS);
+      case 'leafy': // a tree that bears no fruit: leaves (or sweets, or snow) shake down and sometimes a butterfly flutters out
+        if (pk(q.kind) === 'snowtree') puff(8, 'dust', x, top + h * 0.3, w * 0.45, ['#ffffff', '#e8f0ff']);
+        else if (q.kind === 'lollitree' || area === 'candy') puff(7, 'bit', x, top + h * 0.3, w * 0.4, SWEETS);
         else { puff(q.kind === 'glowtree' ? 5 : 7, 'leaf', x, top + h * 0.3, w * 0.4); if (q.kind === 'glowtree') puff(4, 'spark', x, top + h * 0.35, w * 0.4, ['#c8fff8', '#ffffff']); }
         if (Math.random() < 0.45) flutterOut(x, top + 3);
         break;
@@ -1865,6 +1940,7 @@
         if (Math.random() < 0.3) find(3, 'A shiny coin!');
         break;
       case 'sweet': puff(7, 'bit', x, top + h * 0.4, w / 2, SWEETS); find(2, 'A sweet coin!'); break;
+      case 'snowy': puff(6, 'dust', x, top + h * 0.35, w / 2, ['#ffffff', '#e8f0ff']); break;
       default: puff(3, 'dust', x, q.y - 1, w / 2, '#d8cbb0');
     }
   }
@@ -2152,7 +2228,7 @@
       const p = Lw.slots[i]; if (!p || p.tree !== ti) return;
       const k = growK(s); if (k < 0.35) return;
       const f = itemSpr('fruit', s.kind);
-      if (k < 1) { const sz = Math.max(3, Math.round(artW(f) * (0.3 + 0.6 * k) * SK) * FP); bx.drawImage(f, sn(p.x - sz / 2), sn(p.y - sz / 2), sz, sz); return; }
+      if (k < 1) { const sz = Math.max(3, Math.round(artW(f) * (0.3 + 0.6 * k) * SK) * FP); bx.imageSmoothingEnabled = true; bx.drawImage(f, sn(p.x - sz / 2), sn(p.y - sz / 2), sz, sz); bx.imageSmoothingEnabled = false; return; }
       if (hint && Math.floor(t * 3) % 2) twinkle4(p.x, p.y, 8.5);
       bx.drawImage(f, Math.round(p.x - artW(f) / 2), Math.round(p.y - artH(f) / 2 + (Math.floor(t * 2 + i) % 2)), artW(f), artH(f));
     });
@@ -2473,6 +2549,9 @@
     }
     // glowing plants
     for (const c of critters) { const gcol = PLANT_GLOW[c.id]; if (gcol) glow(c.x, c.y - (c.where === 'water' ? 5 : 9), 8, gcol, 0.3 * lit * (0.75 + Math.sin(t * 2.4 + c.ph) * 0.25)); }
+    // holiday mode: the holiday tree glows warmly at dusk (its star a little brighter), and the Reindeer's red nose glows
+    if (Lw.xmas && lit > 0.15) { const X = Lw.xmas, h = artH(X.c); glow(X.x, X.y - h * 0.45, 16, '255,228,150', 0.13 * lit * (0.85 + Math.sin(t * 1.1) * 0.15)); glow(X.x, X.y - h * 0.93, 5, '255,242,120', 0.3 * lit); }
+    for (const c of critters) if (c.id === 'reindeer' && c.life >= 3) glow(c.x + c.facing * NOSE[0], c.y - NOSE[1], 4, '255,80,96', 0.5 * lit * (0.8 + Math.sin(t * 2.6 + c.ph) * 0.2));
     // spooky Sprouts glow softly at night
     if (lit > 0.3) for (const r of here) { const sp = SPOOKY[r.s.look && r.s.look.skin]; if (sp && r.state !== 'travel') glow(r.x, (r.state === 'held' ? r.feetY : r.y - (r.state === 'fall' ? r.z : 0)) - 12, 10, sp.glow, 0.13 * lit); }
     // glowing reed tips and lotus buds, the lighthouse beam, floating lanterns
@@ -2519,6 +2598,74 @@
       }
     }
     parts.length = j;
+  }
+
+  // ---------------- holiday mode: the holiday tree, its daily gift, falling snow ----------------
+  // The tree (a prop, placed by buildProps) has a few lights that fade up and down slowly, out of step, and a star that glints now
+  // and then. Its gift (PS.holiday, one a day per player) waits at its foot: tap it for a surprise. giftOn: a gift is waiting
+  // (checked with the hints, a few times a second).
+  let giftOn = false, tellAt = 0;
+  const NOSE = [7, 12]; // the Reindeer's nose, from its feet (world px; mirrored when it faces left)
+  const LIGHTS = [[-0.17, 0.33], [0.15, 0.37], [-0.05, 0.46], [0.25, 0.51], [-0.29, 0.57], [0.05, 0.61], [0.33, 0.68], [-0.21, 0.71], [0.12, 0.77]];
+  const LIGHT_COL = ['#ff6a6a', '#ffd84a', '#7ad0ff', '#ff9ad8', '#8ef07a'], LIGHT_RGB = ['255,106,106', '255,216,74', '122,208,255', '255,154,216', '142,240,122'];
+  function treeLights(q) {
+    if (RMO) return;
+    const w = artW(q.c), h = artH(q.c), left = q.x - Math.floor(w / 2) + (q.ox || 0), top = q.y - h, lit = 0.4 + 0.6 * PS.clock.night();
+    for (let i = 0; i < LIGHTS.length; i++) {
+      const k = 0.5 + 0.5 * Math.sin(t * 1.2 + i * 2.3); if (k < 0.4) continue;
+      const x = sn(left + w * (0.5 + LIGHTS[i][0])), y = sn(top + h * LIGHTS[i][1]), c = i % LIGHT_COL.length;
+      glow(x, y, 2, LIGHT_RGB[c], 0.5 * k * lit);
+      bx.fillStyle = LIGHT_COL[c]; bx.fillRect(x - FP, y - FP, 2 * FP, 2 * FP);
+      if (k > 0.8) { bx.fillStyle = '#ffffff'; bx.fillRect(x - FP, y - FP, FP, FP); }
+    }
+    if (Math.sin(t * 0.8) > 0.75) { const x = sn(left + w * 0.5), y = sn(top + h * 0.075); bx.fillStyle = '#ffffff'; bx.fillRect(x - 1.5, y, 3, FP); bx.fillRect(x, y - 1.5, FP, 3); }
+  }
+  const giftSpr = () => propSpr(GIFT_OF[area] || 'gift', themeOf(area));
+  function drawGift() {
+    const G = Lw.gift, c = giftSpr(), bob = RMO ? 0 : Math.floor(t * 1.5) % 2;
+    shadow(G.x, G.y, Math.max(8, artW(c) - 3));
+    PX.blit(bx, c, G.x, G.y - bob);
+    // a sparkle above it (blinking until the first gift has been opened, then now and then)
+    if (seen('gift') ? Math.floor(t * 1.2 + 0.5) % 4 === 0 : Math.floor(t * 3) % 2) fxAt(whiteSpark(), G.x + Math.round(artW(c) / 2) - 2, G.y - artH(c) - 3 - bob);
+  }
+  function giftHit(p) {
+    const G = Lw.gift; if (!giftOn || !G) return false;
+    const c = giftSpr(); return Math.abs(p.x - G.x) < Math.max(artW(c) / 2 + 2, hitR(7)) && p.y > G.y - artH(c) - Math.max(4, hitR(7) - 4) && p.y < G.y + 4;
+  }
+  // the prize's picture for the moment (the same art the shop shows for gumball prizes)
+  function giftArt(r) {
+    if (r.type === 'coins') return PX.item('bigcoin');
+    if (r.type === 'fruit' || r.type === 'goldfruit' || r.type === 'egg') return PX.item(r.type === 'egg' ? 'egg' : 'fruit', r.id);
+    if (PS.styleArt && PS.styleArt.item) return PS.styleArt.item(r.type, r.id);
+    return PX.item(r.type, r.id);
+  }
+  function openGift() {
+    const G = Lw.gift, r = PS.holiday.openGift(); giftOn = false; if (!r || !G) return;
+    markSeen('gift'); buzz(20); sndP('twinkle', 1.1);
+    burst(G.x, G.y - 6, 'spark', 16, '#fbf236'); burst(G.x, G.y - 6, 'spark', 10, '#ffffff'); burst(G.x, G.y - 8, 'petal', 8, '#e8445a');
+    for (const q of here) if (!busy(q) && q.state !== 'sleep' && dist(q, G) < 60) { q.cheerT = 1.4; emote(q, 'heart', 1.6); q.facing = G.x > q.x ? 1 : -1; }
+    let icon = null; try { icon = giftArt(r); } catch (e) { icon = null; }
+    const o = { kind: 'gift', wait: true, eyebrow: 'Happy holidays!', title: r.title, sub: r.text + ' Another gift will be under the tree tomorrow!', icon, button: 'Yay!' };
+    if (PS.ui.celebrate) PS.ui.celebrate(o);
+    else PS.ui.modal({ eyebrow: o.eyebrow, title: ST.esc(o.title), html: `<p>${ST.esc(o.sub)}</p>`, buttons: [{ label: 'Yay!', kind: 'primary' }] });
+  }
+  // falling snow: calm on purpose (the family found busy skies distracting): 22 flakes spread over the view whatever the zoom, each
+  // drifting down a screen in 20-45 s with a gentle sway; drawn above the night tint, so it shows at night too
+  function drawSnow() {
+    const vw = VR.x1 - VR.x0, vh = VR.y1 - VR.y0;
+    bx.fillStyle = '#ffffff'; bx.globalAlpha = 0.85;
+    for (const f of SNOW) {
+      const x = sn(VR.x0 + ((((f.x + Math.sin(t * 0.35 + f.ph) * 0.015) % 1) + 1) % 1) * vw), y = sn(VR.y0 + ((f.y + t * f.v) % 1) * vh);
+      if (f.big) { bx.fillRect(x - FP, y, 3 * FP, FP); bx.fillRect(x, y - FP, FP, 3 * FP); } else bx.fillRect(x, y, 2 * FP, 2 * FP);
+    }
+    bx.globalAlpha = 1;
+  }
+  // holiday mode switched on or off (the date, or Parent tools): the ground, the scenery and the tree are rebuilt; the Reindeer leaves
+  function holidayCheck() {
+    const h = holOn(); if (h === HOL) return;
+    HOL = h; giftOn = false;
+    if (!h) critters = critters.filter(c => !(D.ANIMALS[c.id] || {}).season);
+    if (ww && Lw.shore.length) layout();
   }
 
   // ---------------- night raids ----------------
@@ -3055,7 +3202,7 @@
     for (let a = 1; a < dlN; a++) { const e = DL[a]; let b = a - 1; while (b >= 0 && DL[b].y > e.y) { DL[b + 1] = DL[b]; b--; } DL[b + 1] = e; } // (insertion sort: a few dozen items)
     for (let a = 0; a < dlN; a++) {
       const e = DL[a];
-      switch (e.k) { case 0: drawTree(e.i, hintT); break; case 1: drawProp(e.o); break; case 2: drawHome(); break; case 3: drawEgg(e.o); break; case 4: drawSprout(e.o); break; case 5: drawCritter(e.o); break; case 6: drawGroundFruit(e.o); break; }
+      switch (e.k) { case 0: drawTree(e.i, hintT); break; case 1: drawProp(e.o); if (e.o === Lw.xmas) treeLights(e.o); break; case 2: drawHome(); break; case 3: drawEgg(e.o); break; case 4: drawSprout(e.o); break; case 5: drawCritter(e.o); break; case 6: drawGroundFruit(e.o); break; case 7: drawGift(); break; }
       e.o = null;
     }
   }
@@ -3067,7 +3214,7 @@
   // is something standing at (x, y), hw px either side and up px tall, on screen?
   const vis = (x, y, hw, up) => x + hw >= VR.x0 && x - hw <= VR.x1 && y + 8 >= VR.y0 && y - up <= VR.y1;
   function render(dt) {
-    const n = PS.clock.night(), th = TH[area];
+    const n = PS.clock.night(), th = TA();
     ensureBg(n);
     viewRect();
     const vx = VR.x0, vy = VR.y0, vw = VR.x1 - VR.x0, vh = VR.y1 - VR.y0;
@@ -3086,6 +3233,7 @@
     for (const r of here) { if (r.state === 'held' || r.state === 'fall') topQ[topN++] = r; else if (vis(r.x, r.y, 20, 44)) dl(r.y, 4, r, 0); }
     for (const c of critters) if (c.where !== 'air' && vis(c.x, c.y, 16, 30)) dl(c.y, 5, c, 0);
     for (const f of groundList(area)) if (vis(f.x, f.y, 8, 14 + f.z)) dl(f.y, 6, f, 0);
+    if (giftOn && Lw.gift && vis(Lw.gift.x, Lw.gift.y, 10, 18)) dl(Lw.gift.y, 7, null, 0);
     drawList(hintT);
     drawAmbient(n);
     for (const c of critters) if (c.where === 'air') drawCritter(c);
@@ -3103,6 +3251,7 @@
     }
     drawMagic(n, dt);
     drawLights(n);
+    if (HOL && !RMO) drawSnow();
     if (raidHere()) { drawPortal(); drawGlooms(); drawRaidTop(); }
     drawDizzy();
     if (eggBits.length) drawEggBits();
@@ -3121,7 +3270,8 @@
     ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = th.water[3]; ctx.fillRect(0, 0, cv.width, cv.height);
     // far out a buffer pixel is smaller than a device pixel: smooth it then (nearest would drop the thin fine lines)
-    if (sc < SK - 0.01) { ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'low'; }
+    // (and while a pinch or glide is between crisp steps: a fine pixel that isn't a whole number of device pixels)
+    const fpx = sc / SK; if (fpx < 0.99 || Math.abs(fpx - Math.round(fpx)) > 0.01) { ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'low'; }
     const X0 = Math.round((vx - camX) * sc), Y0 = Math.round((vy - camY) * sc), X1 = Math.round((VR.x1 - camX) * sc), Y1 = Math.round((VR.y1 - camY) * sc);
     ctx.drawImage(buf, vx * SK, vy * SK, vw * SK, vh * SK, X0, Y0, X1 - X0, Y1 - Y0);
     ctx.imageSmoothingEnabled = false;
@@ -3219,6 +3369,7 @@
     const gl = groundList(area);
     for (let i = gl.length - 1; i >= 0; i--) { const f = gl[i]; if (Math.hypot(p.x - f.x, p.y - (f.y - 5)) < 7.5) { press = Object.assign({ kind: 'gfruit', f, x0: p.x, y0: p.y }, base); return; } }
     for (const c of critters) if (critterHit(c, p)) { catchCritter(c); return; }
+    if (giftHit(p)) { closeCard(); openGift(); return; }
     const r = sproutAt(p);
     if (r) { press = Object.assign({ kind: 'sprout', r, t0: t, x0: p.x, y0: p.y, mode: 'pending', rub: 0 }, base); return; }
     if (propAt(p) === 'gumball') { press = Object.assign({ kind: 'gumball' }, base); return; }
@@ -3335,7 +3486,7 @@
     drag = { src, id, idx, el, pid: e.pointerId, hover: null };
     const s = src === 'pouch' ? critterSpr(id) : itemSpr('fruit', id);
     // (the bitmap is the sprite's fine size; the CSS size, the scale and drag.gw / gh are in art px)
-    ghostEl.width = s.width; ghostEl.height = s.height;
+    ghostEl.width = s.width; ghostEl.height = s.height; ghostEl._pk = s.k || 1;
     gctx.imageSmoothingEnabled = false; gctx.clearRect(0, 0, s.width, s.height); gctx.drawImage(s, 0, 0, s.width, s.height);
     const aw = artW(s), ah = artH(s), sc = Math.max(2, Math.floor(56 / Math.max(aw, ah)));
     ghostEl.style.width = aw * sc + 'px'; ghostEl.style.height = ah * sc + 'px';
@@ -3395,7 +3546,7 @@
   function slotEl(s, data, label, cls, count) {
     const b = document.createElement('button'); b.className = 'g-slot ' + (cls || ''); b.type = 'button';
     b.setAttribute('aria-label', `${label}${count ? ' x' + count : ''}. Drag onto a Sprout.`);
-    const c = document.createElement('canvas'); c.width = s.width; c.height = s.height; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(s, 0, 0, s.width, s.height);
+    const c = document.createElement('canvas'); c.width = s.width; c.height = s.height; c._pk = s.k || 1; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(s, 0, 0, s.width, s.height);
     const aw = artW(s), ah = artH(s), sc = Math.max(1, Math.floor(38 / Math.max(aw, ah))); c.style.width = aw * sc + 'px'; c.style.height = ah * sc + 'px';
     b.appendChild(c);
     if (count) { const n = document.createElement('i'); n.className = 'g-n'; n.textContent = count; b.appendChild(n); }
@@ -3509,6 +3660,7 @@
     const pz = Math.floor(t * 1.2) % 2 ? { eyes: 'happy', mouth: 'open' } : {};
     const c = PX.sprig(ST.lookOf(s), pz);
     if (card.spr.width !== c.width || card.spr.height !== c.height) { card.spr.width = c.width; card.spr.height = c.height; }
+    card.spr._pk = c.k || 1; card.spr.style.imageRendering = c.hdSpr ? 'auto' : ''; // (a smooth HD Sprout is shown smoothly; app.js skips snapping it)
     card.spr.style.width = artW(c) * 2 + 'px'; card.spr.style.height = artH(c) * 2 + 'px';
     const x = card.spr.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, c.width, c.height); x.drawImage(c, 0, 0, c.width, c.height);
     card.name.textContent = s.name;
@@ -3834,6 +3986,7 @@
     });
     PS.on('night', () => { skyKey = ''; for (const c of critters) { const a = D.ANIMALS[c.id]; if (a.time !== 'any' && (a.time === 'night') !== PS.clock.isNight()) c.life = Math.min(c.life, 3); } });
     PS.on('egg:new', () => updatePill());
+    PS.on('holiday', holidayCheck); // (Parent tools switched holiday mode)
     PS.on('reset', () => { if (raid) { raidHold(false); raid = null; raidUI(null); } RT.clear(); hatchFx.clear(); eggBits = []; critters = []; for (const k in drops) delete drops[k]; for (const k in ground) delete ground[k]; closeCard(); renderTray(); shownOnce = false; });
     mounted = true;
     renderTray();
@@ -3843,6 +3996,8 @@
     const want = (params && params.area) || PS.S.area || 'meadow';
     area = D.AREAS[want] ? want : 'meadow';
     if (PS.S.area !== area) { PS.S.area = area; PS.emit('area', { area }); }
+    HOL = holOn(); tellAt = t + 2.5; // (holiday mode; its "a gift is waiting" message comes a moment after arriving)
+    if (!HOL) critters = critters.filter(c => !(D.ANIMALS[c.id] || {}).season);
     resize(); lastTrayH = trayEl.offsetHeight;
     if (raidHere()) { raidHold(true); closeCard(); if (raid.ui) raidUI(...raid.ui); } else if (raidEl) raidEl.hidden = true;
     renderTray(); updatePill();
@@ -3880,6 +4035,10 @@
     if (uiT <= 0) {
       uiT = 0.4;
       checkPics();
+      // holiday mode: is it on (the date can pass midnight while the app is open), is a gift waiting, and once a day say so
+      holidayCheck();
+      giftOn = HOL && !!Lw.gift && PS.holiday.giftReady();
+      if (giftOn && t > tellAt && !raidHere() && !PS.ui.modalOpen && !PS.ui.menuOpen && PS.holiday.tellGift()) PS.ui.toast('Happy holidays! A gift is waiting under the tree.', 3600);
       // hints pop up briefly on arrival; the holding hint, a new player's first-egg hint and the first lessons stay while they apply
       if (hintReset) { hintReset = false; hintUntil = t + 4; }
       const holding = here.some(r => r.state === 'held'), firstEgg = !PS.S.sprouts.length && PS.S.eggs.some(e => e.area === area);
@@ -3953,5 +4112,7 @@
     propHit, funProp, sceneryTap, toggleFar, get fun() { return PS.S.gardenFun; }, get parts() { return parts.length; }, get hatching() { return hatchFx.size; }, shootStar() { shoot.life = 0; nextShoot = t + 0.01; },
     spawnCritter, spawnDrop, setArea, switchArea, eggsHere, tapEgg, treeSlots, feedSprout, giveAnimal, startTravel, askTravel, openCard, closeCard,
     toScreen: (x, y) => { const r = cv.getBoundingClientRect(), p = worldToScreen(x, y); return { x: r.left + p.x, y: r.top + p.y }; },
+    // holiday mode: the gift under the tree (Lw.xmas / Lw.gift), opened as if tapped; spawnCritter('reindeer') brings the Reindeer
+    openGift() { if (!giftOn) return 'no gift waiting'; openGift(); return 'opened'; }, get giftOn() { return giftOn; },
   };
 })();

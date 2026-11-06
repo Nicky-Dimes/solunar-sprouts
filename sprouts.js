@@ -125,11 +125,14 @@
 .sp-evo-bar .row{display:flex;justify-content:space-between;margin-bottom:5px}
 .sp-evo-bar .bar{height:14px}
 .sp-flowers{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
-.sp-flower{display:grid;justify-items:center;gap:2px;padding:7px 4px 6px;border-radius:12px;background:var(--field);border:2px solid var(--line);text-align:center}
+.sp-flower{display:grid;justify-items:center;align-content:start;gap:2px;min-height:88px;padding:8px 4px 7px;border-radius:12px;background:var(--field);border:2px solid var(--line);border-bottom-width:4px;text-align:center;color:var(--ink)}
+.sp-flower:active{transform:translateY(2px);border-bottom-width:2px;margin-bottom:2px}
+.sp-flower:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
 .sp-flower canvas{width:30px;height:30px}
 .sp-flower b{font-family:var(--f-ui);font-weight:600;font-size:14.5px;line-height:1.1}
-.sp-flower small{font-size:14px;color:var(--ink-soft)}
-.sp-flower.pick{border-color:var(--sun-edge);background:var(--panel);box-shadow:inset 0 -3px 0 var(--sun)}
+.sp-flower small{font-size:14px;line-height:1.2;color:var(--ink-soft)}
+.sp-flower.pick{border-color:var(--sun-edge);background:var(--panel);box-shadow:inset 0 0 0 2px var(--sun)}
+.sp-flower .sp-chosen{display:inline-block;margin-top:1px;font-family:var(--f-ui);font-weight:700;font-size:12.5px;line-height:16px;padding:0 6px;border-radius:6px;background:var(--sun);border:1px solid var(--sun-edge);color:#4a3210}
 .sp-flower.pick small{color:#8a5a10;font-weight:600}
 
 .sp-moves{display:grid;gap:8px;margin-top:10px}
@@ -435,20 +438,27 @@
   // already go and get: shop things, gumball prizes, and animals of the areas you have been to; the rest show as "???".
   // Every PRIZE_EVERY entries pays PRIZE_COINS once; PS.S.bookPrize (optional number) remembers how many prizes were given.
   const PRIZE_EVERY = 10, PRIZE_COINS = 100;
+  // seasonal entries (holiday mode: Holiday eggs, the Reindeer, holiday hats) are in the book all year, on Holiday shelves at the end
+  // of each tab. In season the ones not found yet show too (something to look for); out of season only the ones found do. They count
+  // towards the totals only once found, so 100% is always possible.
+  const seasonal = (k, id) => (k === 'e' ? !!(D.EGGS[id] || {}).holiday : k === 'a' ? !!(D.ANIMALS[id] || {}).season : k === 'h' ? !!(D.HATS[id] || {}).holiday : false);
+  const holOn = () => { try { return !!(PS.holiday && PS.holiday.on()); } catch (e) { return false; } };
+  const shownEntry = (k, id, f) => !seasonal(k, id) || holOn() || f[k].has(id);
   let IDS = null;
   function ids() {
     if (IDS) return IDS;
     const area = D.AREA_ORDER.filter(k => D.EGGS[k]), e = area.concat(Object.keys(D.EGGS).filter(k => !area.includes(k)));
     const a = [];
     for (const ar of D.AREA_ORDER) {
-      const here = Object.keys(D.ANIMALS).filter(id => D.ANIMALS[id].area === ar);
+      const here = Object.keys(D.ANIMALS).filter(id => D.ANIMALS[id].area === ar && !D.ANIMALS[id].season);
       a.push(...here.filter(id => D.ANIMALS[id].kind !== 'plant'), ...here.filter(id => D.ANIMALS[id].kind === 'plant'));
     }
-    a.push(...Object.keys(D.ANIMALS).filter(id => !a.includes(id)), ...Object.keys(D.RARES));
+    const sa = Object.keys(D.ANIMALS).filter(id => D.ANIMALS[id].season); // (seasonal visitors: after the Legends)
+    a.push(...Object.keys(D.ANIMALS).filter(id => !a.includes(id) && !D.ANIMALS[id].season), ...Object.keys(D.RARES));
     const p = Object.keys(D.COLORS), s = Object.keys(D.PATTERNS).filter(k => k !== 'plain');
-    const h = Object.keys(D.HATS).sort((x, y) => (D.HATS[x].slot === 'extra') - (D.HATS[y].slot === 'extra'));
+    const h = Object.keys(D.HATS).filter(x => !D.HATS[x].holiday).sort((x, y) => (D.HATS[x].slot === 'extra') - (D.HATS[y].slot === 'extra')).concat(Object.keys(D.HATS).filter(x => D.HATS[x].holiday));
     const g = LEG().map(L => L.id); // Legends (kind 'g'): pages on the Animals tab, after the rare creatures
-    const out = { e, a, p, s, h, g, eggs: e.map(i => 'e:' + i), animals: a.map(i => 'a:' + i).concat(g.map(i => 'g:' + i)), looks: p.map(i => 'p:' + i).concat(s.map(i => 's:' + i), h.map(i => 'h:' + i)) };
+    const out = { e, a: a.concat(sa), p, s, h, g, eggs: e.map(i => 'e:' + i), animals: a.map(i => 'a:' + i).concat(g.map(i => 'g:' + i), sa.map(i => 'a:' + i)), looks: p.map(i => 'p:' + i).concat(s.map(i => 's:' + i), h.map(i => 'h:' + i)) };
     if (g.length) IDS = out; // (kept once the Battle screen has listed its Legends)
     return out;
   }
@@ -512,8 +522,8 @@
     return true; // paint and stickers are in the Shop, hats in the Gumball machine
   }
   function counts(sc) {
-    const I = ids(), f = (sc || scan()).f, n = k => I[k].filter(id => f[k].has(id)).length;
-    const c = { eggs: n('e'), eggsAll: I.e.length, animals: n('a') + n('g'), animalsAll: I.a.length + I.g.length, paints: n('p'), paintsAll: I.p.length, stickers: n('s'), stickersAll: I.s.length, hats: n('h'), hatsAll: I.h.length };
+    const I = ids(), f = (sc || scan()).f, n = k => I[k].filter(id => f[k].has(id)).length, all = k => I[k].filter(id => !seasonal(k, id) || f[k].has(id)).length; // (seasonal: only once found)
+    const c = { eggs: n('e'), eggsAll: all('e'), animals: n('a') + n('g'), animalsAll: all('a') + I.g.length, paints: n('p'), paintsAll: I.p.length, stickers: n('s'), stickersAll: I.s.length, hats: n('h'), hatsAll: all('h') };
     c.looks = c.paints + c.stickers + c.hats; c.looksAll = c.paintsAll + c.stickersAll + c.hatsAll;
     c.entries = c.eggs + c.animals + c.looks; c.total = Math.max(1, c.eggsAll + c.animalsAll + c.looksAll);
     c.pct = Math.floor(c.entries / c.total * 100);
@@ -536,7 +546,8 @@
       mummy: 'Mummy Eggs come wrapped up snug, like a present.', candycorn: 'Yellow, orange, white: Candy Corn Eggs have three stripes.', vampire: 'Vampire Eggs like to sleep all day long.',
       witch: 'A Witch Egg hums a spooky little tune.', dragon: 'Dragon Eggs feel warm, like a cozy cup of cocoa.', eclipse: 'Half sun, half moon: the most Solunar egg of all!',
       starry: 'Look closely: a Starry Egg has a whole night sky inside.', frost: 'A Frost Egg makes tiny snowflakes when it wiggles.', blossom: 'Blossom Eggs smell like spring flowers.',
-      pearl: 'Pearl Eggs come from the bottom of the sea.' },
+      pearl: 'Pearl Eggs come from the bottom of the sea.', snowman: 'A Snowman Egg feels as cold as a snowball.', gingerbread: 'Gingerbread Eggs smell like warm cookies.',
+      candycane: 'A Candy Cane Egg is minty fresh!', elf: 'Shake an Elf Egg and you might hear a tiny bell.', reindeer: 'A Reindeer Egg has a little red nose that glows.' },
     a: { sparrow: 'Sparrows chirp good morning to the whole garden.', hare: 'A hare can hop farther than three Sprouts in a row.', ram: 'Rams bonk heads to say hello. Bonk!',
       tortoise: 'Tortoises carry their house everywhere they go.', fox: 'Foxes tiptoe so quietly that even the moon can\'t hear them.', bee: 'Bees do a wiggle dance to show friends where flowers are.',
       duck: 'Ducks have waterproof feathers. Rain just rolls off!', koi: 'Some koi grow longer than your arm.', owl: 'Owls can turn their heads almost all the way round.',
@@ -558,7 +569,8 @@
       licoriceeel: 'Licorice Eels twist into loops just for fun.',
       fairy: 'Fairies leave a trail of sparkles wherever they fly.', unicorn: "A unicorn's horn shines every color of the rainbow.", kitsune: 'A kitsune grows a new tail every hundred years.',
       yeti: 'Yetis are big and fluffy, and they give the best hugs.', griffin: 'A griffin is half eagle and half lion.', dinosaur: 'Some real dinosaurs were as small as a chicken!',
-      kraken: 'The Kraken is shy. It hides way down in the deep sea.', phoenix: 'A phoenix is born again from warm, glowing embers.', dragon: 'Dragons keep their treasure warm by sleeping on it.' },
+      kraken: 'The Kraken is shy. It hides way down in the deep sea.', phoenix: 'A phoenix is born again from warm, glowing embers.', dragon: 'Dragons keep their treasure warm by sleeping on it.',
+      reindeer: 'Reindeer hooves work like snowshoes, so they can walk on deep snow.' },
     g: { golem: 'Birds love to nap in the Golem\'s mossy hands.', yeti: 'The Yeti\'s biggest snowball was as tall as a house!', griffin: 'The Griffin can fly higher than the highest cloud.',
       dinosaur: 'One swing of its tail can shake the whole jungle!', kraken: 'The Kraken has eight arms, so it can give eight hugs.', phoenix: 'When the Phoenix faints, it rises again from warm embers.',
       dragon: 'The Dragon breathes fire every third turn. Be ready!', stormwhale: 'The Storm Whale sings so loudly that the thunder sings along.',
@@ -581,11 +593,22 @@
       sunhat: 'A sun hat makes a shady spot wherever you go.', tophat: 'Tip your top hat to say hello!', wizard: 'This hat is full of stars and tiny spells.',
       witch: 'The pointy tip is great for catching moonbeams.', crown: 'Only the bravest Sprouts wear a crown.', star: 'A little star that follows you everywhere.',
       moon: 'A tiny moon charm for night owls.', halo: 'A glowing ring for the kindest Sprouts.', flowercrown: 'Made from flowers picked in the Meadow.',
-      bandana: 'Ready for a big adventure!', headphones: 'Now your Sprout can hear the garden music.', propeller: 'Spin, spin! It almost makes you fly.', heart: 'A heart charm full of love.' },
+      bandana: 'Ready for a big adventure!', headphones: 'Now your Sprout can hear the garden music.', propeller: 'Spin, spin! It almost makes you fly.', heart: 'A heart charm full of love.',
+      santa: 'A Santa hat keeps ears toasty on snowy nights.', elf: 'Elf hats are made for busy little helpers.', antlers: 'Real reindeer grow new antlers every year!' },
   };
   const WHERE = { land: 'on the grass', air: 'in the air', water: 'in the water', coast: 'by the water' };
   const WHEN = { day: 'by day', night: 'at night', any: 'day and night' };
+  // the holidays' dates for the book ("November 1 to January 6", from D.HOLIDAY)
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const holDates = () => { const H = D.HOLIDAY || { from: [11, 1], to: [1, 6] }; return `${MONTHS[H.from[0] - 1]} ${H.from[1]} to ${MONTHS[H.to[0] - 1]} ${H.to[1]}`; };
+  const aOrAn = w => (/^[aeiou]/i.test(String(w)) ? 'an' : 'a');
   function howTo(k, id) {
+    if (seasonal(k, id)) {
+      if (k === 'a') return `Visits every garden for the holidays (${holDates()}). Catch it in the Garden!`;
+      if (k === 'e') return `In the Shop for the holidays (${holDates()}), for ${fmt((D.EGGS[id] || {}).price || 0)} coins. Gumballs can have one too, and so can the gift under the holiday tree!`;
+      const egg = Object.keys(D.EGGS).find(e => D.EGGS[e].hat === id);
+      return `For the holidays (${holDates()}): ${egg ? `hatch ${aOrAn(D.EGGS[egg].name)} ${D.EGGS[egg].name}, ` : ''}win it from the Gumball machine, or find it under the holiday tree.`;
+    }
     if (k === 'a') {
       const A = D.ANIMALS[id];
       if (A) return `Lives in the ${areaName(A.area)} ${WHEN[A.time] || ''}, ${WHERE[A.where] || 'outside'}. Catch it in the Garden!`;
@@ -623,20 +646,26 @@
     return `<h3 class="sp-sect"><canvas data-sp="${icon}" data-scale="0"></canvas>${esc(title)}<span class="n num${got === keys.length ? ' all' : ''}">${got}/${keys.length}</span></h3>
       <div class="sp-coll">${keys.map(key => tileHTML(key, all.indexOf(key), f, vis)).join('')}</div>`;
   }
+  // (a Holiday shelf shows what it can: every seasonal entry in season, only the found ones out of season, none if nothing to show)
+  const sea = key => seasonal(key.charAt(0), key.slice(2));
+  const holShelf = (title, icon, keys, all, f, vis) => { const k2 = keys.filter(key => shownEntry(key.charAt(0), key.slice(2), f)); return k2.length ? shelf(title, icon, k2, all, f, vis) : ''; };
   function eggsHTML(f, vis) {
     const all = ids().eggs, area = all.filter(k => D.AREAS[k.slice(2)]);
-    return shelf('Garden eggs', 'egg:meadow', area, all, f, vis) + shelf('Special eggs', 'egg:golden', all.filter(k => !area.includes(k)), all, f, vis);
+    return shelf('Garden eggs', 'egg:meadow', area, all, f, vis) + shelf('Special eggs', 'egg:golden', all.filter(k => !area.includes(k) && !sea(k)), all, f, vis)
+      + holShelf('Holiday eggs', 'egg:' + ((D.HOLIDAY_EGGS || [])[0] || 'golden'), all.filter(sea), all, f, vis);
   }
   function animalsHTML(f, vis) {
     const all = ids().animals;
-    return D.AREA_ORDER.map(ar => shelf(areaName(ar), 'egg:' + ar, all.filter(k => (D.ANIMALS[k.slice(2)] || {}).area === ar), all, f, vis)).join('')
+    return D.AREA_ORDER.map(ar => shelf(areaName(ar), 'egg:' + ar, all.filter(k => (D.ANIMALS[k.slice(2)] || {}).area === ar && !sea(k)), all, f, vis)).join('')
       + shelf('Rare creatures', 'critter:fairy', all.filter(k => k[0] === 'a' && D.RARES[k.slice(2)]), all, f, vis)
-      + (ids().g.length ? shelf('Legends', 'icon:trophy', all.filter(k => k[0] === 'g'), all, f, vis) : '');
+      + (ids().g.length ? shelf('Legends', 'icon:trophy', all.filter(k => k[0] === 'g'), all, f, vis) : '')
+      + holShelf('Holiday visitors', 'critter:reindeer', all.filter(k => k[0] === 'a' && sea(k)), all, f, vis);
   }
   function looksHTML(f, vis) {
     const all = ids().looks;
     return shelf('Paint colors', 'paint:rose', all.filter(k => k[0] === 'p'), all, f, vis) + shelf('Stickers', 'pattern:star', all.filter(k => k[0] === 's'), all, f, vis)
-      + shelf('Hats and charms', 'hat:party', all.filter(k => k[0] === 'h'), all, f, vis);
+      + shelf('Hats and charms', 'hat:party', all.filter(k => k[0] === 'h' && !sea(k)), all, f, vis)
+      + holShelf('Holiday hats', 'hat:santa', all.filter(k => k[0] === 'h' && sea(k)), all, f, vis);
   }
   function headHTML(c) {
     const done = c.entries >= c.total, left = PRIZE_EVERY - (c.entries % PRIZE_EVERY), fill = PRIZE_EVERY - left;
@@ -716,7 +745,7 @@
       const A = D.ANIMALS[id], R = D.RARES[id], C = A || R; if (!C) return '';
       const time = A ? (A.time === 'night' ? ch('<canvas data-sp="icon:moon"></canvas>Night') : A.time === 'day' ? ch('<canvas data-sp="icon:sun"></canvas>Day') : ch('<canvas data-sp="icon:sun"></canvas><canvas data-sp="icon:moon"></canvas>Day and night')) : '';
       const parts = A ? [A.part] : Object.keys(R.parts || {});
-      return `<div class="sp-ichips">${elChip(C.el)}${A ? ch(`<canvas data-sp="egg:${A.area}"></canvas>${esc(areaName(A.area))}`) : ch('Rare', 'gold')}${time}${parts.filter(Boolean).map(p => ch('Grows ' + esc(partName(p)))).join('')}</div>`;
+      return `<div class="sp-ichips">${elChip(C.el)}${A && A.season ? ch('Holiday visitor', 'gold') : A ? ch(`<canvas data-sp="egg:${A.area}"></canvas>${esc(areaName(A.area))}`) : ch('Rare', 'gold')}${time}${parts.filter(Boolean).map(p => ch('Grows ' + esc(partName(p)))).join('')}</div>`;
     }
     if (k === 'g') {
       const L = legendOf(id); if (!L) return '';
@@ -737,7 +766,7 @@
   }
   function pageBtnsHTML(k, id, ok) {
     const b = [];
-    if (k === 'a') { const A = D.ANIMALS[id]; if (A) b.push(`<button class="btn go" data-areago="${A.area}"><canvas data-sp="egg:${A.area}"></canvas>Go to the ${esc(areaName(A.area))}</button>`); else b.push('<button class="btn primary" data-shopgo="rare"><canvas data-sp="icon:shop"></canvas>Creatures in the Shop</button>'); }
+    if (k === 'a') { const A = D.ANIMALS[id]; if (A && A.season) b.push('<button class="btn go" data-go-garden><canvas data-sp="icon:garden"></canvas>Go to the Garden</button>'); else if (A) b.push(`<button class="btn go" data-areago="${A.area}"><canvas data-sp="egg:${A.area}"></canvas>Go to the ${esc(areaName(A.area))}</button>`); else b.push('<button class="btn primary" data-shopgo="rare"><canvas data-sp="icon:shop"></canvas>Creatures in the Shop</button>'); }
     else if (k === 'e') { const E = D.EGGS[id] || {}; if (E.price) b.push('<button class="btn primary" data-shopgo="egg"><canvas data-sp="icon:shop"></canvas>Eggs in the Shop</button>'); else if (!ok) b.push('<button class="btn go" data-go-garden><canvas data-sp="icon:garden"></canvas>Go to the Garden</button>'); }
     else if (k === 'g') { const L = legendOf(id); b.push(`<button class="btn go" data-legendgo="${id}"><canvas data-sp="icon:battle"></canvas>${L && L.unlocked ? 'Challenge it!' : 'See the Legends'}</button>`); }
     else if (k === 'h') b.push('<button class="btn primary" data-gumball-go><canvas data-sp="gumball:6"></canvas>Gumball machine</button>');
@@ -763,8 +792,10 @@
       ${ok && k === 'g' ? '<p class="sp-muted" style="text-align:center">Tap the Legend to hear it roar!</p>' : ''}
       ${ok && k !== 'a' && k !== 'g' ? `<p class="sp-muted" style="text-align:center">${k === 'e' ? 'Tap the Sprout to say hi!' : `Tap ${state.active() ? esc(state.active().name) : 'the Sprout'} to see it wiggle!`}</p>` : ''}`;
   }
+  // the pages you can turn to on a tab (a seasonal entry that isn't shown on its shelf is skipped, unless it's the open page)
+  function pageList(k, id) { const all = ids()[tabOf(k)], f = scan().f, vis = all.filter(key => shownEntry(key.charAt(0), key.slice(2), f)); return vis.includes(k + ':' + id) ? vis : all; }
   function pageHTML() {
-    const list = ids()[tabOf(pg.kind)], key = pg.kind + ':' + pg.id, i = list.indexOf(key), sc = scan();
+    const list = pageList(pg.kind, pg.id), key = pg.kind + ':' + pg.id, i = list.indexOf(key), sc = scan();
     const ok = sc.f[pg.kind].has(pg.id), sn = ok || seenOf(pg.kind, pg.id, visitedAreas());
     const back = { eggs: 'Eggs', animals: 'Animals', looks: 'Looks' }[tabOf(pg.kind)];
     return `<div class="sp-page"><div class="sp-pin"><div class="sp-pnav">
@@ -779,7 +810,7 @@
     pg = { kind: k, id }; turn = dir || 0; view = 'page'; render(false); turn = 0;
   }
   function flip(d) {
-    const list = ids()[tabOf(pg.kind)], i = list.indexOf(pg.kind + ':' + pg.id), next = list[(i + d + list.length) % list.length];
+    const list = pageList(pg.kind, pg.id), i = list.indexOf(pg.kind + ':' + pg.id), next = list[(i + d + list.length) % list.length];
     PX.Sound.play('tick');
     openPage(next.charAt(0), next.slice(2), d);
   }
@@ -858,8 +889,8 @@
   }
   function evoHTML(s) {
     const E = D.EVO, tl = state.totalLevels(s), nk = state.natureKind(s), stage = s.stage || 0;
-    const budForm = stage === 1 ? s.form : stage === 2 && s.flower && D.FLOWERS[s.flower] ? D.FLOWERS[s.flower].nature + 'bud' : nk + 'bud';
-    const flowerNow = stage === 2 && s.flower ? s.flower : Object.keys(D.FLOWERS).find(k => D.FLOWERS[k].area === s.area && D.FLOWERS[k].nature === nk) || 'daisy';
+    const budForm = stage === 1 ? s.form : stage === 2 ? (s.bud && D.FORMS[s.bud + 'bud'] ? s.bud + 'bud' : (s.flower && D.FLOWERS[s.flower] ? D.FLOWERS[s.flower].nature : nk) + 'bud') : nk + 'bud';
+    const picked = state.pickedFlower(s), flowerNow = state.targetFlower(s); // (a child may choose the flower: state.chooseFlower)
     const F = D.FLOWERS[flowerNow];
     const cls = i => (i < stage ? 'done' : i === stage ? 'now' : 'next');
     const sub = i => (i < stage ? 'Done' : i === stage ? 'Now' : i === 1 ? `At level ${E.budAt}` : `At level ${E.bloomAt}`);
@@ -873,16 +904,20 @@
       bar = `<div class="sp-evo-bar"><div class="row"><span>${stage === 0 ? 'Becomes a Bud' : 'Blooms'} at total level <b>${goal}</b></span><b class="num">${tl} / ${goal}</b></div>
         <div class="bar"><i style="width:${pct}%;background:var(--accent)"></i></div></div>
         <p class="sp-muted">${stage === 0 ? `Its bud follows its nature when it evolves. Right now that would be a <b>${esc(names[1])}</b>.` : ''}
-        If it bloomed right now it would become a <b>${esc(F.name)}</b>. Blooms depend on where it lives and its nature.</p>`;
+        ${picked ? `It will bloom as a <b>${esc(F.name)}</b> because you chose it.` : `If it bloomed right now it would become a <b>${esc(F.name)}</b>. Blooms depend on where it lives and its nature, unless you choose one below.`}</p>`;
     } else {
       bar = `<p class="sp-muted">Fully bloomed as a <b>${esc(state.formInfo(s).name)}</b>. Its title comes from its strongest stat (${D.STAT_META[state.domStat(s)].label}).</p>`;
     }
+    // the three flowers of its area are buttons: tap one to choose what it blooms into (any time, even after it has bloomed)
+    const flowerSub = k => (k === flowerNow ? (stage === 2 ? 'Its bloom' : picked ? '<span class="sp-chosen">Chosen</span>' : 'Heading here') : stage === 2 ? 'Tap to change' : NATURE[D.FLOWERS[k].nature] + ' nature');
     const trio = Object.keys(D.FLOWERS).filter(k => D.FLOWERS[k].area === s.area)
       .sort((a, b) => ['moon', 'wild', 'sun'].indexOf(D.FLOWERS[a].nature) - ['moon', 'wild', 'sun'].indexOf(D.FLOWERS[b].nature))
-      .map(k => `<div class="sp-flower ${k === flowerNow ? 'pick' : ''}"><canvas data-sp="flower:${k}"></canvas><b>${esc(D.FLOWERS[k].name)}</b><small>${k === flowerNow ? (stage === 2 ? 'Its bloom' : 'Heading here') : NATURE[D.FLOWERS[k].nature] + ' nature'}</small></div>`).join('');
+      .map(k => `<button class="sp-flower ${k === flowerNow ? 'pick' : ''}" data-flower="${k}" aria-pressed="${k === flowerNow}" aria-label="${esc(D.FLOWERS[k].name)}"><canvas data-sp="flower:${k}"></canvas><b>${esc(D.FLOWERS[k].name)}</b><small>${flowerSub(k)}</small></button>`).join('');
+    const how = stage === 2 ? 'Tap a different flower to change its bloom. It keeps its stats, animals and parts; its moves and element change with the flower.'
+      : `Tap a flower to choose what it blooms into.${picked ? ' Tap your choice again to let its nature decide.' : ''} Moving it to another area changes which three flowers it can become.`;
     return `<section class="panel sp-sec"><h2>Evolution <span class="sp-aside">Stage ${stage + 1} of 3</span></h2><div class="sp-evo">${track}</div>${bar}
       <div class="sp-lbl" style="margin:12px 0 0">${esc(areaName(s.area))} blooms</div><div class="sp-flowers">${trio}</div>
-      ${stage < 2 ? `<p class="sp-muted">Moving it to another area before it blooms changes which flower it becomes.</p>` : ''}</section>`;
+      <p class="sp-muted">${how}</p></section>`;
   }
   // ---------- fold-away sections: a short summary until tapped open ----------
   const openSecs = new Set();
@@ -1012,6 +1047,26 @@
     <figure><div class="pic after"><canvas></canvas></div><figcaption>After</figcaption></figure></div>`;
   function cheer() {
     for (const a of [heroAnim, mirrorAnim]) if (a) a.happyUntil = clock + 1.3;
+  }
+  // the three flowers under Evolution: before it blooms a tap picks what it will bloom into (tap again to let its nature decide);
+  // once bloomed, a tap changes its flower after a quick before / after check (state.chooseFlower)
+  function chooseBloom(s, key) {
+    const F = D.FLOWERS[key]; if (!F || F.area !== s.area) return;
+    if (s.stage === 2) {
+      if (s.flower === key) { PX.Sound.play('tick'); PS.ui.toast(`${s.name} is already a ${F.name}!`); return; }
+      PX.Sound.play('pop');
+      PS.ui.modal({
+        eyebrow: 'Bloom', title: `Change ${esc(s.name)} into a ${esc(F.name)}?`,
+        html: `${BA}<p class="sp-m-left">It's free, and you can change it again any time. Its moves and element change with the flower; its stats, animals and parts stay.</p>`,
+        row: true, buttons: [{ label: 'Not now' }, { label: 'Change!', kind: 'primary', onClick: () => { const x = state.get(s.id); if (x && state.chooseFlower(x, key)) { PX.buzz(20); cheer(); } } }],
+        mount: card => beforeAfter(card, s, state.lookOf(Object.assign({}, s, { flower: key }))),
+      });
+      return;
+    }
+    if (state.pickedFlower(s) === key) { state.chooseFlower(s, null); PX.Sound.play('pop'); PS.ui.toast(`${s.name}'s nature will choose its flower.`); return; }
+    if (!state.chooseFlower(s, key)) return;
+    PX.Sound.play('chime'); PX.buzz(8); cheer();
+    PS.ui.toast(`${s.name} will bloom as a ${F.name}!`);
   }
   function confirmPaint(s, id) {
     const name = D.COLORS[id], n = (state.items().paints || {})[id] || 0, skin = skinOf(s);
@@ -1152,7 +1207,7 @@
       const mirror = root.querySelector('[data-mirror]');
       mirrorAnim = mirror ? animSprite(mirror, state.lookOf(s), 3, { phase: 0.3, flap: hasWings(s) }) : null;
       // evolution previews: same Sprout, drawn as each stage
-      const nk = state.natureKind(s), flower = s.stage === 2 && s.flower ? s.flower : (Object.keys(D.FLOWERS).find(k => D.FLOWERS[k].area === s.area && D.FLOWERS[k].nature === nk) || 'daisy');
+      const nk = state.natureKind(s), flower = state.targetFlower(s); // (its bloom, the flower it was given, or the one its nature picks)
       root.querySelectorAll('canvas[data-evo]').forEach(cv => {
         const i = +cv.dataset.evo;
         const fake = Object.assign({}, s, { stage: i, flower: i === 2 ? flower : null, form: i === 0 ? 'seedling' : i === 1 ? (s.stage >= 1 ? s.form : nk + 'bud') : 'bloom' });
@@ -1213,6 +1268,7 @@
     if ((b = q('[data-paint]'))) { PX.Sound.play('pop'); confirmPaint(s, b.dataset.paint); return; }
     if ((b = q('[data-pattern]'))) { PX.Sound.play('pop'); confirmPattern(s, b.dataset.pattern); return; }
     if ((b = q('[data-hat]'))) { toggleHat(s, b.dataset.hat); return; }
+    if ((b = q('[data-flower]'))) { chooseBloom(s, b.dataset.flower); return; }
     if (q('[data-sell]')) { PX.Sound.play('pop'); confirmSell(s); return; }
   }
   function commitName(inp) {

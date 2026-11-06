@@ -207,7 +207,7 @@
   // copy a sprite into a canvas at an integer scale: the bitmap keeps every fine pixel, the CSS size comes from the art size
   // (no scale: the page's CSS sizes it; canvases that nothing else sizes pass data-scale="1")
   function put(cv, src, scale) {
-    cv.width = src.width; cv.height = src.height;
+    cv.width = src.width; cv.height = src.height; cv._pk = src.k || 1; // (app.js snaps it to whole device pixels per fine pixel)
     const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, cv.width, cv.height); x.drawImage(src, 0, 0, src.width, src.height);
     if (scale) { cv.style.width = artW(src) * scale + 'px'; cv.style.height = artH(src) * scale + 'px'; }
     cv.classList.add('px');
@@ -556,7 +556,7 @@
     const extra = id === 'golden' ? ' Also won from Master races and the Legend League.' : '';
     return `<article class="sh-card">
       <div class="sh-art" style="background:linear-gradient(#fff8e6, var(--slot))"><canvas class="sh-peek" data-sh="eggpeek:${id}" data-scale="2"></canvas>${n ? `<span class="sh-own" title="Waiting in the Garden">${n}</span>` : ''}</div>
-      <div class="sh-info"><div class="sh-title"><h3>${esc(e.name)}</h3>${e.sparkle ? '<span class="sh-chip" style="background:#e0a800">Sparkly</span>' : ''}${e.spooky ? '<span class="sh-chip" style="background:#df7126">Spooky</span>' : ''}</div>
+      <div class="sh-info"><div class="sh-title"><h3>${esc(e.name)}</h3>${e.sparkle ? '<span class="sh-chip" style="background:#e0a800">Sparkly</span>' : ''}${e.spooky ? '<span class="sh-chip" style="background:#df7126">Spooky</span>' : ''}${e.holiday ? '<span class="sh-chip" style="background:#2f8a3a">Holiday</span>' : ''}</div>
       <p class="sh-blurb">${esc(e.desc || '')}${extra}</p></div>
       <dl class="sh-facts">
         ${e.bonus ? `<div class="sh-fact"><dt>Bonus</dt><dd><span class="sh-chip soft">+${e.bonus} XP in every stat</span></dd></div>` : ''}
@@ -614,7 +614,7 @@
     paint: ['Paint', () => 'paint:' + firstOf(D.COLORS, 'coral')], pattern: ['Sticker', () => 'pattern:' + firstOf(D.PATTERNS, 'heart')], hat: ['Hat', () => 'hat:' + firstOf(D.HATS, 'party')],
     animal: ['Animal', () => 'critter:' + firstOf(D.ANIMALS, 'hare')], egg: ['Egg', () => 'egg:meadow'], spookyegg: ['Spooky egg', () => 'egg:' + ((D.SPOOKY_EGGS || [])[0] || 'pumpkin')],
     goldenegg: ['Golden Egg', () => 'egg:golden'], rainbowegg: ['Rainbow Egg', () => 'egg:rainbow'], fancyegg: ['Fancy egg', () => 'egg:' + (FANCY()[0] || 'meadow')],
-    rare: ['Rare creature', () => 'critter:' + firstOf(D.RARES, 'unicorn')],
+    rare: ['Rare creature', () => 'critter:' + firstOf(D.RARES, 'unicorn')], holidayegg: ['Holiday egg', () => 'egg:' + ((D.HOLIDAY_EGGS || [])[0] || 'meadow')],
   };
   function prizeLook(k) {
     if (PRIZE[k]) return { label: PRIZE[k][0], icon: PRIZE[k][1]() };
@@ -637,7 +637,8 @@
     return `1 in ${fmt(nOf(p))}`;
   }
   function oddsOf(tier) {
-    const G = D.GUMBALL[tier], list = G && Array.isArray(G.prizes) ? G.prizes.filter(x => Array.isArray(x) && +x[1] > 0) : [];
+    const G = D.GUMBALL[tier], all = G && Array.isArray(G.prizes) ? (state.gumballPrizes ? state.gumballPrizes(G) : G.prizes) : []; // (Holiday eggs only in season)
+    const list = all.filter(x => Array.isArray(x) && +x[1] > 0);
     const tot = list.reduce((a, x) => a + +x[1], 0), by = {};
     if (!(tot > 0)) return [];
     for (const [k0, w] of list) { const k = k0 === 'fancyegg' && !FANCY().length ? 'coins' : k0; by[k] = (by[k] || 0) + +w; } // no fancy eggs yet: that prize pays coins
@@ -655,6 +656,7 @@
     if (r.type !== 'egg') return has(r.type) ? r.type : null;
     if (has(r.id + 'egg')) return r.id + 'egg';
     if ((D.SPOOKY_EGGS || []).includes(r.id) && has('spookyegg')) return 'spookyegg';
+    if ((D.HOLIDAY_EGGS || []).includes(r.id) && has('holidayegg')) return 'holidayegg';
     if (FANCY().includes(r.id) && has('fancyegg')) return 'fancyegg';
     if (D.AREAS[r.id] && has('egg')) return 'egg';
     return null;
@@ -833,7 +835,10 @@
     if (tab === 'rare') return `<div class="sh-list">${Object.keys(D.RARES).map(rareCard).join('')}</div>`;
     if (tab === 'egg') {
       const ids = (D.SHOP_EGGS || []).filter(id => D.EGGS[id] && D.EGGS[id].price > 0), rare = ids.filter(id => !D.EGGS[id].spooky), spooky = ids.filter(id => D.EGGS[id].spooky);
-      return `<div class="sh-list">${rare.map(eggCard).join('')}</div>` + (spooky.length ? `<h2 class="sh-sec px-title">Spooky eggs</h2><p class="sh-sec-sub">Halloween Sprouts! Pumpkins, ghosts, mummies and more.</p><div class="sh-list">${spooky.map(eggCard).join('')}</div>` : '');
+      // holiday mode (PS.holiday): the Holiday eggs come first, only while it's on
+      const hol = PS.holiday && PS.holiday.on() ? (D.HOLIDAY_EGGS || []).filter(id => D.EGGS[id] && D.EGGS[id].price > 0) : [];
+      return (hol.length ? `<h2 class="sh-sec px-title" style="margin-top:4px">Holiday eggs</h2><p class="sh-sec-sub">Snowmen, gingerbread, elves and reindeer, only while the holidays last!</p><div class="sh-list">${hol.map(eggCard).join('')}</div><h2 class="sh-sec px-title">Rare eggs</h2>` : '')
+        + `<div class="sh-list">${rare.map(eggCard).join('')}</div>` + (spooky.length ? `<h2 class="sh-sec px-title">Spooky eggs</h2><p class="sh-sec-sub">Halloween Sprouts! Pumpkins, ghosts, mummies and more.</p><div class="sh-list">${spooky.map(eggCard).join('')}</div>` : '');
     }
     if (tab === 'gumball') return gumballHTML();
     return `<div class="sh-list fruit">${Object.keys(D.FRUITS).map(fruitCard).join('')}</div>`;

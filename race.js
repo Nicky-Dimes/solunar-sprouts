@@ -572,7 +572,7 @@
   function wildAnimals(R, tier) {
     const key = R.id; if (!wildCache[key]) {
       const W = SEGS.reduce((a, k) => a + (R.mix[k] || 0), 0);
-      const ids = Object.keys(D.ANIMALS).filter(id => D.ANIMALS[id].area === R.area);
+      const ids = Object.keys(D.ANIMALS).filter(id => D.ANIMALS[id].area === R.area && !D.ANIMALS[id].season); // (a seasonal visitor never races here)
       const fit = id => { const f = animalFactors(id); return SEGS.reduce((a, k) => a + f[k] * (R.mix[k] || 0) / W, 0); };
       wildCache[key] = ids.sort((a, b) => fit(a) - fit(b) || (a < b ? -1 : 1));
     }
@@ -720,7 +720,7 @@
     return names.map((name, i) => {
       const rating = {}; for (const k of SEGS) rating[k] = +mulRating(Math.min(CUP_F[2], f[i] * (0.98 + r() * 0.04)) * mulOf(pr[k])).toFixed(2);
       const look = Object.assign(PX.cloneLook(PX.DEFAULT_LOOK), { body: bodies[Math.floor(r() * bodies.length)], eyes: ['round', 'brave', 'dot'][Math.floor(r() * 3)] });
-      const hats = PX.HAT_IDS || []; if (hats.length && r() < 0.5) look.hat = hats[Math.floor(r() * hats.length)];
+      const hats = (PX.HAT_IDS || []).filter(h => !(D.HATS[h] || {}).holiday); if (hats.length && r() < 0.5) look.hat = hats[Math.floor(r() * hats.length)]; // (the same rivals all year)
       return makeRacer({ name, look, rating, stamR: st * (f[i] + 0.3), cheer: cheerOf(CUP_CHEER) });
     });
   }
@@ -1101,18 +1101,18 @@
     return safeProp(kind, TH[th].prop);
   }
   function paint2x(cv, src) { // a small sprite at exactly 2x (crisp) — for 18px critters in 36px slots
-    const m = src.k ? 1 : 2; cv.width = src.width * m; cv.height = src.height * m; // (a hi-res critter already has 2x the pixels)
+    const m = src.k ? 1 : 2; cv.width = src.width * m; cv.height = src.height * m; cv._pk = src.k || 2; // (a hi-res critter already has 2x the pixels; _pk: app.js snaps it to whole device px)
     const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, cv.width, cv.height); x.drawImage(src, 0, 0, cv.width, cv.height);
   }
   function paintTo(cv, src, w, h) { // (w, h in art pixels; a hi-res sprite gets k x the bitmap)
-    const k = src.k || 1; cv.width = w ? w * k : src.width; cv.height = h ? h * k : src.height; smoothCv(cv, src);
+    const k = src.k || 1; cv.width = w ? w * k : src.width; cv.height = h ? h * k : src.height; cv._pk = k; smoothCv(cv, src);
     const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.clearRect(0, 0, cv.width, cv.height);
     x.drawImage(src, Math.floor((cv.width - src.width) / 2), Math.floor((cv.height - src.height) / 2), src.width, src.height);
   }
   // a sprout sprite fitted into a small square canvas (canvas can be taller for flower heads)
   function spriteBox(cv, look, pose, size) {
     const src = sprig(look, pose), k = src.k || 1; size = size || 36;
-    const h = size + Math.max(0, PX.artH(src) - 32); cv.width = size * k; cv.height = h * k; smoothCv(cv, src); // (bitmap k x the art size)
+    const h = size + Math.max(0, PX.artH(src) - 32); cv.width = size * k; cv.height = h * k; cv._pk = k; smoothCv(cv, src); // (bitmap k x the art size)
     const x = cv.getContext('2d'); x.setTransform(k, 0, 0, k, 0, 0); x.imageSmoothingEnabled = false; x.clearRect(0, 0, size, h);
     PX.blit(x, src, size / 2, h - 2, false, sprigAX(), sprigAY());
   }

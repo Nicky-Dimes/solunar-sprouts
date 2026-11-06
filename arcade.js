@@ -1132,7 +1132,7 @@
           const col = colOk(p.c) ? p.c : 'mint'; it.paints[col] = (it.paints[col] | 0) + 1; c.plush[col] = (c.plush[col] | 0) + 1; PS.emit('items');
           cel = { title: `${D.COLORS[col]} Sprout plushie!`, sub: `It sits on your plushie shelf. And here is ${D.COLORS[col]} paint for a Sprout!`, icon: prizeSpr(p), tiles: [{ icon: PX.item('paint', col), value: '+1', label: D.COLORS[col] + ' paint' }] };
         } else if (p.type === 'capsule') {
-          const hats = Object.keys(D.HATS || {}).filter(h => D.HATS[h].tier <= 2 && !it.hats[h]);
+          const hats = Object.keys(D.HATS || {}).filter(h => D.HATS[h].tier <= 2 && !it.hats[h] && !D.HATS[h].holiday); // (holiday hats come from the holidays)
           if (hats.length && Math.random() < 0.45) { const h = pick(hats); it.hats[h] = true; PS.emit('items'); cel = { title: D.HATS[h].name + '!', sub: `A new ${D.HATS[h].slot === 'extra' ? 'charm' : 'hat'} for your closet. Any Sprout can wear it.`, icon: PX.item('hat', h) }; }
           else { const L = Object.keys(D.PATTERNS).filter(k => k !== 'plain'), id = pick(L); it.patterns[id] = (it.patterns[id] | 0) + 1; PS.emit('items'); cel = { title: `${D.PATTERNS[id]} sticker!`, sub: 'Give a Sprout this pattern from its page in Sprouts.', icon: PX.item('pattern', id) }; }
         } else if (p.type === 'egg') {
@@ -1443,7 +1443,7 @@
       const it = ST.items();
       if (P.t === 'hat') {
         let h = D.HATS && D.HATS[P.id] && !it.hats[P.id] ? P.id : null;
-        if (!h) { const L2 = Object.keys(D.HATS || {}).filter(k => !it.hats[k] && D.HATS[k].tier <= 3); h = L2.length ? L2[(GAMES.findIndex(x => x.id === id) * 3 + 1) % L2.length] : null; }
+        if (!h) { const L2 = Object.keys(D.HATS || {}).filter(k => !it.hats[k] && D.HATS[k].tier <= 3 && !D.HATS[k].holiday); h = L2.length ? L2[(GAMES.findIndex(x => x.id === id) * 3 + 1) % L2.length] : null; }
         if (h) return { type: 'hat', id: h, n: 1, name: D.HATS[h].name };
         return { type: 'paint', id: 'rose', n: 2, name: `2 ${D.COLORS.rose || 'Rose'} paints` };
       }
@@ -1709,11 +1709,14 @@
   // ---------------- size ----------------
   function checkSize() {
     if (!G || !cv) return;
-    const r = cv.getBoundingClientRect(), dpr = Math.min(3, window.devicePixelRatio || 1);
+    // (measured on the canvas's container: the canvas itself carries an exact CSS size, so it can't report a rotation)
+    const r = (cv.parentElement || cv).getBoundingClientRect(), dpr = Math.min(3, window.devicePixelRatio || 1);
     const key = Math.round(r.width) + 'x' + Math.round(r.height) + ':' + dpr + ':' + hudBottom();
     if (key === sizeKey || r.width < 10 || r.height < 10) return;
     sizeKey = key; W = r.width; H = r.height; DPR = dpr;
-    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    // the bitmap is exactly the CSS size x DPR device pixels, so the browser never rescales (blurs) it
+    cv.width = Math.ceil(W * DPR - 0.01); cv.height = Math.ceil(H * DPR - 0.01);
+    cv.style.width = cv.width / DPR + 'px'; cv.style.height = cv.height / DPR + 'px';
     G.mod.layout(G); paintBg();
   }
 
@@ -1794,7 +1797,7 @@
   @keyframes arNew{0%,100%{transform:rotate(8deg) scale(1)}50%{transform:rotate(4deg) scale(1.1)}}
   .ar-foot{margin:18px auto 0;max-width:520px;text-align:center;color:var(--ink);font:600 15px/1.35 var(--f-ui);background:rgba(255,248,230,.75);border-radius:14px;padding:8px 12px}
   .ar-play{position:absolute;inset:0;background:#bfe3b4}
-  .ar-cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  .ar-cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;image-rendering:pixelated;image-rendering:crisp-edges}
   .ar-hud{position:absolute;left:8px;right:8px;top:calc(8px + env(safe-area-inset-top,0px));display:flex;align-items:center;gap:8px;pointer-events:none;z-index:2}
   .ar-hud>*{pointer-events:auto}
   .ar-x{width:50px;height:50px;flex:0 0 auto;border-radius:14px;border:2px solid var(--line);border-bottom:5px solid var(--edge);background:var(--panel);color:var(--ink);font:600 32px/1 var(--f-ui);padding:0;cursor:pointer}

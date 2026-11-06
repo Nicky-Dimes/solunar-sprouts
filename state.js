@@ -96,6 +96,7 @@
       if (!isObj(sp.parts)) sp.parts = {}; if (!isObj(sp.absorbed)) sp.absorbed = {}; if (!isObj(sp.look)) sp.look = {};
       if (!Array.isArray(sp.partOrder)) sp.partOrder = Object.keys(sp.parts).filter(p => p !== 'spots' && sp.parts[p] > 0);
       if (sp.moveset != null && (!Array.isArray(sp.moveset) || sp.moveset.some(x => typeof x !== 'string'))) { repairs.push('moveset'); delete sp.moveset; } // chosen battle moves (optional)
+      if (sp.pick != null && typeof sp.pick !== 'string') { repairs.push('pick'); delete sp.pick; } // the flower a child chose (optional)
       sp.record = Object.assign({ races: 0, raceWins: 0, battles: 0, battleWins: 0 }, isObj(sp.record) ? sp.record : {});
       sp.nature = num(sp.nature, 0); if (sp.stage == null) sp.stage = 0; if (!sp.form) sp.form = 'seedling';
       sp.happy = num(sp.happy, 70); if (sp.energy == null) sp.energy = 100; if (!D.AREAS[sp.area]) sp.area = 'meadow';
@@ -122,6 +123,14 @@
     if (s.raidsOff != null && typeof s.raidsOff !== 'boolean') { repairs.push('raidsOff'); if (s.raidsOff === 1 || s.raidsOff === 'true') s.raidsOff = true; else delete s.raidsOff; }
     if (s.raids != null && !isObj(s.raids)) { repairs.push('raids'); delete s.raids; }
     if (s.raids) for (const k of ['night', 'wins', 'losses', 'kings']) if (s.raids[k] != null && (typeof s.raids[k] !== 'number' || !isFinite(s.raids[k]))) { repairs.push('raids.' + k); delete s.raids[k]; }
+    // holiday mode (PS.holiday below, made when first needed): holiday = { giftDay: the day the last gift under the holiday tree was
+    // opened ('YYYY-MM-DD'), gifts: how many were opened, told: the day the "a gift is waiting" message was shown }. A wrong type goes
+    // (at worst today's gift can be opened again).
+    if (s.holiday != null && !isObj(s.holiday)) { repairs.push('holiday'); delete s.holiday; }
+    if (s.holiday) {
+      for (const k of ['giftDay', 'told']) if (s.holiday[k] != null && typeof s.holiday[k] !== 'string') { repairs.push('holiday.' + k); delete s.holiday[k]; }
+      if (s.holiday.gifts != null && (typeof s.holiday.gifts !== 'number' || !isFinite(s.holiday.gifts))) { repairs.push('holiday.gifts'); delete s.holiday.gifts; }
+    }
   }
   // battle.js keeps its own progress in progress.battleExtra (bosses, tower, friend, snack, seen, wild). Only wrong types are fixed;
   // missing parts are fine (battle.js fills them in when it needs them).
@@ -393,11 +402,31 @@
     const from = formInfo(s).name;
     s.stage = stage;
     if (stage === 1) { s.form = natureKind(s) + 'bud'; s.bud = natureKind(s); }
-    if (stage === 2) { s.flower = flowerFor(s.area, natureKind(s)); s.form = 'bloom'; }
+    if (stage === 2) { s.flower = pickedFlower(s) || flowerFor(s.area, natureKind(s)); s.form = 'bloom'; }
     const to = formInfo(s).name;
-    const ev = { s, from, to, name: s.name, stage };
+    const ev = { s, from, to, name: s.name, stage, chosen: stage === 2 && !!s.flower && s.flower === pickedFlower(s) };
     if (!s.npc) { emit('sprout:evolve', ev); save(); }
     return ev;
+  }
+  // Choosing a flower: a child can pick any of the three flowers of the area a Sprout lives in (s.pick, optional). The pick counts
+  // while the Sprout stays in that area; moved elsewhere, its nature decides again (until it's moved back or picks anew).
+  function pickedFlower(s) { const p = s && s.pick; return p && D.FLOWERS[p] && D.FLOWERS[p].area === s.area ? p : null; }
+  // the flower it already is (a Bloom), or the one it is heading for: the pick if there is one, otherwise its area and nature
+  function targetFlower(s) { return s.stage === 2 && s.flower && D.FLOWERS[s.flower] ? s.flower : pickedFlower(s) || flowerFor(s.area, natureKind(s)); }
+  // key: one of the flowers of the Sprout's area, or null to let its nature decide again. A Sprout that has already bloomed changes
+  // into the new flower straight away (same stage; its form, moves and element follow the flower). Returns null for a bad key.
+  function chooseFlower(s, key) {
+    if (!s || (key != null && (!D.FLOWERS[key] || D.FLOWERS[key].area !== s.area))) return null;
+    if (key == null) delete s.pick; else s.pick = key;
+    let ev = null;
+    if (s.stage === 2 && key && s.flower !== key) {
+      const from = formInfo(s).name, fromFlower = s.flower;
+      s.flower = key; s.form = 'bloom';
+      ev = { s, from, to: formInfo(s).name, name: s.name, stage: 2, rebloom: true, fromFlower, chosen: true };
+      if (!s.npc) emit('sprout:evolve', ev);
+    }
+    if (!s.npc) { emit('sprout:update', { s }); save(); }
+    return ev || { s, stage: s.stage, pick: s.pick || null };
   }
 
   // ---------------- forms, moves, looks ----------------
@@ -590,7 +619,7 @@
   function buy(kind, id) {
     if (kind === 'fruit') { const f = D.FRUITS[id]; if (!f || !spend(f.price)) return false; PS.S.fruits[id] = (PS.S.fruits[id] || 0) + 1; emit('pouch'); save(); return true; }
     if (kind === 'rare') { const r = D.RARES[id]; if (!r || !spend(r.price)) return false; PS.S.pouch.push(id); PS.S.seen['rare:' + id] = true; emit('pouch'); save(); return true; }
-    if (kind === 'egg') { const e = D.EGGS[id]; if (!e || !e.price || !spend(e.price)) return false; addEgg(id, 'Bought at the shop'); return true; }
+    if (kind === 'egg') { const e = D.EGGS[id]; if (!e || !e.price || (e.holiday && !holiday.on()) || !spend(e.price)) return false; addEgg(id, 'Bought at the shop'); return true; }
     // pick the exact paint colour or sticker you want (the gumball machine only gives random ones)
     const CP = D.CLOSET_PRICES || {};
     if (kind === 'paint') { if (!D.COLORS[id] || !spend(CP.paint || 60)) return false; bump(items().paints, id); emit('items'); save(); return true; }
@@ -634,6 +663,8 @@
 
   // ---------------- gumball machine + closet (paints, pattern stickers, hats) ----------------
   function weighted(list) { const tot = list.reduce((a, x) => a + x[1], 0); let r = Math.random() * tot; for (const x of list) { r -= x[1]; if (r <= 0) return x[0]; } return list[list.length - 1][0]; }
+  // the prizes a gumball draws from right now: 'holidayegg' only while holiday mode is on (out of season: exactly the usual odds)
+  function gumballPrizes(G) { const on = holiday.on(); return (G && Array.isArray(G.prizes) ? G.prizes : []).filter(x => x[0] !== 'holidayegg' || on); }
   const items = () => PS.S.items || (PS.S.items = { paints: {}, patterns: {}, hats: {} });
   const bump = (bag, id, n) => { bag[id] = (bag[id] || 0) + (n || 1); };
   // Spends the price and gives one prize. Returns null (unknown tier), {ok:false, reason:'coins'} or
@@ -642,16 +673,16 @@
   function gumball(tier) {
     const G = D.GUMBALL[tier]; if (!G) return null;
     if (!spend(G.price)) return { ok: false, reason: 'coins' };
-    const mega = tier === 'mega', it = items();
-    let type = weighted(G.prizes), out = null;
+    const mega = tier === 'mega', it = items(), hol = holiday.on();
+    let type = weighted(gumballPrizes(G)), out = null;
     const coins = n => { const got = addCoins(n, 'gumball'); return { type: 'coins', n: got, title: `${got} coins`, text: 'Coins spill out of the gumball!' }; };
     if (type === 'hat') {
-      const pool = Object.keys(D.HATS).filter(h => D.HATS[h].tier <= (mega ? 3 : 2) && !it.hats[h]);
+      const pool = Object.keys(D.HATS).filter(h => D.HATS[h].tier <= (mega ? 3 : 2) && !it.hats[h] && (!D.HATS[h].holiday || hol)); // (holiday hats only in season)
       if (pool.length) { const h = pick(pool); it.hats[h] = true; out = { type, id: h, title: D.HATS[h].name, text: `A new ${D.HATS[h].slot === 'extra' ? 'accessory' : 'hat'} for your closet. Any Sprout can wear it.` }; }
       else type = 'coins';
     }
     if (type === 'animal') {
-      const id = pick(Object.keys(D.ANIMALS));
+      const id = pick(Object.keys(D.ANIMALS).filter(a => !D.ANIMALS[a].season)); // (a seasonal visitor is only found in the garden)
       if (canCatch()) { PS.S.pouch.push(id); PS.S.seen['animal:' + id] = true; emit('pouch'); out = { type, id, title: `A ${D.ANIMALS[id].name}!`, text: `It hopped into your pouch. It lives in ${inArea(D.ANIMALS[id].area)}.` }; }
       else type = 'coins';
     }
@@ -667,6 +698,7 @@
       case 'pattern': { const id = pick(Object.keys(D.PATTERNS).filter(k => k !== 'plain')); bump(it.patterns, id); out = { type, id, title: `${D.PATTERNS[id]} sticker`, text: 'Give a Sprout this pattern from its page in Sprouts.' }; break; }
       case 'egg': { const k = pick(D.AREA_ORDER); addEgg(k, 'Gumball machine'); out = { type, id: k, title: D.EGGS[k].name, text: `It's waiting in ${inArea(k)}. Tap it to hatch.` }; break; }
       case 'spookyegg': { const k = pick(D.SPOOKY_EGGS); const e = addEgg(k, 'Gumball machine'); out = { type: 'egg', id: k, title: D.EGGS[k].name + '!', text: `A spooky surprise! It's waiting in ${inArea(e.area)}.` }; break; }
+      case 'holidayegg': { const k = pick(D.HOLIDAY_EGGS); const e = addEgg(k, 'Gumball machine'); out = { type: 'egg', id: k, title: D.EGGS[k].name + '!', text: `A holiday surprise! It's waiting in ${inArea(e.area)}.` }; break; }
       case 'goldenegg': case 'rainbowegg': { const k = type === 'goldenegg' ? 'golden' : 'rainbow'; const e = addEgg(k, 'Gumball machine'); out = { type: 'egg', id: k, title: D.EGGS[k].name + '!', text: `A special egg! It's waiting in ${inArea(e.area)}.` }; break; }
       case 'fancyegg': {
         const pool = (D.FANCY_EGGS || []).filter(k => D.EGGS[k]);
@@ -807,9 +839,57 @@
   }
   // (battle rewards are paid in battle.js by one function, grant(), using D.BATTLE's prize settings)
 
+  // ---------------- holidays ----------------
+  // Holiday mode (snow, lights, the holiday tree and its daily gift, the Reindeer, Holiday eggs and hats) is on from D.HOLIDAY.from
+  // to D.HOLIDAY.to each year. A grown-up can make it always on or off in Parent tools; that choice is kept per device
+  // (localStorage 'solunar:holiday' = 'on' | 'off'; none = automatic), so every player on the device sees the same garden.
+  // Only what can be FOUND is seasonal: holiday eggs, skins and hats a player has, and a bonded Reindeer, stay all year.
+  const HKEY = 'solunar:holiday';
+  const dayKey = d => { d = d || new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const holSave = () => { let H = PS.S.holiday; if (!isObj(H)) H = PS.S.holiday = {}; return H; };
+  const holiday = {
+    season(d) {
+      d = d || new Date(); const H = D.HOLIDAY || { from: [11, 1], to: [1, 6] };
+      const md = (d.getMonth() + 1) * 100 + d.getDate(), from = H.from[0] * 100 + H.from[1], to = H.to[0] * 100 + H.to[1];
+      return from <= to ? md >= from && md <= to : md >= from || md <= to; // (the window wraps over New Year)
+    },
+    mode() { try { const m = localStorage.getItem(HKEY); return m === 'on' || m === 'off' ? m : 'auto'; } catch (e) { return 'auto'; } },
+    setMode(m) {
+      try { if (m === 'on' || m === 'off') localStorage.setItem(HKEY, m); else localStorage.removeItem(HKEY); } catch (e) { /* this device can't keep it */ }
+      emit('holiday', { on: holiday.on() });
+    },
+    on() { const m = holiday.mode(); return m === 'on' || (m === 'auto' && holiday.season()); },
+    // the gift under the holiday tree: one a day per player (once they have a Sprout)
+    giftReady() { return holiday.on() && !!PS.S.sprouts.length && (PS.S.holiday || {}).giftDay !== dayKey(); },
+    // the "a gift is waiting" message: once a day per player; true (and noted) when it should show now
+    tellGift() { if (!holiday.giftReady()) return false; const H = holSave(), d = dayKey(); if (H.told === d) return false; H.told = d; save(); return true; },
+    openGift() {
+      if (!holiday.giftReady()) return null;
+      const G = D.HOLIDAY, it = items(); let type = weighted(G.gift), out = null;
+      const coins = n => { const got = addCoins(n, 'gift'); return { type: 'coins', n: got, title: `${got} coins`, text: 'A pouch of shiny coins!' }; };
+      if (type === 'hat') { // a holiday hat they don't have yet, else an everyday hat they don't have, else coins
+        const free = h => D.HATS[h] && !it.hats[h], hol = G.hats.filter(free), pool = hol.length ? hol : Object.keys(D.HATS).filter(h => free(h) && !D.HATS[h].holiday && D.HATS[h].tier <= 2);
+        if (pool.length) { const h = pick(pool); it.hats[h] = true; out = { type, id: h, title: D.HATS[h].name + '!', text: `A new ${D.HATS[h].slot === 'extra' ? 'charm' : 'hat'} for your closet. Any Sprout can wear it.` }; }
+        else type = 'coins';
+      }
+      if (!out) switch (type) {
+        case 'fruit': { const pool = Object.keys(D.FRUITS).filter(k => k !== 'goldfruit'), got = [pick(pool), pick(pool)]; got.forEach(k => bump(PS.S.fruits, k)); emit('pouch'); out = { type, id: got[0], n: 2, title: '2 fruits', text: got.map(k => D.FRUITS[k].name).join(' and ') + '. Find them in the fruit tray.' }; break; }
+        case 'goldfruit': bump(PS.S.fruits, 'goldfruit'); emit('pouch'); out = { type, id: 'goldfruit', n: 1, title: 'A Golden Fruit!', text: 'XP to every stat. Find it in the fruit tray.' }; break;
+        case 'paint': { const id = pick(Object.keys(D.COLORS)); bump(it.paints, id); out = { type, id, title: `${D.COLORS[id]} paint`, text: 'Paint a Sprout this color from its page in Sprouts.' }; break; }
+        case 'pattern': { const id = pick(Object.keys(D.PATTERNS).filter(k => k !== 'plain')); bump(it.patterns, id); out = { type, id, title: `${D.PATTERNS[id]} sticker`, text: 'Give a Sprout this pattern from its page in Sprouts.' }; break; }
+        case 'holidayegg': { const k = pick(D.HOLIDAY_EGGS); const e = addEgg(k, 'Under the holiday tree'); out = { type: 'egg', id: k, title: D.EGGS[k].name + '!', text: `It's waiting in ${inArea(e.area)}. Tap it to hatch.` }; break; }
+        case 'egg': { const k = pick(D.AREA_ORDER); const e = addEgg(k, 'Under the holiday tree'); out = { type: 'egg', id: k, title: D.EGGS[k].name + '!', text: `It's waiting in ${inArea(e.area)}. Tap it to hatch.` }; break; }
+        default: out = coins(Math.round(irand(G.giftCoins[0], G.giftCoins[1]) * (1 + (PS.S.bestTier || 0) * 0.5)));
+      }
+      const H = holSave(); H.giftDay = dayKey(); H.gifts = (+H.gifts || 0) + 1;
+      emit('items'); save();
+      return Object.assign({ ok: true }, out);
+    },
+  };
+
   // ---------------- boot ----------------
   const PS = window.PS = {
-    D, S: load() || fresh(), save, saveNow, reset, lockSaves, on, emit, clock, players: playersApi,
+    D, S: load() || fresh(), save, saveNow, reset, lockSaves, on, emit, clock, players: playersApi, holiday,
     get loadNote() { return loadNote; }, clearLoadNote() { loadNote = null; },
     backup: { exportBackup, decodeBackup, importBackup, autoBackups, restoreAuto, rescued },
     util: { rand, irand, pick, clamp, newId },
@@ -820,8 +900,8 @@
       canCatch, addToPouch, takeFromPouch, addCoins, spend, buy, useFruit, addFruit, discardFruit, rollDrop,
       addEgg, hatchEgg, moveSprout, homeName, renameSprout, get, active, setActive,
       raceProgress, raceUnlocked, raceRivals, finishRace,
-      leagueProgress, leagueUnlocked, makeNPC, checkEvolve, evolveTo, flowerFor, PART_RACE, esc,
-      sellPrice, canSell, sellSprout, gumball, items, usePaint, usePattern, ownsHat, wear,
+      leagueProgress, leagueUnlocked, makeNPC, checkEvolve, evolveTo, flowerFor, pickedFlower, targetFlower, chooseFlower, PART_RACE, esc,
+      sellPrice, canSell, sellSprout, gumball, gumballPrizes, items, usePaint, usePattern, ownsHat, wear,
     },
   };
   lastNight = clock.isNight();

@@ -295,6 +295,10 @@
     cometdive: M('Comet Dive', 'sky', 85, 0.9, {}, 'Zooms down like a comet.'),
     starglow: M('Star Glow', 'light', 0, 1, { heal: 0.2, cleanse: true, buff: { stat: 'eva', n: 1 } }, 'Shines brighter. Heals and raises Dodge.'),
     firstlight: M('First Light', 'light', 120, 0.85, {}, 'The light of the very first star.'),
+    // the holiday Reindeer (a visitor while holiday mode is on: see HOLIDAY)
+    sleighdash: M('Sleigh Dash', 'sky', 50, 0.95, { first: true }, 'Zooms in like a sleigh. Goes first.'),
+    jinglebell: M('Jingle Bell', 'light', 0, 1, { status: { type: 'stun', chance: 0.45 } }, 'Rings a merry bell. May stun.'),
+    northstar: M('North Star', 'light', 85, 0.9, { heal: 0.1 }, 'A guiding star shines down. Heals a little.'),
   };
 
   // ---------- Animals: caught in the garden areas, absorbed by Sprouts ----------
@@ -361,6 +365,9 @@
     licovine: P('Licorice Vine', 'candy', 'land', 'any', { power: 9, run: 6 }, 'vines', 'sweet', ['twirlwhip', 'stickyvine', 'licoknot'], 0, 'Twists and curls everywhere.'),
     sugarlily: P('Sugar Lily', 'candy', 'water', 'day', { swim: 10, fly: 4 }, 'petals', 'water', ['fizzbloom', 'lilyfloat', 'candyrain'], 1, 'Floats on the soda sea.'),
     licoriceeel: A('Licorice Eel', 'candy', 'water', 'any', { swim: 12, run: 6 }, 'fins', 'sweet', ['licoricelash', 'twist', 'sugarshock'], -1, 'Long, twisty and chewy.'),
+    // seasonal visitor (season: 'holiday'): wanders into every garden while holiday mode is on. It stays in the game all year (a
+    // Sprout keeps it once bonded), but it is never in the Wild Battle or Wild Race lists, gumballs, or the Sprout Book's totals.
+    reindeer: Object.assign(A('Reindeer', 'meadow', 'land', 'any', { run: 10, fly: 8, stamina: 3 }, 'horns', 'light', ['sleighdash', 'jinglebell', 'northstar'], 2, 'Visits every garden for the holidays. Its nose glows!'), { season: 'holiday' }),
   };
 
   // ---------- Rare creatures: bought with coins, absorbed like animals but much stronger ----------
@@ -551,6 +558,13 @@
     frost: { name: 'Frost Egg', bodies: ['cloud', 'sky', 'aqua'], skin: 'frost', taps: 8, bonus: 20, price: 2750, hatchWith: 'yeti', desc: 'Hatches a frosty snowflake Sprout bonded with a Yeti.' },
     blossom: { name: 'Blossom Egg', bodies: ['rose', 'bubblegum', 'cream'], skin: 'blossom', taps: 6, bonus: 15, price: 900, desc: 'Hatches a sweet pink Sprout covered in little spring flowers.' },
     pearl: { name: 'Pearl Egg', bodies: ['cloud', 'cream', 'lilac'], skin: 'pearl', taps: 6, bonus: 15, price: 1400, hatchWith: 'seahorse', desc: 'Hatches a shimmery pearl Sprout bonded with a Seahorse.' },
+    // Holiday eggs (holiday: true): festive skins. Sold in the Shop and found in gumballs and under the holiday tree only while
+    // holiday mode is on (HOLIDAY below); eggs and Sprouts a player already has stay all year.
+    snowman: { name: 'Snowman Egg', bodies: ['cloud', 'sky'], skin: 'snowman', taps: 6, bonus: 10, price: 600, holiday: true, desc: 'Hatches a jolly snowman Sprout with a carrot nose and a cosy scarf.' },
+    gingerbread: { name: 'Gingerbread Egg', bodies: ['cocoa', 'clay'], skin: 'gingerbread', taps: 6, bonus: 10, price: 650, holiday: true, desc: 'Hatches a gingerbread Sprout with icing and gumdrop buttons. Smells like cookies!' },
+    candycane: { name: 'Candy Cane Egg', bodies: ['cherry', 'cream'], skin: 'candycane', taps: 6, bonus: 10, price: 600, holiday: true, desc: 'Hatches a stripy peppermint Sprout.' },
+    elf: { name: 'Elf Egg', bodies: ['leaf', 'lime'], skin: 'elf', taps: 8, bonus: 20, price: 1100, holiday: true, hat: 'elf', desc: 'Hatches a busy little elf Sprout, pointy hat included.' },
+    reindeer: { name: 'Reindeer Egg', bodies: ['cocoa', 'peach'], skin: 'reindeer', taps: 8, bonus: 20, price: 1200, holiday: true, hat: 'antlers', hatchWith: 'reindeer', desc: 'Hatches a reindeer Sprout with antlers and a red nose, bonded with a Reindeer.' },
   };
   // special skins (from rare eggs)
   const SKINS = {
@@ -569,6 +583,11 @@
     frost: { name: 'Frost', from: 'frost' },
     blossom: { name: 'Blossom', from: 'blossom' },
     pearl: { name: 'Pearl', from: 'pearl' },
+    snowman: { name: 'Snowman', from: 'snowman', holiday: true },
+    gingerbread: { name: 'Gingerbread', from: 'gingerbread', holiday: true },
+    candycane: { name: 'Candy Cane', from: 'candycane', holiday: true },
+    elf: { name: 'Elf', from: 'elf', holiday: true },
+    reindeer: { name: 'Reindeer', from: 'reindeer', holiday: true },
   };
 
   // ---------- Looks: colours, patterns, hats (gumball prizes) ----------
@@ -590,13 +609,28 @@
     halo: { name: 'Halo', slot: 'extra', tier: 3 },
     flowercrown: { name: 'Flower crown', slot: 'hat', tier: 1 }, bandana: { name: 'Bandana', slot: 'hat', tier: 1 },
     headphones: { name: 'Headphones', slot: 'hat', tier: 2 }, propeller: { name: 'Propeller cap', slot: 'hat', tier: 2 }, heart: { name: 'Heart charm', slot: 'extra', tier: 2 },
+    // holiday hats (holiday: true): from Holiday eggs, the gift under the holiday tree and gumballs, only while holiday mode is on
+    santa: { name: 'Santa hat', slot: 'hat', tier: 2, holiday: true }, elf: { name: 'Elf hat', slot: 'hat', tier: 2, holiday: true }, antlers: { name: 'Antlers', slot: 'hat', tier: 2, holiday: true },
   };
 
   // ---------- Gumball machine ----------
-  // price per gumball. prizes: [type, weight]. Prize types are handled in state.gumball().
+  // price per gumball. prizes: [type, weight]. Prize types are handled in state.gumball(). 'holidayegg' is only in the draw while
+  // holiday mode is on (out of season it is left out, so the odds are exactly the usual ones).
   const GUMBALL = {
-    small: { name: 'Gumball', price: 25, prizes: [['coins', 20], ['fruit', 24], ['goldfruit', 2], ['paint', 20], ['pattern', 12], ['hat', 10], ['animal', 8], ['egg', 2], ['spookyegg', 1], ['fancyegg', 0.6], ['goldenegg', 0.25], ['rare', 0.15]], coins: [8, 40] },
-    mega: { name: 'Mega gumball', price: 150, prizes: [['coins', 14], ['goldfruit', 10], ['paint', 14], ['pattern', 8], ['hat', 20], ['animal', 10], ['egg', 10], ['spookyegg', 6], ['fancyegg', 6], ['goldenegg', 3], ['rainbowegg', 1], ['rare', 2]], coins: [60, 240] },
+    small: { name: 'Gumball', price: 25, prizes: [['coins', 20], ['fruit', 24], ['goldfruit', 2], ['paint', 20], ['pattern', 12], ['hat', 10], ['animal', 8], ['egg', 2], ['spookyegg', 1], ['fancyegg', 0.6], ['goldenegg', 0.25], ['rare', 0.15], ['holidayegg', 1.5]], coins: [8, 40] },
+    mega: { name: 'Mega gumball', price: 150, prizes: [['coins', 14], ['goldfruit', 10], ['paint', 14], ['pattern', 8], ['hat', 20], ['animal', 10], ['egg', 10], ['spookyegg', 6], ['fancyegg', 6], ['goldenegg', 3], ['rainbowegg', 1], ['rare', 2], ['holidayegg', 7]], coins: [60, 240] },
+  };
+  // ---------- Holidays ----------
+  // Holiday mode (state.js PS.holiday) decorates the game: snow on every island, lights under the top bar, a holiday tree in each
+  // garden with a gift under it once a day, a visiting Reindeer, and Holiday eggs and hats. It is on from `from` to `to` each year
+  // ([month, day], both included; the window wraps over New Year) unless a grown-up switches it on or off in Parent tools.
+  const HOLIDAY = {
+    from: [11, 1], to: [1, 6],
+    eggs: ['snowman', 'gingerbread', 'candycane', 'elf', 'reindeer'],
+    hats: ['santa', 'elf', 'antlers'],
+    // the gift under the tree, once a day per player: [prize, weight]; coins scale with bestTier like the garden's coin drops
+    gift: [['coins', 26], ['fruit', 18], ['goldfruit', 10], ['paint', 10], ['pattern', 8], ['hat', 14], ['holidayegg', 10], ['egg', 4]],
+    giftCoins: [60, 180],
   };
   const FANCY_EGGS = ['blossom', 'pearl', 'starry']; // the gumball 'fancyegg' prize picks one of these
   const CLOSET_PRICES = { paint: 60, pattern: 80 };  // buy an exact paint colour or sticker in the shop
@@ -619,5 +653,5 @@
 
   window.PSDATA = { STATS, STAT_META, ELEMENTS, MOVES, ANIMALS, RARES, EVO, FORMS, BLOOM_POOL, FLOWERS, STAT_TITLES, AREAS, AREA_ORDER,
     GROWTH, DROPS, FRUITS, TREE_FRUITS, RACE_TIERS, RACES, RACE_PLACE_SHARE, RACE_STAT, LEAGUES, BATTLE, EGGS, SHOP_EGGS, SPOOKY_EGGS, NAMES, CLOCK, PART_NAMES,
-    SKINS, COLORS, PATTERNS, PATTERN_COLORS, HATS, GUMBALL, SELL, MAX_PARTS, FANCY_EGGS, CLOSET_PRICES, SHINY_CHANCE };
+    SKINS, COLORS, PATTERNS, PATTERN_COLORS, HATS, GUMBALL, SELL, MAX_PARTS, FANCY_EGGS, CLOSET_PRICES, SHINY_CHANCE, HOLIDAY, HOLIDAY_EGGS: HOLIDAY.eggs };
 })();

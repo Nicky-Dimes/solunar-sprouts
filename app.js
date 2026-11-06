@@ -219,6 +219,8 @@
   }
   function refresh() {
     refreshPlayerChip();
+    // holiday mode (state.js PS.holiday): app.css hangs a string of twinkling lights under the top bar
+    const hol = !!(PS.holiday && PS.holiday.on()), appEl = $('app'); if (appEl.classList.contains('holiday') !== hol) appEl.classList.toggle('holiday', hol);
     $('coinText').textContent = (coinFreeze == null ? PS.S.coins : coinFreeze).toLocaleString();
     const night = PS.clock.isNight(), ms = PS.clock.msToSwitch(), m = Math.floor(ms / 60000), s = Math.floor(ms / 1000) % 60;
     // (the word sits in its own span: a phone hides it, the sun or moon icon says it, so the player's name keeps its room)
@@ -399,16 +401,19 @@
   PS.on('save:failed', () => saveWarning('This device just refused to save the game.'));
   PS.on('save:ok', () => { saveWarned = false; });
   // why a Sprout changed the way it did (the evolution scene says it at the end)
-  function evoWhy(s, stg) {
+  // (ev: the 'sprout:evolve' event: chosen = it bloomed into the flower a child picked; rebloom = a Bloom changed its flower)
+  function evoWhy(s, stg, ev) {
     try {
-      const nk = state.natureKind(s);
-      return (stg == null ? s.stage : stg) === 1 ? `Its ${nk === 'sun' ? 'sunny' : nk === 'moon' ? 'moonlit' : 'wild'} nature shaped its bud.`
-        : `It bloomed as a ${D.FLOWERS[s.flower].name} because it lives in the ${D.AREAS[s.area].name} and has a ${nk} nature.`;
+      const nk = state.natureKind(s), F = D.FLOWERS[s.flower];
+      if ((stg == null ? s.stage : stg) === 1) return `Its ${nk === 'sun' ? 'sunny' : nk === 'moon' ? 'moonlit' : 'wild'} nature shaped its bud.`;
+      if (ev && ev.rebloom) return `You chose the ${F.name}. Its moves and element changed with it; everything else stayed the same.`;
+      if (ev && ev.chosen) return `It bloomed as a ${F.name} because you chose it.`;
+      return `It bloomed as a ${F.name} because it lives in the ${D.AREAS[s.area].name} and has a ${nk} nature.`;
     } catch (e) { return ''; }
   }
   function evoModal(e) { // the plain pop-up (only if the scene can't run)
     const s = e.s, fi = state.formInfo(s), mv = (fi.moves || []).map(id => (D.MOVES[id] || {}).name).filter(Boolean).join(', ');
-    return { eyebrow: 'Evolution', title: `${E(e.name || s.name)} became a ${E(e.to || fi.name)}!`, sprite: s, html: `<p>${E(evoWhy(s, e.stage))}</p>${mv ? `<p><b>New moves:</b> ${E(mv)}</p>` : ''}`, buttons: [{ label: 'Wonderful', kind: 'primary' }] };
+    return { eyebrow: e.rebloom ? 'New bloom' : 'Evolution', title: `${E(e.name || s.name)} ${e.rebloom ? 'is now' : 'became'} a ${E(e.to || fi.name)}!`, sprite: s, html: `<p>${E(evoWhy(s, e.stage, e))}</p>${mv ? `<p><b>${e.rebloom ? 'Moves now' : 'New moves'}:</b> ${E(mv)}</p>` : ''}`, buttons: [{ label: 'Wonderful', kind: 'primary' }] };
   }
   PS.on('sprout:evolve', e => { if (e && e.s && !e.s.npc) { queue.push({ evo: e }); pumpModals(); } }); // (the evolution scene: showEvolution)
   PS.on('egg:new', e => { refresh(); const eg = D.EGGS[e.egg.kind] || D.EGGS.meadow, ar = D.AREAS[e.egg.area] || D.AREAS.meadow; toast(`New ${eg.name}! It's waiting in the ${ar.name}.`, 3200); });
@@ -421,7 +426,7 @@
     if (!shiny && !first && !firstKind) return;
     goalT = performance.now() + 2500; // (a goal reached by this hatch is paid after the moment, where it can be seen)
     setTimeout(() => celebrate({ kind: 'hatch', wait: true, eyebrow: shiny ? 'A Shiny Sprout!' : 'It hatched!', title: `Hi, ${s.name}!`, sprite: s, cry: true,
-      sub: shiny ? `${s.name} is Shiny! It shimmers like the moon.` : special ? `Your first Sprout from a ${D.EGGS[kind].name}!` : `${s.name} is yours to look after. Say hi!`, button: 'Hi!' }), first ? 600 : 1400); // (the very first: before the garden's own "Say hi" pop-up, which then queues after it)
+      sub: shiny ? `${s.name} is Shiny! It shimmers like the moon.` : special ? `Your first Sprout from ${/^[aeiou]/i.test(D.EGGS[kind].name) ? 'an' : 'a'} ${D.EGGS[kind].name}!` : `${s.name} is yours to look after. Say hi!`, button: 'Hi!' }), first ? 600 : 1400); // (the very first: before the garden's own "Say hi" pop-up, which then queues after it)
   });
   // something new to play or collect (any screen can send it): PS.emit('unlock', { title, sub, eyebrow, icon:<canvas>, sprite, tiles })
   PS.on('unlock', e => { if (e && e.title) celebrate({ kind: e.kind || 'unlock', wait: true, eyebrow: e.eyebrow || 'Unlocked!', title: e.title, sub: e.sub || '', icon: e.icon || null, sprite: e.sprite || null, tiles: e.tiles, button: e.button || 'Hooray!' }); });
@@ -468,6 +473,11 @@
           PS.S.raidsOff = !PS.S.raidsOff; PS.save(); close();
           toast(PS.S.raidsOff ? 'The gloom won\'t come to the garden any more.' : 'The gloom may come to the garden at night again.', 3200);
         });
+        // holiday mode (state.js PS.holiday): Auto (on from November 1 to January 6), Always on, or Off, kept for this device
+        { const hb = document.createElement('button'); hb.className = 'btn'; hb.style.gridColumn = '1 / -1';
+          const hlabel = () => { const m = PS.holiday.mode(); hb.textContent = `Holiday mode: ${m === 'on' ? 'Always on' : m === 'off' ? 'Off' : `Auto, ${PS.holiday.on() ? 'on now' : 'off now'}`} (tap to change)`; };
+          hb.onclick = () => { const m = PS.holiday.mode(); PS.holiday.setMode(m === 'auto' ? 'on' : m === 'on' ? 'off' : 'auto'); hlabel(); refresh(); PX.Sound.play('tick'); };
+          hlabel(); grid.appendChild(hb); }
         add('Get a Meadow egg', () => state.addEgg('meadow', 'Parent tools'));
         add('Get a Golden egg', () => state.addEgg('golden', 'Parent tools'));
         add('Get a surprise shop egg', () => { const k = PS.util.pick(D.SHOP_EGGS.filter(id => D.EGGS[id])); state.addEgg(k, 'Parent tools'); });
@@ -981,11 +991,12 @@
     const fi = state.formInfo(stg >= 2 ? s : Object.assign({}, s, { stage: 1, form: s.stage === 1 ? s.form : nk + 'bud' }));
     const newL = state.lookOf(s); if (stg < 2) { delete newL.bloom; newL.bud = nk; }
     const oldL = Object.assign({}, newL);
-    if (stg >= 2) { delete oldL.bloom; oldL.bud = nk; } else delete oldL.bud; // (the form it had before: a bud, or a seedling)
+    if (e.rebloom && e.fromFlower && D.FLOWERS[e.fromFlower]) oldL.bloom = e.fromFlower; // (a Bloom that changed its flower: the flower it was)
+    else if (stg >= 2) { delete oldL.bloom; oldL.bud = nk; } else delete oldL.bud; // (the form it had before: a bud, or a seedling)
     const J = journey(), seenEvo = J.evo && typeof J.evo === 'object' ? J.evo : (J.evo = {}), key = stg + ':' + (s.form || '') + ':' + (s.flower || ''), seen = !!seenEvo[key];
     seenEvo[key] = 1; PS.save();
-    const oldName = e.name || s.name, why = evoWhy(s, stg);
-    const sayDone = `${oldName} became a ${fi.name}!${stg >= 2 ? ' It is fully grown!' : ''}${why ? ' ' + why : ''}`;
+    const oldName = e.name || s.name, why = evoWhy(s, stg, e);
+    const sayDone = e.rebloom ? `${oldName} is now a ${fi.name}!${why ? ' ' + why : ''}` : `${oldName} became a ${fi.name}!${stg >= 2 ? ' It is fully grown!' : ''}${why ? ' ' + why : ''}`;
     const moves = (fi.moves || []).map(id => D.MOVES[id]).filter(Boolean).map(m => `<span class="chip-el" style="background:${(D.ELEMENTS[m.el] || D.ELEMENTS.normal).color}">${E(m.name)}</span>`).join('');
     root.innerHTML = `<div class="sv-cel sv-evo${rm ? ' rm' : ''}" role="dialog" aria-modal="true">
       <div class="sv-cel-rays" aria-hidden="true"></div><canvas class="sv-cel-fx" aria-hidden="true"></canvas><div class="sv-evo-flash" aria-hidden="true"></div>
@@ -1183,7 +1194,7 @@
   function mapPreview(id) {
     const W = 150, H = 84, K = 2, FP = 1 / K, c = document.createElement('canvas'); c.width = W * K; c.height = H * K; c.k = K;
     const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.setTransform(K, 0, 0, K, 0, 0);
-    const th = (PS.gardenThemes && PS.gardenThemes[id]) || {}, A = D.AREAS[id] || D.AREAS.meadow, theme = A.theme || 'day';
+    const th = (PS.gardenTheme ? PS.gardenTheme(id) : PS.gardenThemes && PS.gardenThemes[id]) || {}, A = D.AREAS[id] || D.AREAS.meadow, theme = A.theme || 'day'; // (snowy in holiday mode)
     const R = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
     // a round disc in fine rows (no blurry edge: the same fine pixels as the sprites)
     const disc = (cx, cy, r, col) => { g.fillStyle = col; for (let fy = Math.floor((cy - r) * K); fy < Math.ceil((cy + r) * K); fy++) { const dy = (fy + 0.5) / K - cy, hw = Math.sqrt(Math.max(0, r * r - dy * dy)); const a = Math.round((cx - hw) * K), b = Math.round((cx + hw) * K); if (b > a) g.fillRect(a / K, fy / K, (b - a) / K, FP); } };

@@ -18,7 +18,7 @@
   if (!window.PX || typeof window.Image !== 'function' || typeof document === 'undefined') return;
   const HD = (() => { try { if (/[?&]hd=1(?:&|$)/.test(location.search || '')) return true; return localStorage.getItem('solunar:hd') === '1'; } catch (e) { return false; } })();
   const D = window.PSDATA || {};
-  const PROPS = ['tree', 'bigtree', 'bush', 'flowerbed', 'mushrooms', 'shroomhouse', 'stump', 'fern', 'palm', 'beachhut', 'crystalcave', 'gingerhouse', 'lollitree', 'lamp', 'fence', 'rock'];
+  const PROPS = ['tree', 'bigtree', 'bush', 'flowerbed', 'mushrooms', 'shroomhouse', 'stump', 'fern', 'palm', 'beachhut', 'crystalcave', 'gingerhouse', 'lollitree', 'lamp', 'fence', 'rock', 'holidaytree', 'gift', 'giftblue', 'giftpink', 'snowman', 'snowtree'];
   const PLANTY = { tree: 1, bigtree: 1, bush: 1, flowerbed: 1, fern: 1 }; // (recoloured by theme in pixel.js)
   const LIST = {
     critters: Object.keys(D.ANIMALS || {}).concat(Object.keys(D.RARES || {})),
