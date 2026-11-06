@@ -17,6 +17,7 @@
   const seen = k => !!(PS.S.seen && PS.S.seen['g:' + k]);
   const markSeen = k => { if (!seen(k)) { PS.S.seen['g:' + k] = true; PS.save(); } };
   const areaName = a => D.AREAS[a].name;
+  const TRAY_LOW_KEY = 'solunar:trayLow'; // this device keeps the garden tray lowered (a screen setting, not part of any save)
   const toArea = a => (a === 'candy' ? '' : 'the ') + areaName(a);
   // music, jingles and Sprout voices (audio.js). All optional: the garden works without them. audio.js's stand-in (before its
   // engine loads) is one shared no-op, so "the jingle function isn't the stop function" means the real engine is there.
@@ -356,7 +357,7 @@
   let critters = [], parts = [], floaters = [], fizz = [];
   const drops = {}, ground = {};     // per area
   let here = [];                     // runtimes of Sprouts in the viewed area (rebuilt each frame)
-  let nextCritter = 0, nextDrop = 0, skyKey = '', bgKey = '', saveT = 0, uiT = 0, flushT = 0, cleanT = 0, sel = null, trayDirty = false;
+  let nextCritter = 0, nextDrop = 0, skyKey = '', bgKey = '', saveT = 0, uiT = 0, flushT = 0, cleanT = 0, sel = null, trayDirty = false, trayCount = -1;
   const lanes = new Map();
   const ptr = { x: 0, y: 0, vx: 0, px: 0, py: 0 };
   let press = null, drag = null, trayPress = null;
@@ -382,18 +383,35 @@
   const lawnRight = y => shoreAt(y) - sandW(y) - 4;
   const atUV = (u, v) => { const y = Math.round(Lw.minY + clamp(v, 0, 1) * Lw.span); return { x: Math.round(clamp(u, 0, 1) * lawnRight(y)), y }; };
 
+  // the tray's height on screen: lowered with its arrow tab, only its top edge shows
+  function trayH0() { return !trayEl ? 110 : trayEl.classList.contains('g-low') ? 22 : trayEl.offsetHeight || 110; }
+  // the hint floats above the tray (and above the arrow tab when the tray is lowered)
+  const placeHint = () => { hintEl.style.bottom = (trayH0() + (trayEl && trayEl.classList.contains('g-low') ? 42 : 18)) + 'px'; };
+  // zoomed all the way out, the whole garden fits the screen above the tray (a whole number of device px per world px when
+  // that's close)
+  function farFit() {
+    const fit = Math.min(W / ww, (H - trayH0() - 8) / (Lw.maxY + 12));
+    let zf = Math.floor(fit * DPR) / DPR; if (zf < fit * 0.9) zf = fit;
+    ZFAR = Math.max(0.3, Math.min(ZMIN, zf));
+  }
+  // The tray changed height (a row filled up or emptied, or the arrow tab lowered / raised it). Only the zoomed-out fit, the
+  // hint and the camera's limits depend on it, so the land and sky are NOT repainted: doing that (layout) froze the garden for a
+  // moment on phones, e.g. right after catching an animal into an empty pouch, just when you want to give it to a Sprout.
+  function trayMoved() {
+    const wasFar = Z <= ZFAR + 0.001;
+    farFit();
+    if (!pinch && !zoomAnim && (Z < ZFAR - 0.001 || wasFar)) Z = ZFAR;
+    placeHint();
+    clampCam();
+  }
+
   function layout() {
-    const trayH = trayEl.offsetHeight || 110;
     // the sky keeps its height (a fifth of the screen at zoomMin); the big lawn fills the rest of the map
     Lw.hz = Math.round(H / ZMIN * 0.2);
     Lw.minY = Lw.hz + 18;
     Lw.maxY = Math.max(Lw.minY + 30, wh - 14);
     Lw.span = Lw.maxY - Lw.minY;
-    // zoomed all the way out, the whole garden fits the screen above the tray (a whole number of device px per world px when
-    // that's close)
-    const fit = Math.min(W / ww, (H - trayH - 8) / (Lw.maxY + 12));
-    let zf = Math.floor(fit * DPR) / DPR; if (zf < fit * 0.9) zf = fit;
-    ZFAR = Math.max(0.3, Math.min(ZMIN, zf));
+    farFit();
     if (Z < ZFAR - 0.001 && !pinch && !zoomAnim) Z = ZFAR;
     Lw.waterTop = Lw.hz + 2;
     Lw.shore.length = 0;
@@ -402,7 +420,7 @@
     Lw.sb = new Float32Array(wh + 3); for (let y = 0; y < wh + 3; y++) Lw.sb[y] = shoreB(y + 0.5);
     Lw.dockY = Math.round(Lw.minY + Lw.span * 0.3);
     Lw.dockX0 = shoreAt(Lw.dockY) - 4; Lw.dockX1 = shoreAt(Lw.dockY) + Math.round((ww - shoreAt(Lw.dockY)) * 0.36);
-    hintEl.style.bottom = (trayH + 18) + 'px';
+    placeHint();
     buildProps();
     bgKey = ''; skyKey = '';
   }
@@ -1143,7 +1161,7 @@
     return s;
   }
   function camLimits() {
-    const trayH = trayEl ? trayEl.offsetHeight || 110 : 110;
+    const trayH = trayH0();
     const maxX = Math.max(0, ww - viewW());
     // don't scroll further down than the bottom of the lawn sitting just above the tray
     const maxY = Math.max(0, Math.min(wh - viewH(), Lw.maxY + 12 - (H - trayH - 8) / Z));
@@ -1207,7 +1225,7 @@
     if (!follow || pinch || zoomAnim || drag || touches.size || (press && press.kind === 'bg') || Z <= ZFAR * 1.03) return;
     const r = RT.get(follow);
     if (!r || !here.includes(r) || r.state === 'travel' || r.state === 'held' || r.state === 'enter') { follow = null; return; }
-    const vw = viewW(), vh = viewH(), mx = vw * 0.2, top = 96 / Z + vh * 0.08, bot = (H - (cardEl && !cardEl.hidden ? cardEl.offsetHeight : trayEl.offsetHeight) - 24) / Z - vh * 0.06;
+    const vw = viewW(), vh = viewH(), mx = vw * 0.2, top = 96 / Z + vh * 0.08, bot = (H - (cardEl && !cardEl.hidden ? cardEl.offsetHeight : trayH0()) - 24) / Z - vh * 0.06;
     const fx = r.x, fy = (r.state === 'fall' ? r.y - r.z : r.y) - 12;
     let tx = camX, ty = camY;
     if (fx < camX + mx) tx = fx - mx; else if (fx > camX + vw - mx) tx = fx - vw + mx;
@@ -1218,9 +1236,9 @@
   let lastTrayH = 0;
   function checkSize() {
     if (!root) return;
-    const w = root.clientWidth, h = root.clientHeight, th = trayEl.offsetHeight;
+    const w = root.clientWidth, h = root.clientHeight, th = trayH0();
     if (w !== Math.round(W) || h !== Math.round(H) || !ww) resize();
-    else if (th !== lastTrayH) layout();
+    else if (th !== lastTrayH) trayMoved();
     lastTrayH = th;
   }
 
@@ -1745,7 +1763,7 @@
   }
   // is a world point on screen right now (clear of the top bar and the tray)? m = margin in world px
   function inView(x, y, m) {
-    const trayH = trayEl ? trayEl.offsetHeight || 110 : 110;
+    const trayH = trayH0();
     return x > camX + m && x < camX + viewW() - m && y > camY + 76 / Z + m && y < camY + (H - trayH - 12) / Z - m;
   }
   function critterSpot(a) {
@@ -3511,7 +3529,7 @@
     else if (target) { if (d.src !== 'fruitinv' || ST.useFruit(d.id)) feedSprout(target, d.id); }
     else if (!cancelled || d.src !== 'fruitinv') {
       // no Sprout under it: drop the fruit on the grass for a Sprout to find (or it sinks in the water)
-      const cr = root.getBoundingClientRect(), overTray = e.clientY - cr.top > H - trayEl.offsetHeight - 10;
+      const cr = root.getBoundingClientRect(), overTray = e.clientY - cr.top > H - trayH0() - 10;
       const q = ghostWorld(e), wx = clamp(q.x, 5, ww - 5), wy = q.y + 6, gy = clamp(wy, Lw.minY, Lw.maxY);
       const fromTray = d.src === 'fruitinv';
       if (!fromTray && overTray && !cancelled) { ST.addFruit(d.id, 1); snd('pop'); PS.ui.toast(`+1 ${D.FRUITS[d.id].name} in your fruit tray`, 1800); }
@@ -3529,6 +3547,11 @@
     if (!mounted) return;
     if (drag) { trayDirty = true; return; }
     trayDirty = false;
+    { // lowered: the arrow tab hops when an animal or a fruit lands in the tray, so it's clear where it went
+      const n = PS.S.pouch.length + Object.values(PS.S.fruits || {}).reduce((a, k) => a + (k > 0 ? k : 0), 0);
+      if (trayCount >= 0 && n > trayCount && trayEl.classList.contains('g-low')) { const tg = trayEl.querySelector('.g-tog'); tg.classList.remove('g-ping'); void tg.offsetWidth; tg.classList.add('g-ping'); }
+      trayCount = n;
+    }
     const animals = PS.S.pouch.filter(id => !D.RARES[id]).length;
     pouchCnt.textContent = `${animals}/${D.GROWTH.pouchMax}`;
     pouchCnt.classList.toggle('g-full', animals >= D.GROWTH.pouchMax);
@@ -3551,7 +3574,7 @@
     b.appendChild(c);
     if (count) { const n = document.createElement('i'); n.className = 'g-n'; n.textContent = count; b.appendChild(n); }
     b.addEventListener('pointerdown', e => {
-      if (!visible || drag || (e.button != null && e.button > 0)) return;
+      if (!visible || drag || (e.button != null && e.button > 0) || trayEl.classList.contains('g-low')) return; // (lowered: a tap raises it)
       PX.Sound.unlock();
       trayPress = { el: b, data, pid: e.pointerId, x0: e.clientX, y0: e.clientY, mouse: e.pointerType === 'mouse', timer: setTimeout(() => { if (trayPress && trayPress.el === b && !drag) beginTrayDrag(trayPress.last || e); }, 320) };
       trayPress.last = e;
@@ -3757,7 +3780,8 @@
   // the same hand as a little overlay on a tray slot, sliding up towards the garden ("drag it up")
   function placeTrayHand(gd) {
     if (!handEl) return;
-    const el = gd && gd.mode === 'tray' && gd.el;
+    let el = gd && gd.mode === 'tray' && gd.el;
+    if (el && trayEl.classList.contains('g-low')) el = trayEl.querySelector('.g-tog'); // lowered: point at the tab that raises it
     hintEl.classList.toggle('g-hint-up', !!el); // make room for the hand above the tray
     if (!el) { if (!handEl.hidden) handEl.hidden = true; return; }
     const r = root.getBoundingClientRect(), b = el.getBoundingClientRect(), up = ((t * 0.7) % 1) * 46;
@@ -3767,7 +3791,7 @@
   // animals that wandered in off-screen: a bouncing arrow at the edge points the way
   function drawCritterArrows() {
     if (!critters.length || pinch) return;
-    const trayH = trayEl.offsetHeight || 110, top = 86, bot = H - trayH - 24;
+    const trayH = trayH0(), top = 86, bot = H - trayH - 24;
     for (const c of critters) {
       if (inView(c.x, c.y - 6, -4)) continue;
       const p = worldToScreen(c.x, c.y - 6), X = clamp(p.x, 22, W - 22), Y = clamp(p.y, top, bot), a = Math.atan2(p.y - Y, p.x - X), b = Math.sin(t * 6) * 3;
@@ -3830,12 +3854,21 @@
 .g-dots{display:flex;gap:5px;justify-content:center;margin-top:3px}
 .g-dots i{width:7px;height:7px;border-radius:2px;background:var(--line)}
 .g-dots i.on{background:var(--sun-edge)}.g-dots i.egg{background:var(--berry)}
-.g-tray{position:absolute;left:8px;right:8px;bottom:8px;padding:6px 8px 7px;z-index:3;display:grid;gap:3px}
-.g-row{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:center;gap:6px}
+.g-tray{position:absolute;left:8px;right:8px;bottom:8px;padding:6px 8px 7px;z-index:3;display:grid;gap:3px;transition:transform .25s ease}
+/* lowered with the arrow tab: only the tray's top edge shows, so more of the garden fits on screen (a tap on the edge raises it) */
+.g-tray.g-low{transform:translateY(calc(100% - 14px));cursor:pointer}
+.g-tog{position:absolute;top:-30px;right:14px;width:68px;height:32px;border-radius:16px 16px 0 0;background:var(--panel);border:2px solid var(--line);border-bottom:none;display:grid;place-items:center;padding:0 0 3px;color:var(--ink);-webkit-tap-highlight-color:transparent;touch-action:manipulation;cursor:pointer}
+.g-tog svg{width:18px;height:18px;display:block;transition:transform .25s}
+.g-tray.g-low .g-tog svg{transform:rotate(180deg)}
+.g-tog:active svg{transform:translateY(2px)}.g-tray.g-low .g-tog:active svg{transform:rotate(180deg) translateY(2px)}
+.g-row{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:center;gap:6px;transition:opacity .2s}
+.g-tray.g-low .g-row{opacity:0} /* (lowered: a clean edge, not half a row) */
+.g-tog.g-ping{animation:gPing .6s ease-out}
+@keyframes gPing{0%,100%{transform:none}30%{transform:translateY(-7px)}60%{transform:none}80%{transform:translateY(-3px)}}
 .g-rl{font-family:var(--f-ui);font-weight:600;font-size:13.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;line-height:1.15}
 .g-rl span{display:block;font-family:var(--f-ui);font-weight:700;color:var(--ink);font-size:13px;letter-spacing:0;text-transform:none}
 .g-rl span.g-full{color:var(--berry)}
-.g-strip{display:flex;gap:7px;overflow-x:auto;overflow-y:hidden;touch-action:pan-x;scrollbar-width:none;padding:3px 6px 5px 2px;min-height:50px;align-items:center;overscroll-behavior-x:contain}
+.g-strip{display:flex;gap:7px;overflow-x:auto;overflow-y:hidden;touch-action:pan-x;scrollbar-width:none;padding:3px 6px 5px 2px;min-height:52px;align-items:center;overscroll-behavior-x:contain}
 .g-strip::-webkit-scrollbar{display:none}
 .g-slot{flex:0 0 auto;position:relative;width:44px;height:44px;border-radius:12px;background:var(--field);border:2px solid var(--line);border-bottom-width:4px;display:grid;place-items:center;padding:0;touch-action:pan-x;cursor:grab;-webkit-touch-callout:none}
 .g-slot canvas{image-rendering:pixelated;image-rendering:crisp-edges;pointer-events:none;display:block}
@@ -3924,6 +3957,7 @@
       <button class="g-find" type="button" aria-label="Find your Sprout" hidden><canvas class="px" width="32" height="32"></canvas><i hidden></i></button>
       <div class="hint g-hint" style="opacity:0"></div>
       <footer class="panel g-tray">
+        <button class="g-tog" type="button" aria-label="Lower the tray"><svg viewBox="0 0 9 9" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path d="M1 2h1v1h1v1h1v1h1V4h1V3h1V2h1v2H7v1H6v1H5v1H4V6H3V5H2V4H1z"/></svg></button>
         <div class="g-row"><div class="g-rl">Pouch<span class="g-pc">0/8</span></div><div class="g-strip g-pouch"></div></div>
         <div class="g-row"><div class="g-rl">Fruit</div><div class="g-strip g-fruit"></div></div>
       </footer>
@@ -3947,6 +3981,19 @@
     // the garden's name drops down a map of every area (app.js pickMap); tap one to go there
     q('.g-pill').addEventListener('click', () => { PX.Sound.unlock(); closeCard(); openAreas(q('.g-pill')); });
     trayEl = q('.g-tray'); pouchStrip = q('.g-pouch'); fruitStrip = q('.g-fruit'); pouchCnt = q('.g-pc');
+    { // the arrow tab drops the tray down out of the way (more garden on screen) and brings it back; remembered on this device
+      // (checkSize sees the new height next frame and moves the camera limits and the hint; nothing is repainted)
+      const tog = q('.g-tog'), lowNow = () => trayEl.classList.contains('g-low');
+      const setLow = low => {
+        trayEl.classList.toggle('g-low', low);
+        tog.setAttribute('aria-label', low ? 'Raise the tray' : 'Lower the tray');
+        try { if (low) localStorage.setItem(TRAY_LOW_KEY, '1'); else localStorage.removeItem(TRAY_LOW_KEY); } catch (e) { /* storage blocked: just for this visit */ }
+      };
+      try { if (localStorage.getItem(TRAY_LOW_KEY)) setLow(true); } catch (e) { /* storage blocked */ }
+      tog.addEventListener('click', e => { e.stopPropagation(); PX.Sound.unlock(); setLow(!lowNow()); snd('pop'); });
+      // lowered, a tap anywhere on the edge that still shows brings it back up
+      trayEl.addEventListener('click', e => { if (lowNow() && !e.target.closest('.g-tog')) { PX.Sound.unlock(); setLow(false); snd('pop'); } });
+    }
     hintEl = q('.g-hint'); cardEl = q('.g-card'); ghostEl = q('.g-ghost'); gctx = ghostEl.getContext('2d');
     handEl = q('.g-hand'); { const hs = handSprite(), hx = handEl.getContext('2d'); handEl.width = hs.width; handEl.height = hs.height; hx.imageSmoothingEnabled = false; hx.drawImage(hs, 0, 0, hs.width, hs.height); }
     card.spr = q('.g-ch canvas'); card.name = q('.g-nm'); card.tag = q('.g-tag'); card.sub = q('.g-csub');
@@ -3998,7 +4045,7 @@
     if (PS.S.area !== area) { PS.S.area = area; PS.emit('area', { area }); }
     HOL = holOn(); tellAt = t + 2.5; // (holiday mode; its "a gift is waiting" message comes a moment after arriving)
     if (!HOL) critters = critters.filter(c => !(D.ANIMALS[c.id] || {}).season);
-    resize(); lastTrayH = trayEl.offsetHeight;
+    resize(); lastTrayH = trayH0();
     if (raidHere()) { raidHold(true); closeCard(); if (raid.ui) raidUI(...raid.ui); } else if (raidEl) raidEl.hidden = true;
     renderTray(); updatePill();
     if (nextCritter < t) nextCritter = t + 6;
